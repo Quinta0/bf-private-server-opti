@@ -15,5 +15,8 @@
     "miniflare": "5.20261012.0-beta",
     "pngjs": "7.0.0",
     "wrangler": "^4.151.0"
+  },
+  "overrides": {
+    "undici": "^7.30.1"
   }
 }
