@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies]
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /cdn-worker
+    schedule:
+      interval: weekly
+    labels: [dependencies, cdn-worker]
+    open-pull-requests-limit: 5

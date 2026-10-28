@@ -1,0 +1,249 @@
+json EventTokenInfo {
+    doc """
+    One event-token balance (wrapper l234vdKs, EventTokenInfoResponse).
+
+    Event tokens are the per-event currencies — "Rift Token" (id 8) is the
+    Frontier Gate's, and F_FROGATE_REWARD_MST pays it as present type 8004 on
+    505 rows.  The client can name a token by itself (PresentCommon::
+    createPresentName @0x11C3AF8 formats `EVENT_TOKEN_%04d_NAME`, which its own
+    sgtext_Exchange_Token table resolves), so `name` here is the display copy
+    for the token screens rather than the only source.
+
+    Field map decoded 2026-09-12 from EventTokenInfoResponse::readParam
+    @0x1C49274.  The class's setters are inlined string assignments, so the
+    mapping comes from each key's conversion and the one call that survived:
+    `fE2d6ivS` goes through CommonUtils::StrToLong straight into
+    EventTokenInfo::setTimeleft @0x1C7E504, which fixes the numeric pair, and
+    the remaining keys follow the class's own setter order (eventTokenID, name,
+    desciption, amount, dungeonsId, unitsIds).
+
+    readParam calls EventTokenInfoList::removeAllObjects() before its first
+    row, so sending this key is a FULL REPLACE.
+    """
+
+    field token_id type="i32::str" {
+        key "Slkc395l"
+        doc "setEventTokenID.  Read with StrToInt then IntToString, so \"0008\" and \"8\" are the same token; our own tables use the short form."
+    }
+
+    field name type="str" {
+        key "s35idar9"
+        doc "setName.  Display name (\"Rift Token\").  Same hash the summon-ticket and selector tables use for a name."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "setDesciption (sic).  Long copy for the token screens; empty is accepted."
+    }
+
+    field amount type="i32::str" {
+        key "lDk4hv20"
+        doc "setAmount.  How many the player holds."
+    }
+
+    field timeleft type="i64::str" {
+        key "fE2d6ivS"
+        doc "setTimeleft.  Seconds until the token expires; 0 for one that does not."
+    }
+
+    field dungeon_ids type="str" {
+        key "0Dk4fc81"
+        doc "setDungeonsId.  Comma-separated dungeons that pay this token, for the \"where do I farm it\" link."
+    }
+
+    field unit_ids type="str" {
+        key "pn16CNah"
+        doc "setUnitsIds.  Comma-separated units the token's exchange offers."
+    }
+}
+
+json EventTokenInfoReq {
+    doc """
+    Request for the player's event-token balances (GroupId f49als4D, key
+    94lDsgh4).
+
+    Bare: EventTokenInfoRequest::createBody @0x1C491EC is 44 bytes and adds
+    nothing past the identity envelope.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json EventTokenInfoResp {
+    doc "The player's event-token balances.  A full replace -- see EventTokenInfo."
+
+    field event_token_info type="[EventTokenInfo]" {
+        key "l234vdKs"
+        doc "One row per token the player has a record of, zeros included."
+    }
+}
+json EventExchangeOffer {
+    doc "EventTokenExchangeInfoResponse readParam 0x1C48250; full replacement list c2Sls4DD."
+    field id type="str" {
+        key "Kd3DL39d"
+        doc "id; see enclosing packet for binary evidence."
+    }
+    field name type="str" {
+        key "s35idar9"
+        doc "name; see enclosing packet for binary evidence."
+    }
+    field description type="str" {
+        key "qp37xTDh"
+        doc "description; see enclosing packet for binary evidence."
+    }
+    field order type="i32::str" {
+        key "XuJL4pc5"
+        doc "order; see enclosing packet for binary evidence."
+    }
+    field price type="i32::str" {
+        key "3EWLm0sA"
+        doc "price; see enclosing packet for binary evidence."
+    }
+    field remaining type="i32::str" {
+        key "S8rdp9zk"
+        doc "remaining; see enclosing packet for binary evidence."
+    }
+    field reward type="str" {
+        key "qBAb07rh"
+        doc "reward; see enclosing packet for binary evidence."
+    }
+    field preview type="str" {
+        key "ra4iFR6T"
+        doc "preview; see enclosing packet for binary evidence."
+    }
+}
+
+json EventExchangeToken {
+    doc "Selected currency, from createBody 0x1C480DC."
+    field token_id type="str" {
+        key "Slkc395l"
+        doc "token id; see enclosing packet for binary evidence."
+    }
+}
+
+json EventExchangeReq {
+    doc "Group 49zxdfl3, key v2DfDSFl."
+    field login_info type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "login info; see enclosing packet for binary evidence."
+    }
+    field tokens type="[EventExchangeToken]" {
+        key "l234vdKs"
+        doc "tokens; see enclosing packet for binary evidence."
+    }
+}
+
+json EventExchangePurchaseNode {
+    doc "Purchase createBody 0x1C48A30; count uses integer addParam.  QUOTED like every number a request carries: JsonNode::addParam(const char*, int) @0xFDB82C is CommonUtils::IntToString plus the string overload (binary-confirmed 2026-09-27).  An unquoted i32::int here stops glaze at this field and silently drops the rest of the request."
+    field id type="str" {
+        key "Kd3DL39d"
+        doc "id; see enclosing packet for binary evidence."
+    }
+    field count type="i32::str" {
+        key "H6k1LIxC"
+        doc "count; see enclosing packet for binary evidence."
+    }
+    field token_id type="str" {
+        key "Slkc395l"
+        doc "token id; see enclosing packet for binary evidence."
+    }
+}
+
+json EventExchangePurchaseReq {
+    doc "Group SLf48fs0, key Odiel30s."
+    field login_info type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "login info; see enclosing packet for binary evidence."
+    }
+    field nodes type="[EventExchangePurchaseNode]" {
+        key "c2Sls4DD"
+        doc "nodes; see enclosing packet for binary evidence."
+    }
+}
+
+json EventExchangeResult {
+    doc "Result reader at 0x1C48F14. Success compares the literal string 1."
+    field id type="str" {
+        key "Kd3DL39d"
+        doc "id; see enclosing packet for binary evidence."
+    }
+    field success type="i32::str" {
+        key "Sc3slc04"
+        doc "success; see enclosing packet for binary evidence."
+    }
+    field message type="str" {
+        key "Sd3dsx41"
+        doc "message; see enclosing packet for binary evidence."
+    }
+}
+
+json ExchangeResp {
+    doc "Exchange snapshots after a purchase; inventory lists are complete when replaced."
+    field offers type="[EventExchangeOffer]" {
+        key "c2Sls4DD"
+        optional #true
+        doc "offers; see enclosing packet for binary evidence."
+    }
+    field results type="[EventExchangeResult]" {
+        key "Sdvs2lds"
+        optional #true
+        doc "results; see enclosing packet for binary evidence."
+    }
+    field event_token_info type="[EventTokenInfo]" {
+        key "l234vdKs"
+        optional #true
+        doc "event token info; see enclosing packet for binary evidence."
+    }
+    field guild_stock type="[GuildExchangeStock]" {
+        key "nMe3ai17"
+        optional #true
+        doc "guild stock; see enclosing packet for binary evidence."
+    }
+    field guild_members type="[GuildMemberInfo]" {
+        key "csIuech30"
+        optional #true
+        doc "guild members; see enclosing packet for binary evidence."
+    }
+    field unit_info type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        optional #true
+        doc "unit info; see enclosing packet for binary evidence."
+    }
+    field unit_dictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        optional #true
+        doc "unit dictionary; see enclosing packet for binary evidence."
+    }
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        optional #true
+        doc "warehouse info; see enclosing packet for binary evidence."
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        optional #true
+        doc "item dictionary info; see enclosing packet for binary evidence."
+    }
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        optional #true
+        doc "team info; see enclosing packet for binary evidence."
+    }
+}

@@ -1,0 +1,2767 @@
+#include "App.hpp"
+#include "MigrationManager.hpp"
+
+#include <gimuserver/gme/common/GameDay.hpp>   // dayClockKey, gameDayShiftAt
+#include <gimuserver/gme/common/ExtraSkills.hpp>   // kElgifUnitId, randomElgifSkillSql
+
+using MigrationEntry = std::pair<std::string, std::function<void(drogon::orm::DbClientPtr&)>>;
+using MigrationMap = std::vector<MigrationEntry>;
+
+#define migrate(name, func) map.emplace_back(name, [](drogon::orm::DbClientPtr& p) func )
+
+/*!
+* Register all the available migrations
+* @param map Map to register
+*/
+static void RegisterMigrations(MigrationMap& map)
+{
+	// DDMMYYYY_MigrationName
+
+	migrate("29082025_CreateDefaultTables", {
+		p->execSqlSync(
+			"CREATE TABLE gumi_live_users("
+			"id TEXT PRIMARY KEY NOT NULL"
+			");"
+		);
+		p->execSqlSync(
+			"CREATE TABLE user_info("
+			"id TEXT PRIMARY KEY NOT NULL,"
+			"gumi_user_id TEXT NOT NULL,"
+			"device_id TEXT NOT NULL,"
+			"username TEXT NOT NULL DEFAULT '',"
+			"level INTEGER(10) NOT NULL DEFAULT 1,"
+			"debug_mode INTEGER(1) NOT NULL DEFAULT 0,"
+			"exp INTEGER(10) NOT NULL DEFAULT 0,"
+			"max_unit_count INTEGER(9) NOT NULL DEFAULT 0,"
+			"max_friend_count INTEGER(9) NOT NULL DEFAULT 0,"
+			"zel INTEGER(9) NOT NULL DEFAULT 0,"
+			"karma INTEGER(9) NOT NULL DEFAULT 0,"
+			"brave_coin INTEGER(9) NOT NULL DEFAULT 0,"
+			"max_warehouse_count INTEGER(9) NOT NULL DEFAULT 0,"
+			"want_gift TEXT NOT NULL DEFAULT '',"
+			"friend_points INTEGER(9) NOT NULL DEFAULT 0,"
+			"gems INTEGER(4) NOT NULL DEFAULT 0,"
+			"active_deck INTEGER(1) NOT NULL DEFAULT 0,"
+			"tutorial_status INTEGER(3) NOT NULL DEFAULT 1,"
+			"summon_tickets INTEGER(4) NOT NULL DEFAULT 0,"
+			"rainbow_coins INTEGER(4) NOT NULL DEFAULT 0,"
+			"colosseum_tickets INTEGER(4) NOT NULL DEFAULT 0,"
+			"active_arena_deck INTEGER(1) NOT NULL DEFAULT 0,"
+			"total_brave_points INTEGER(9) NOT NULL DEFAULT 0,"
+			"avail_brave_points INTEGER(9) NOT NULL DEFAULT 0,"
+			"energy INTEGER(10) NOT NULL DEFAULT 0,"
+			"energy_full_ts INTEGER(10) NOT NULL DEFAULT 0"
+			");"
+		);
+	});
+
+	migrate("08032025_CreateUserUnitsTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_units ("
+			"user_unit_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"user_id TEXT NOT NULL,"
+			"unit_id INTEGER NOT NULL,"
+			"unit_type_id INTEGER NOT NULL,"
+			"unit_lvl INTEGER NOT NULL DEFAULT 0,"
+			"base_hp INTEGER NOT NULL,"
+			"base_atk INTEGER NOT NULL,"
+			"base_def INTEGER NOT NULL,"
+			"base_rec INTEGER NOT NULL,"
+			"ext_hp INTEGER NOT NULL DEFAULT 0,"
+			"ext_atk INTEGER NOT NULL DEFAULT 0,"
+			"ext_def INTEGER NOT NULL DEFAULT 0,"
+			"ext_rec INTEGER NOT NULL DEFAULT 0,"
+			"bb_id TEXT NOT NULL DEFAULT '',"
+			"bb_lvl INTEGER NOT NULL DEFAULT 0,"
+			"sbb_id TEXT NOT NULL DEFAULT '',"
+			"sbb_lvl INTEGER NOT NULL DEFAULT 0,"
+			"new INTEGER NOT NULL DEFAULT 0"
+			");"
+		);
+		// Keep local user unit ids away from low values that the client treats
+		// as special ids, such as the summoner unit id 20.
+		p->execSqlSync(
+			"INSERT INTO sqlite_sequence(name, seq) "
+			"SELECT 'user_units', 999 "
+			"WHERE NOT EXISTS ("
+			"SELECT 1 FROM sqlite_sequence WHERE name = 'user_units'"
+			");"
+		);
+	});
+
+	migrate("07062026_CreateUserDecksTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_decks ("
+			"user_id TEXT NOT NULL,"
+			"user_unit_id INTEGER NOT NULL,"
+			"deck_type INTEGER NOT NULL,"
+			"deck_num INTEGER NOT NULL,"
+			"member_type INTEGER NOT NULL,"
+			"disp_order INTEGER NOT NULL,"
+			"PRIMARY KEY (user_id, deck_type, deck_num, disp_order)"
+			");"
+		);
+	});
+
+	// NOTE: the unit_lv / base_heal / ext_heal columns added here duplicate the
+	// unit_lvl / base_rec / ext_rec columns 08032025 already created, and
+	// add_heal / limit_over_heal use the wrong vocabulary for a column.
+	// 06082026_ConsolidateUserUnitStatColumns (bottom of this file) collapses
+	// all five.  This migration is left as-is rather than corrected in place so
+	// that databases which already ran it and databases created fresh converge
+	// on the same schema.
+	//
+	// Extra user_units columns used by the quests-branch handlers
+	// (UnitMix/UnitEvo/UnitSell/UnitFavorite, GachaAction, FriendGet,
+	// CampaignBattleStart).  Consolidates the former
+	// 13032025_AddStatsToUserUnitsTable + 09042026_AddSphereSlotsToUserUnits +
+	// 14042026_AddFavoriteFlgToUserUnits migrations onto the upstream table
+	// shape.  Upstream columns (unit_lvl/base_rec/ext_rec/bb_*) remain the
+	// source of truth for upstream handlers; these serve the not-yet-ported
+	// quests handlers and are consolidated away as each moves to
+	// PacketInterface.
+	migrate("02072026_ExtendUserUnitsForUnitOps", {
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN unit_lv INTEGER NOT NULL DEFAULT 1");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN base_heal INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN add_hp INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN add_atk INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN add_def INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN add_heal INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN ext_heal INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN limit_over_hp INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN limit_over_atk INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN limit_over_def INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN limit_over_heal INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN exp INTEGER NOT NULL DEFAULT 1");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN total_exp INTEGER NOT NULL DEFAULT 1");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN skill_id INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN skill_lv INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN extra_skill_id INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN extra_skill_lv INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN leader_skill_id INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN element TEXT NOT NULL DEFAULT 'fire'");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN fe_bp INTEGER NOT NULL DEFAULT 100");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN fe_max_usable_bp INTEGER NOT NULL DEFAULT 200");
+		// Sphere equipment slots (UserUnitInfo: Ge8Yo32T/0R3qTPK9, mZA7fH2v/RXfC31FA).
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN eqip_item_id INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN eqip_item_frame_id INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN eqip_item_id2 INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN eqip_item_frame_id2 INTEGER NOT NULL DEFAULT 0");
+		// Lock/favorite flag (UnitFavoriteRequest: req["3kcmQy7B"][0]["5JbjC3Pp"]).
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN favorite_flg INTEGER NOT NULL DEFAULT 0");
+	});
+
+	migrate("25042026_CreateUserTownTables", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_town_facilities ("
+			"user_id     TEXT    NOT NULL,"
+			"facility_id INTEGER NOT NULL,"
+			"lv          INTEGER NOT NULL DEFAULT 1,"
+			"karma       INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, facility_id)"
+			");"
+		);
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_town_locations ("
+			"user_id     TEXT    NOT NULL,"
+			"location_id INTEGER NOT NULL,"
+			"lv          INTEGER NOT NULL DEFAULT 1,"
+			"karma       INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, location_id)"
+			");"
+		);
+	});
+
+	migrate("03072026_CreateUserUnitDictionaryTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_unit_dictionary ("
+			"user_id TEXT NOT NULL,"
+			"unit_id INTEGER NOT NULL,"
+			"img_type_flag INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, unit_id)"
+			");"
+		);
+	});
+
+	// Owned-item inventory: potions, materials, spheres.  One row per stack.
+	// instance_id is the warehouse row id the client references (UserWarehouse
+	// n6E8iMf3 / legacy ItemSphereEqp wh ids).  Populated naturally — the
+	// tutorial seeds a test potion in CreateUser, mission drops append here.
+	migrate("05072026_CreateUserItemsTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_items ("
+			"instance_id  INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"user_id      TEXT    NOT NULL,"
+			"item_id      INTEGER NOT NULL,"
+			"item_num     INTEGER NOT NULL DEFAULT 1,"
+			"favorite_flg INTEGER NOT NULL DEFAULT 0,"
+			"disp_order   INTEGER NOT NULL DEFAULT 0,"
+			"UNIQUE(user_id, item_id)"
+			");"
+		);
+	});
+
+	// Viewed-cutscene state: one row per scenario the user has watched.
+	// GetScenarioPlayingInfo returns this set (sBbp47fi) so the client skips
+	// already-seen cutscenes; RaidUpScenarioInfo appends to it.  Structural
+	// only — never seeded; a fresh account sees every cutscene once.
+	migrate("17072026_CreateUserScenariosTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_scenarios ("
+			"user_id     TEXT    NOT NULL,"
+			"scenario_id INTEGER NOT NULL,"
+			"viewed_at   INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, scenario_id)"
+			");"
+		);
+	});
+
+	migrate("25042026_CreateUserCampaignTables", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_campaign_missions ("
+			"user_id          TEXT    NOT NULL,"
+			"mission_id       TEXT    NOT NULL,"
+			"state            INTEGER NOT NULL DEFAULT 0,"
+			"attain_percent   INTEGER NOT NULL DEFAULT 0,"
+			"clear_count      INTEGER NOT NULL DEFAULT 0,"
+			"last_cleared_at  INTEGER NOT NULL DEFAULT 0,"
+			"reward_claimed   INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, mission_id)"
+			");"
+		);
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_campaign_decks ("
+			"user_id      TEXT    NOT NULL,"
+			"deck_num     INTEGER NOT NULL,"
+			"member_type  INTEGER NOT NULL,"
+			"user_unit_id INTEGER NOT NULL,"
+			"disporder    INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, deck_num, disporder)"
+			");"
+		);
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_campaign_state ("
+			"user_id            TEXT PRIMARY KEY,"
+			"active_mission_id  TEXT    NOT NULL DEFAULT '',"
+			"active_battle_seed INTEGER NOT NULL DEFAULT 0,"
+			"saved_state        TEXT    NOT NULL DEFAULT ''"
+			");"
+		);
+	});
+
+	migrate("13052026_CreateUserSummonTicketsV2", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_summon_tickets_v2 ("
+			"user_id   TEXT    NOT NULL,"
+			"ticket_id INTEGER NOT NULL,"
+			"count     INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, ticket_id)"
+			");"
+		);
+	});
+
+	// Collapses the duplicate stat columns 02072026 added beside the ones
+	// 08032025 already created.  They exist because the client names the same
+	// stat differently in different packets — UserUnitInfo says base_rec /
+	// ext_rec / unit_lvl, while FriendInfo and ReinforcementInfo say base_heal
+	// / ext_heal / unit_lv (both spellings come from IDA; see
+	// net/friends.kdl).  A column was added per spelling, so a unit could hold
+	// two recovery values that disagree.
+	//
+	// One column per concept from here.  The rec/lvl spelling wins because
+	// 08032025_CreateUserUnitsTable established it; PacketInterfaceFor<T> maps
+	// either packet vocabulary onto it, which is what it is for.
+	//
+	// Merge rule: the duplicate wins only where the canonical column is still
+	// at its default, since the quests-branch handlers wrote the duplicates
+	// while upstream handlers wrote the canonical ones.  Where both hold real
+	// values they are expected to agree; if they do not, the canonical value is
+	// kept.
+	migrate("06082026_ConsolidateUserUnitStatColumns", {
+		p->execSqlSync("UPDATE user_units SET unit_lvl = unit_lv "
+			"WHERE unit_lvl = 0 AND unit_lv != 0;");
+		p->execSqlSync("UPDATE user_units SET base_rec = base_heal "
+			"WHERE base_rec = 0 AND base_heal != 0;");
+		p->execSqlSync("UPDATE user_units SET ext_rec = ext_heal "
+			"WHERE ext_rec = 0 AND ext_heal != 0;");
+
+		p->execSqlSync("ALTER TABLE user_units DROP COLUMN unit_lv;");
+		p->execSqlSync("ALTER TABLE user_units DROP COLUMN base_heal;");
+		p->execSqlSync("ALTER TABLE user_units DROP COLUMN ext_heal;");
+
+		// These two had no canonical counterpart — they are not duplicates,
+		// just the wrong vocabulary for a column.
+		p->execSqlSync("ALTER TABLE user_units RENAME COLUMN add_heal TO add_rec;");
+		p->execSqlSync("ALTER TABLE user_units "
+			"RENAME COLUMN limit_over_heal TO limit_over_rec;");
+	});
+
+	// Frontier Gate — per-user, per-gate progress.  Feeds FrontierGateInfo
+	// (M17pPotk) response key dPM7oJDl; see tools/ida/audits/dPM7oJDl_audit.txt
+	// and tools/FRONTIER_GATE_STATE_MODEL.md.
+	//
+	// Deliberately NARROWER than the 11-field packet (handbook §6.15.0 — the
+	// KDL is the wire vocabulary and should be maximal, the schema is state and
+	// should be minimal).  Four of the packet's fields are intentionally absent:
+	//
+	//   start_date / end_date  — the gate's availability window is already in
+	//       FrontierGateMst (qA7M9EjP / SzV0Nps7, 94 rows).  §6.15 rule 3: if
+	//       the cache can answer, a per-user copy is a second source that drifts.
+	//   progress_max           — likewise derivable from the gate definition,
+	//       AND its name is only MEDIUM confidence (see below).
+	//   ranking                — no leaderboard exists single-player, and the
+	//       client gates the display behind FrontierGateMst::getRankingDispFlg.
+	//
+	// 69bpUIXR/progress_max and 2wHGmJqm/ranking are named from vtable slot
+	// position, not from a real setter, and could be swapped for one another.
+	// Persisting a column under a name we cannot yet prove is exactly the debt
+	// §6.15 warns about, so neither gets a column until a capture settles it.
+	//
+	// To delete this table later: it is consumed only by FrontierGateInfo.cpp.
+	migrate("07082026_CreateUserFrontierGatesTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_frontier_gates ("
+			"user_id         TEXT    NOT NULL,"
+			"frogate_id      INTEGER NOT NULL,"
+			"state           INTEGER NOT NULL DEFAULT 0,"
+			"progress        INTEGER NOT NULL DEFAULT 0,"
+			"score           INTEGER NOT NULL DEFAULT 0,"
+			"mission_id      TEXT    NOT NULL DEFAULT '',"
+			"sel_support_id  INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, frogate_id)"
+			");"
+		);
+	});
+
+	// Frontier Gate tier 2 — the active run.  Feeds FrontierGateStart's
+	// response key Mg8K8Y1a (FrontierGateNumResponse).
+	//
+	// ONE ROW PER USER, and the row's EXISTENCE is the "run in progress" flag —
+	// which is why there is no `active` column and no separate suspended-info
+	// table.  FrontierGateSuspendedInfoResponse (gmeGFd2s) carries exactly one
+	// field, hBNPQAU0, so "is there a run and on which gate" is a projection of
+	// this row rather than state of its own.  Ending a run deletes the row.
+	//
+	// frogate_num is a SERVER-OWNED run handle.  FrontierGateEnd/Continue/Retry
+	// read it back out of the client's shared FrontierGateNum singleton
+	// (FrontierGateNum::getFrogateNum) and echo it as their 2FQdEbG3, so the
+	// client never authors it — it is opaque to the client and only has to be
+	// stable for the life of the run.
+	//
+	// The three power-up rates in the packet get NO columns: the client parses
+	// them with StrToFloat and divides by 100, but where the server is supposed
+	// to source them (gate MST battle params? the support effect?) is not
+	// decoded, so there is nothing to store.  The handler returns the neutral
+	// 100 (= x1.0).  Add columns only once a real source is identified.
+	//
+	// To delete this table later: consumed only by FrontierGateStart.cpp.
+	// One-off scene intros the client has already played.
+	//
+	// The client reports these as a trailing-comma list in its login envelope
+	// under 9yVsu21R — "randall," on the world map, growing to
+	// "randall,frontiergate_v2," once Frontier Gate has been entered (captured
+	// 2026-08-07 from DungeonEventUpdate requests).  LoginInfoResp carries the
+	// same key back as user_special_scenario_info, so the round trip is what
+	// keeps an intro marked as seen.
+	//
+	// Until now LoginInfoReq did not even declare the key, so the value was
+	// dropped by the lenient read and nothing was ever echoed — which is the
+	// working theory for why the Frontier Gate intro replays every session.
+	//
+	// One TEXT column rather than a row-per-scene table: the client hands us
+	// the whole list every request and reads the whole list back, so there is
+	// no per-scene query to serve and normalising it would only add a join.
+	// Distinct from user_scenarios, which holds numeric F_SCENARIO_MST ids for
+	// GetScenarioPlayingInfo — a different mechanism that the client does not
+	// appear to consult on this path (0 VRfsv4e3 calls in a full FG session).
+	migrate("07082026_AddSpecialScenarioInfo", {
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN special_scenario_info TEXT NOT NULL DEFAULT '';");
+	});
+
+	// Hunter Orbs — the Frontier Gate / Frontier Hunter attempt currency.
+	//
+	// The client calls these fight points: UserTeamInfo carries YS2JG9no
+	// (fight_point) and 9m5FWR8q (max_fight_point), which the Survey Office
+	// header renders as the "Hunter Orbs" x/y counter.  Nothing populated them,
+	// so both went out as 0 and every gate answered "You have no Hunter Orbs
+	// left" — verified 2026-08-07 in a live UserInfo capture.
+	//
+	// Two columns, and both pass the §6.15 test: they are mutable per-user
+	// state (spent on an attempt, restored by a gem or by time), the client
+	// demonstrably blocks the feature without them, and no MST can answer them
+	// — F_USER_LEVEL_MST has no fight-point column, unlike energy.
+	//
+	// Deliberately NOT added: a regeneration timestamp.  defines_mst gives the
+	// cadence (recover_time_fight = 3600s, one orb per hour; frohun uses
+	// 10800s) but energy regeneration is itself still a static placeholder in
+	// this server, so orb regen lands with it rather than growing a column now.
+	//
+	// Seeded at 3/3 rather than the 1/1 the client showed: the real cap source
+	// is not decoded, and 3 gives room to exercise spend-and-restore.
+	migrate("07082026_AddFightPointColumns", {
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN fight_point INTEGER NOT NULL DEFAULT 3;");
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN max_fight_point INTEGER NOT NULL DEFAULT 3;");
+	});
+
+	migrate("07082026_CreateUserFrontierGateRunTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_frontier_gate_run ("
+			"user_id         TEXT    NOT NULL PRIMARY KEY,"
+			"frogate_id      INTEGER NOT NULL,"
+			"frogate_num     INTEGER NOT NULL DEFAULT 0,"
+			"mission_status  INTEGER NOT NULL DEFAULT 0,"
+			"sel_support_id  INTEGER NOT NULL DEFAULT 0"
+			");"
+		);
+	});
+
+	// The run's party, kept so a continued or retried floor still has one.
+	//
+	// Only FrontierGateStart and FrontierGateSave carry the party (MxmCpDRC +
+	// 52xDBRGr); Continue sends nothing and Retry sends the deck alone.  With
+	// nothing stored, continuing to the next floor left the client with an
+	// empty FrontierGateUserUnitInfoList — the party vanished and the leader
+	// showed as dead (observed 2026-08-07).
+	//
+	// Stored as two JSON blobs rather than normalised rows: the client hands us
+	// the whole party and reads the whole party back, so there is no per-member
+	// query to serve and a deck/unit table would only add joins.  Same call as
+	// special_scenario_info.  If a future feature needs per-member queries
+	// (rewards by unit, say), normalise then.
+	migrate("07082026_AddFrontierGateRunParty", {
+		p->execSqlSync(
+			"ALTER TABLE user_frontier_gate_run ADD COLUMN party_deck_json TEXT NOT NULL DEFAULT '';");
+		p->execSqlSync(
+			"ALTER TABLE user_frontier_gate_run ADD COLUMN party_units_json TEXT NOT NULL DEFAULT '';");
+	});
+
+	// Vortex dungeon keys — one row per (user, DungeonKeyMst.id), i.e. three
+	// rows per player (Metal / Jewel / Imp).  Feeds eFU7Qtb0
+	// (UserDungeonKeyInfoResponse) out of UserInfo and all three dungeon-key
+	// handlers.  Field semantics: tools/ida/audits/eFU7Qtb0_audit.txt.
+	//
+	// ONLY THE DURABLE STATE GETS COLUMNS.  Two of the response's six confirmed
+	// fields are derived and are computed per request instead:
+	//   receipt_possible_flg (g85qMNxf)       — "can I claim right now", a pure
+	//       function of today's weekday vs DungeonKeyMst.distribute_days,
+	//       last_receipt_day, and possession vs possession_limit.
+	//   next_receipt_possible_date (b6QR1CH5) — the next weekday in
+	//       distribute_days after today.
+	// Storing either would go stale the moment the clock crossed midnight
+	// without a write, which is the whole failure mode a day-gated feature has
+	// to avoid.  §6.15: no column without a reason it must persist.
+	//
+	// active_type (BY8fZ7M1) DOES get a column: it records which parade tier
+	// the player last opened, which nothing else can reconstruct.
+	//
+	// cnt (H6k1LIxC) gets NO column — its semantic is still unresolved (see the
+	// audit), the KDL leaves it optional, and it is omitted from the wire.
+	// Add a column only once an IDA run names it.
+	//
+	// To delete this table later: it is consumed by DungeonKey.cpp and by
+	// UserInfo's dungeon_key_info population.
+	migrate("08082026_CreateUserDungeonKeysTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_dungeon_keys ("
+			"user_id          TEXT    NOT NULL,"
+			"dungeon_key_id   INTEGER NOT NULL,"
+			"possession       INTEGER NOT NULL DEFAULT 0,"
+			"last_receipt_day INTEGER NOT NULL DEFAULT 0,"
+			"active_type      INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, dungeon_key_id)"
+			");"
+		);
+	});
+
+	// The OTHER half of the cutscene state.
+	//
+	// LoginInfo carries two scenario fields and only one of them was being
+	// persisted.  9yVsu21R (special_scenario_info) is the comma list of named
+	// one-off intros — "randall,frontiergate_v2,challenge," — and has worked
+	// since the Frontier Gate pass.  N4XVE1uA is a separate composite marker
+	// the client also grows across sessions (observed going from "|0,0" to
+	// "0,0@0@2@1&|0,0" as content was seen), and it was never stored: UserInfo
+	// echoed back "" on every login, so whatever it tracks replayed forever.
+	//
+	// Stored verbatim, exactly like special_scenario_info: the client sends the
+	// whole marker every time and only ever extends it, so there is nothing to
+	// merge.  The format is NOT decoded — '&' and '|' separated groups of
+	// comma/at-joined ints — and deliberately not parsed, because round-tripping
+	// an opaque blob needs no schema.
+	migrate("09082026_AddUserScenarioInfo", {
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN scenario_info TEXT NOT NULL DEFAULT '';");
+	});
+
+	// The pre-mission battle-item loadout (the 5 slots on the quest-prep
+	// screen).  Previously nowhere: ItemEdit acked and discarded the
+	// selection, and UserInfo synthesised the equip list by walking the
+	// whole warehouse and emitting EVERY battle consumable the player owned,
+	// so the slots came back full of whatever happened to be in inventory
+	// order and the player's actual choice never survived.
+	//
+	// Keyed by (user_id, disp_order) — disp_order IS the slot, taken
+	// verbatim from the wire.  ItemEditRequest::createBody emits two runs
+	// into the same 71U5wzhI group: the main loadout at slot 0..n and a
+	// second run at slot+100, so the +100 band is stored as-is rather than
+	// being folded into the first.
+	migrate("11082026_CreateUserEquipItemsTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_equip_items ("
+			"user_id     TEXT    NOT NULL,"
+			"disp_order  INTEGER NOT NULL,"
+			"item_id     INTEGER NOT NULL,"
+			"item_num    INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, disp_order)"
+			");"
+		);
+	});
+
+	// tutorial_end_flag (sv6BEI8X).  Previously DERIVED in getLoginInfo as
+	// `tutorial_status >= 12`.  That threshold was this fork's own invention —
+	// the legacy server's Tutorial{Update,Skip} handlers are both empty stubs,
+	// so nothing was ported — and the tutorial does not end at 12: the
+	// client-bundled scripts run to tuto16.txt, with tuto13 = item use,
+	// tuto14 = battle UI, tuto15 = the free summon, tuto16 = farewell.
+	// Deriving the flag at 12 reports "tutorial over" with four scripts still
+	// pending, and makes the status pointer untestable (any status >= 12 forces
+	// the flag true).
+	//
+	// The client already answers this for us: every login envelope carries
+	// sv6BEI8X next to 9sQM2XcN.  Store what the client reports and echo it
+	// back, the same treatment scenario_info gets above, rather than inferring
+	// it from a threshold nobody verified.
+	//
+	// Backfilled with the old derivation so existing accounts keep the state
+	// they already had.
+	migrate("14082026_AddTutorialEndFlag", {
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN tutorial_end_flag INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync(
+			"UPDATE user_info SET tutorial_end_flag = 1 WHERE tutorial_status >= 12;");
+	});
+
+	// Backfill the starting battle-item loadout.
+	//
+	// CreateUser now seeds a user_equip_items slot-0 row with the tutorial
+	// potion, but that only fires for accounts created after the fix.  Accounts
+	// made between 11082026_CreateUserEquipItemsTable (which turned equip_info
+	// into a verbatim read of that table) and the fix own the potion in
+	// user_items yet have an empty loadout — and tuto1.txt blocks forever on
+	// `change_item_scene:tuto_use_item` when the in-battle item menu is empty.
+	//
+	// Only touches accounts with NO loadout at all, so a player who has since
+	// arranged their own slots through ItemEdit is left alone.
+	migrate("14082026_SeedTutorialBattleItemLoadout", {
+		p->execSqlSync(
+			"INSERT INTO user_equip_items (user_id, disp_order, item_id, item_num)"
+			" SELECT i.user_id, 0, i.item_id, 1"
+			" FROM user_items i"
+			" WHERE i.item_id = 20000 AND i.item_num > 0"
+			"   AND NOT EXISTS ("
+			"     SELECT 1 FROM user_equip_items e WHERE e.user_id = i.user_id);");
+	});
+
+	// The present box (sEA41vFK / UserPresentInfoResponse).
+	//
+	// Columns mirror the decoded readParam setters one-for-one so the handler
+	// never has to translate: PresentID/PresentType/TargetID/TargetCnt/
+	// TargetParam/ReceiptType/PresentDate/ReceiptDate/IsReceipt.  The two
+	// *DateStr display fields are deliberately NOT stored — they are formatted
+	// from their epoch siblings at send time, so the pair can never disagree.
+	//
+	// present_type shares the campaign reward vocabulary (same 30Kw4WBa hash
+	// CampaignReceipt dispatches on): 3 = zel, 8 = gem, 6 = unit,
+	// 4/5/7 = item/material/sphere.
+	//
+	// present_id is the autoincrement rowid rendered as a string on the wire;
+	// PresentReceipt echoes it straight back, so it only has to be stable and
+	// unique per user.
+	migrate("15082026_CreateUserPresentsTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_presents ("
+			"present_id   INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"user_id      TEXT    NOT NULL,"
+			"present_type INTEGER NOT NULL,"
+			"target_id    TEXT    NOT NULL DEFAULT '',"
+			"target_cnt   INTEGER NOT NULL DEFAULT 1,"
+			"target_param TEXT    NOT NULL DEFAULT '',"
+			"receipt_type INTEGER NOT NULL DEFAULT 0,"
+			"description  TEXT    NOT NULL DEFAULT '',"
+			"present_date INTEGER NOT NULL DEFAULT 0,"
+			"receipt_date INTEGER NOT NULL DEFAULT 0,"
+			"is_receipt   INTEGER NOT NULL DEFAULT 0"
+			");"
+		);
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_presents_user"
+			" ON user_presents (user_id, is_receipt);");
+	});
+
+	// Harvest state for the four town resource tiles.  Lives on the existing
+	// location row because it is 1:1 with it — UserTownLocationDetail (s8TCo2MS)
+	// and UserTownLocationInfo (yj46Q2xw) are the same (user, location) key.
+	//
+	// The server pre-rolls a whole period of drops into drop_info and the client
+	// replays them tap by tap, so these three columns ARE the tile: without them
+	// every tile reports 0 taps forever and never sparkles.  See
+	// tools/TOWN_STATE_MODEL.md.
+	migrate("18082026_AddTownLocationHarvestState", {
+		// Unix seconds the current harvest period began; 0 = never rolled.
+		p->execSqlSync(
+			"ALTER TABLE user_town_locations ADD COLUMN period_start INTEGER NOT NULL DEFAULT 0");
+		// Taps REMAINING, matching the client's own decTapCnt semantics.
+		p->execSqlSync(
+			"ALTER TABLE user_town_locations ADD COLUMN tap_cnt INTEGER NOT NULL DEFAULT 0");
+		// "<itemId>:<zel>:<karma>,..." — one element per tap of this period.
+		p->execSqlSync(
+			"ALTER TABLE user_town_locations ADD COLUMN drop_info TEXT NOT NULL DEFAULT ''");
+	});
+
+	// The tile level the current period was rolled at.  Drops are pre-rolled a
+	// whole period ahead, so upgrading a tile mid-period would otherwise leave
+	// the player harvesting the old level's pool until the period expired —
+	// the upgrade appears to do nothing.  Town::locationState compares this
+	// against the live level and re-rolls the remaining taps when they differ.
+	migrate("18082026_AddTownLocationPeriodLevel", {
+		p->execSqlSync(
+			"ALTER TABLE user_town_locations ADD COLUMN period_lv INTEGER NOT NULL DEFAULT 0");
+	});
+
+	// Per-recipe craft tally behind PermitRecipe.craft_count (H6k1LIxC).  The
+	// client bumps its own copy after each craft (GameUtils::updatePermitRecipe),
+	// so the count has to survive a relaunch to stay in step.
+	migrate("18082026_CreateUserRecipeCraftsTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_recipe_crafts ("
+			"user_id     TEXT    NOT NULL,"
+			"recipe_id   INTEGER NOT NULL,"
+			"craft_count INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, recipe_id)"
+			");"
+		);
+	});
+
+	// Daily Spin (Rewards menu -> task_dailyloginspin).  Per-user, one row.
+	//
+	//   spin_day     which day of the reward cycle the player is on (1-based).
+	//                The live game's table runs 29 days and then repeats its
+	//                last row, so this only ever counts up.
+	//   spins_used   spins taken TODAY.  This is the value that goes out as
+	//                35JXN4Ay, and the client treats < 1 as "hasn't spun",
+	//                which makes Home force-open the wheel -- see the warning
+	//                in Initialize.cpp before changing how it is derived.
+	//   last_spin_utc_day  days since the unix epoch, i.e. floor(now/86400).
+	//                Stored rather than a date string so the rollover check is
+	//                an integer compare and cannot be tripped by formatting.
+	//                (Since 18102026_DailySpinAndGiftsDayAt0800 it holds the
+	//                08:00 UTC spin day, DayClock::DailySpin.)
+	// Mystery Chest (Rewards menu -> task_mysterychest).  One row per chest a
+	// player holds.
+	//
+	//   box_id      the id sent as rEFRefr8 and echoed back by the claim.
+	//   chest_key   which archive definition this chest is; the contents live
+	//               in deploy/archive/mystery_chest.json, not here, so a chest
+	//               already granted follows edits to its rewards.
+	//   reward_ts   unix SECONDS the chest becomes claimable.
+	//   expiry_ts   unix SECONDS it disappears.  The client counts down from
+	//               this (getPresentTimeLeftType @0x1CB30B4 divides
+	//               expiry - server epoch by 86400) and treats non-positive as
+	//               expired, so the server and the client agree without a flag.
+	//   claimed     1 once opened.  Kept rather than deleted so a chest cannot
+	//               be re-granted to someone who already opened it.
+	// Brave Medals — the currency Brave Slots runs on.
+	//
+	// One row per (user, medal).  The slot machine names the medal it spends in
+	// brave_slots.json's b5yeVr61 ("1"), which reaches the client as
+	// SlotgameInfo::setSlotUseMedal and is looked up through
+	// UserBraveMedalInfoList::getPossessionWithMedalID(string) — so it is an
+	// ID, not a cost.
+	//
+	// Offline there is nothing to earn medals from: the live sources were Brave
+	// Points and events, both unbuilt.  A stock is seeded on first visit
+	// instead, which is why this table exists rather than a userinfo column —
+	// the wire shape is a LIST keyed by medal id and may hold more than one.
+	migrate("21082026_CreateUserBraveMedalsTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_brave_medals ("
+			"user_id    TEXT    NOT NULL,"
+			"medal_id   TEXT    NOT NULL,"
+			"possession INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, medal_id)"
+			");"
+		);
+	});
+
+	// Summoner's Journal progress, one row per (user, task).
+	//
+	// A generic counter table rather than a column per mission: there are 45
+	// missions and each needs its own tally, so widening a table for every one
+	// would be unworkable.  Rows are created on first increment, so a mission
+	// that has never ticked simply has no row and reads as 0.
+	migrate("23082026_CreateUserJournalTasksTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_journal_tasks ("
+			"user_id  TEXT    NOT NULL,"
+			"task_key TEXT    NOT NULL,"
+			"progress INTEGER NOT NULL DEFAULT 0,"
+			"claimed  INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, task_key)"
+			");"
+		);
+	});
+
+	// Lifetime battle statistics -- the progress half of the trophy system.
+	//
+	// UserTeamArchive (zI2tJB7R) carries 39 counters and every one is answered
+	// by PlayerInfoBattleResultScene::getActual @0x1791EEC, which maps exactly
+	// one trophy id per field.  Only these eight are populated: they are the
+	// ones the client already reports in every MissionEnd request, byte
+	// identical keys, so they cost nothing to collect.  The other 31 need
+	// instrumenting at their own call sites (unit fusion, item mixing, gifts,
+	// logins) and are left at 0 until someone does that.
+	//
+	// SUM vs MAX per column is taken from each trophy's label in
+	// deploy/mst/trophy_mst.json -- 累計/総合 sums, 最大 maxes -- NOT from the
+	// setter name.  See tools/SERVER_COMPONENT_AUDIT.md.
+	migrate("24082026_CreateUserTeamArchiveTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_team_archive ("
+			"user_id                TEXT    NOT NULL,"
+			// cumulative
+			"b_crystal              INTEGER NOT NULL DEFAULT 0,"
+			"h_crystal              INTEGER NOT NULL DEFAULT 0,"
+			"battle_spark_cnt       INTEGER NOT NULL DEFAULT 0,"
+			"battle_skill_cnt       INTEGER NOT NULL DEFAULT 0,"
+			"quest_mimic_cnt        INTEGER NOT NULL DEFAULT 0,"
+			// high-water marks
+			"battle_turn_max_damage INTEGER NOT NULL DEFAULT 0,"
+			"battle_turn_max_spark  INTEGER NOT NULL DEFAULT 0,"
+			"turn_max_unit_damage   INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id)"
+			");"
+		);
+	});
+
+	// Second tranche of trophy counters.  Every one is a SUM: the classifier is
+	// each trophy's own label in deploy/mst/trophy_mst.json -- 累計 / 総合 /
+	// 回数 / 数 are all cumulative, and none of these carries 最大.
+	//
+	// Unlike the first eight (which arrive pre-measured in MissionEnd's
+	// rXvA1E5y), these are incremented by the handler that performs the action,
+	// so each is worth exactly one +1 or one += amount at the point of truth.
+	migrate("31082026_UserTeamArchiveCountersTrancheTwo", {
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN zel_get INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN karma_get INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN zel_use INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN karma_use INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN zel_unit_sale INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN unit_mix_cnt INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN unit_mix_elem_cnt INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN unit_evo_cnt INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN town_harvest_cnt INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN quest_challenge_cnt INTEGER NOT NULL DEFAULT 0;");
+			p->execSqlSync("ALTER TABLE user_team_archive ADD COLUMN quest_clear_cnt INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	migrate("21082026_CreateUserMysteryBoxesTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_mystery_boxes ("
+			"user_id   TEXT    NOT NULL,"
+			"box_id    TEXT    NOT NULL,"
+			"chest_key TEXT    NOT NULL,"
+			"reward_ts INTEGER NOT NULL DEFAULT 0,"
+			"expiry_ts INTEGER NOT NULL DEFAULT 0,"
+			"claimed   INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, box_id)"
+			");"
+		);
+	});
+
+	migrate("20082026_CreateUserDailySpinTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_daily_spin ("
+			"user_id           TEXT    NOT NULL,"
+			"spin_day          INTEGER NOT NULL DEFAULT 1,"
+			"spins_used        INTEGER NOT NULL DEFAULT 0,"
+			"last_spin_utc_day INTEGER NOT NULL DEFAULT 0,"
+			"last_reward_id    INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id)"
+			");"
+		);
+	});
+
+	// Summoner Arm ownership.  The client reads it back as UserSummonerArmsInfo
+	// (wire dhMmbm5p): user_id, summoner_arm_id, exp, level -- exactly the four
+	// keys UserSummonerArmsInfoResponse::readParam @0x144E824 sets, and nothing
+	// more.  An arm is OWNED ONCE, so (user_id, summoner_arm_id) is the key and
+	// a second grant of the same arm is a no-op rather than a duplicate row.
+	//
+	// This is what makes first-clear reward type 18 claimable; without a table
+	// to put it in, PresentReceipt could only log "not supported".
+	migrate("04092026_CreateUserSummonerArmsTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_summoner_arms ("
+			"user_id         TEXT    NOT NULL,"
+			"summoner_arm_id TEXT    NOT NULL,"
+			"exp             INTEGER NOT NULL DEFAULT 0,"
+			"level           INTEGER NOT NULL DEFAULT 1,"
+			"PRIMARY KEY (user_id, summoner_arm_id)"
+			");"
+		);
+	});
+
+	// Summoner SP — the currency reward type 17 pays.
+	//
+	// ONE COLUMN ON PURPOSE.  UserSummonerInfo (wire n5mdIUqj) carries 32
+	// fields, but 31 of them belong to a Summoner subsystem nobody has built:
+	// summoner level and element mastery are earned in battle, abilities are
+	// bought in SummonerAbilityListScene, equipment is chosen on the summoner
+	// screen — and none of those handlers exist.  Giving them columns now
+	// would create writeless state that can only go stale.  UserInfo emits
+	// those fields at the values UserSummonerInfo::init() @0x127E9E8 already
+	// assigns, so they persist nowhere because nothing can change them.
+	//
+	// When the summoner subsystem lands, this table grows level/exp/element
+	// columns and the emit stops using init() defaults for them.
+	//
+	// Consumed by PresentReceipt case 17 and UserInfo's summoner_info block.
+	migrate("04092026_CreateUserSummonerTable", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_summoner ("
+			"user_id TEXT    NOT NULL,"
+			"sp      INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id)"
+			");"
+		);
+	});
+
+	// The Sphere Frog's extra sphere slot.
+	//
+	// The rule is the game's own, from MST_HELP_SUBTOPIC_100_8_DESCRIPTION
+	// ("Sphere Capacity Increase"): fusing the unit "Sphere Frog" as material
+	// raises the base unit's sphere capacity, ONE extra slot per unit and no
+	// more, and "those units who have increased their sphere capacity will
+	// inherit this trait even when they evolve".
+	//
+	// A column on user_units rather than a table, because it is one bit that
+	// belongs to a unit instance and dies with it.  Evolution needs no work:
+	// UnitEvo updates the base row in place, so the bit rides along, which is
+	// exactly the inheritance the help text promises.
+	//
+	// Consumed by UnitMix (which sets it), ItemSphereEqp (which enforces it)
+	// and the UserUnitInfo packet mapping (which sends it as ext_count).
+	migrate("04092026_AddUserUnitsSphereExt", {
+		p->execSqlSync(
+			"ALTER TABLE user_units ADD COLUMN sphere_ext INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// Login-day trophies.  TROPHY 100010 (login days) and 100020 (consecutive
+	// login days) are two of the 39 the Records screen draws, and both were
+	// stuck at 0 because nothing counted a login.
+	//
+	// The client read is already decoded: PlayerInfoBattleResultScene::getActual
+	// @0x1791EEC answers trophy 100010 from UserTeamArchive.login_cnt (dD64grYH)
+	// and 100020 from serial_login_day (3w6YDS4z).  Only the source was missing.
+	//
+	// last_login_day is the third column and the only one that is not itself a
+	// trophy: it is the epoch-day token the streak is computed against, the same
+	// once-per-day device user_dungeon_keys uses.  Without it a streak cannot
+	// tell "logged in again today" from "logged in the next day".
+	// The rest of the Records counters the handlers can actually source.
+	// Every one maps 1:1 to a trophy the client already knows how to draw --
+	// PlayerInfoBattleResultScene::getActual @0x1791EEC does the lookup, and
+	// net/user.kdl records which field answers which id:
+	//   zel_item_sale 100060, unit_sum_cnt 100190, item_mix_cnt 100250,
+	//   item_mix_elem_cnt 100260, sphere_mix_cnt 100270, b_crystal_max 100290,
+	//   h_crystal_max 100300, quest_win_cnt 200030.
+	// Written by ItemSell, addUserUnit, ItemMix and MissionEnd respectively.
+	migrate("04092026_AddUserTeamArchiveRecordCounters", {
+		for (const auto* col : {
+			"zel_item_sale     INTEGER NOT NULL DEFAULT 0",
+			"unit_sum_cnt      INTEGER NOT NULL DEFAULT 0",
+			"item_mix_cnt      INTEGER NOT NULL DEFAULT 0",
+			"item_mix_elem_cnt INTEGER NOT NULL DEFAULT 0",
+			"sphere_mix_cnt    INTEGER NOT NULL DEFAULT 0",
+			"b_crystal_max     INTEGER NOT NULL DEFAULT 0",
+			"h_crystal_max     INTEGER NOT NULL DEFAULT 0",
+			"quest_win_cnt     INTEGER NOT NULL DEFAULT 0" })
+		{
+			p->execSqlSync(std::string("ALTER TABLE user_team_archive ADD COLUMN ") + col + ";");
+		}
+	});
+
+	migrate("04092026_AddUserTeamArchiveLoginCounters", {
+		for (const auto* col : {
+			"login_cnt INTEGER NOT NULL DEFAULT 0",
+			"serial_login_day INTEGER NOT NULL DEFAULT 0",
+			"last_login_day INTEGER NOT NULL DEFAULT 0" })
+		{
+			p->execSqlSync(std::string("ALTER TABLE user_team_archive ADD COLUMN ") + col + ";");
+		}
+	});
+
+	// SPHERE CAPACITY SENTINEL.  eqip_item_frame_id2 gained a third meaning:
+	// -1 = "this unit has no second sphere slot", alongside 0 = empty slot and
+	// 1..14 = the sphere type occupying it.  The column was created DEFAULT 0,
+	// so every row on every existing save says "second slot present" and the
+	// client duly draws two slots on every unit.  The Sphere Frog had nothing
+	// left to grant.  gme::kNoSecondSphereSlot has the client-side proof.
+	//
+	// A MIGRATION RATHER THAN A LOCAL DB EDIT, deliberately: this is not a
+	// one-off data fix (which belongs in deploy/gme.sqlite by hand) but a
+	// change to what a value MEANS.  Every save in existence carries the wrong
+	// one, so the correction has to travel with the code.
+	//
+	// Guarded on sphere_ext = 0 so a unit that genuinely earned the slot keeps
+	// it, and on eqip_item_id2 = 0 so a sphere already sitting in slot 2 is
+	// never orphaned by taking the slot away underneath it -- such a row would
+	// need its sphere returned to the warehouse first, and this migration
+	// deliberately does not do that silently.  It leaves the pair disagreeing,
+	// which ItemSphereEqp then reads as "has the slot"; the generous reading is
+	// the right one when the alternative is eating a player's sphere.
+	migrate("05092026_UnitSphereCapacitySentinel", {
+		p->execSqlSync(
+			"UPDATE user_units SET eqip_item_frame_id2 = -1 "
+			"WHERE sphere_ext = 0 AND eqip_item_id2 = 0;");
+	});
+
+	// THE PARADE'S 30-MINUTE WINDOW.  DungeonKeyMst.limit_sec is 1800 on all
+	// three keys, but nothing ever tracked when a key was spent, so the window
+	// had nowhere to live: DungeonKeyUse set active_type and the parade was
+	// open forever in the DB while the client re-locked it instantly.
+	//
+	// It re-locked because UserDungeonKeyInfo.cnt (H6k1LIxC) was never assigned
+	// and went out as 0 -- the client reads it as the seconds remaining on the
+	// active tier, so every reply said "zero seconds left".  That also settles
+	// the field's open question in net/user.kdl, which had it CONFIRMED as
+	// setCnt but UNVERIFIED as to which count.
+	//
+	// Stored as an absolute epoch second rather than a countdown so it survives
+	// a restart and needs no ticking; cnt is derived from it per response.
+	migrate("06092026_AddUserDungeonKeysActiveUntil", {
+		p->execSqlSync(
+			"ALTER TABLE user_dungeon_keys ADD COLUMN active_until INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// WHICH TIER was bought.  active_type cannot answer that: DungeonKeyMst's
+	// usage_pattern gives tiers 1 and 3 the SAME active_type (1), so the spend
+	// count is the only thing that identifies the rung -- and the rung is what
+	// says which missions the player just paid to enter.
+	//
+	// Without it PermitPlace had to permit every parade mission unconditionally,
+	// which showed the Super and Mega variants alongside the basic ones you
+	// actually bought.
+	migrate("07092026_AddUserDungeonKeysActiveTier", {
+		p->execSqlSync(
+			"ALTER TABLE user_dungeon_keys ADD COLUMN active_tier INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// Grand Quest rewards (CampaignEnd).
+	//
+	// rewards_got: the once-only Grand Mission rewards (F_GRAND_MISSION_REWARD_MST
+	// rows with init_flag 1) this user has earned on a mission, as the comma list
+	// the client reads back from CampaignMissionInfo.get_reward (JQ23rIvk) —
+	// CampaignRewardScene::isGetRewardCheck splits it on ','.
+	migrate("11092026_AddUserCampaignMissionsRewardsGot", {
+		p->execSqlSync(
+			"ALTER TABLE user_campaign_missions ADD COLUMN rewards_got TEXT NOT NULL DEFAULT '';");
+	});
+
+	// The run in progress: the zel/karma totals the client reports in every
+	// CampaignBattleEnd archive (wVTBA6b5 — cumulative for the run, so the last
+	// one wins), paid out by a clearing CampaignEnd; run_open, which a
+	// CampaignEnd closes so a repeated end cannot pay twice; and the Grand Quest
+	// item loadout (equipped / reserve lists as JSON), which lives outside the
+	// warehouse while it is set.
+	migrate("11092026_AddUserCampaignStateRun", {
+		p->execSqlSync("ALTER TABLE user_campaign_state ADD COLUMN run_zel INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_campaign_state ADD COLUMN run_karma INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_campaign_state ADD COLUMN run_open INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_campaign_state ADD COLUMN eqp_items TEXT NOT NULL DEFAULT '';");
+		p->execSqlSync("ALTER TABLE user_campaign_state ADD COLUMN rsv_items TEXT NOT NULL DEFAULT '';");
+	});
+
+	// Unit Selector tickets the user holds, keyed by the selector MST's ticket id
+	// (UnitSelectorGachaMst XIvaD6Jp).  They are not V2 summon tickets: a
+	// present of type 8005 grants them and UnitSelectorGachaTicket spends them;
+	// the client reads the counts from UnitSelectorGachaUserInfo (CGHaOZda).
+	// A spent-out row stays at 0 so the zero can still be sent.
+	migrate("11092026_CreateUserSelectorTickets", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_selector_tickets ("
+			"user_id   TEXT    NOT NULL,"
+			"ticket_id TEXT    NOT NULL,"
+			"count     INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, ticket_id)"
+			");"
+		);
+	});
+
+	// Frontier Gate rewards.
+	//
+	// user_frontier_gates.rewards_got: the F_FROGATE_REWARD_MST ids this user
+	// has been paid on the gate, as the comma list FrontierGateInfo sends back
+	// as reward_info_list (JQ23rIvk) — FrontierGateRewardScene::setList draws
+	// the "obtained" mark from exactly that list, so every reward pays once.
+	//
+	// The run row gains the state each Frontier Gate MissionEnd reports
+	// (eIQ79KO2): floors cleared, the running score, the bonus-tally note and
+	// the overdrive info.  The client only keeps them between battles if the
+	// server hands them back (FrontierBattleInfoResponse is their sole setter),
+	// and the end of the run is paid from them — FrontierGateEnd carries none.
+	migrate("11092026_AddFrontierGateRewards", {
+		p->execSqlSync("ALTER TABLE user_frontier_gates ADD COLUMN rewards_got TEXT NOT NULL DEFAULT '';");
+		p->execSqlSync("ALTER TABLE user_frontier_gate_run ADD COLUMN run_score INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_frontier_gate_run ADD COLUMN run_progress INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_frontier_gate_run ADD COLUMN run_note TEXT NOT NULL DEFAULT '';");
+		p->execSqlSync("ALTER TABLE user_frontier_gate_run ADD COLUMN run_od_info TEXT NOT NULL DEFAULT '';");
+	});
+
+	// Frontier Gate rewards pay the moment the run reaches them, not when it
+	// ends: a run abandoned by starting the gate again would otherwise lose
+	// everything it earned.  run_rewards is what this run has been paid, so the
+	// result screen can still list the whole run.
+	//
+	// achieve_point is the Merit Point balance — the number the Randall
+	// Achievement screen prints (RandallAchievementDedicateScene::setAchievePoint
+	// @0x1A39D58 reads UserAchievementInfo +0x18, which is wire key idfCDG70).
+	// Frontier Gate pays it at the end of a run.
+	migrate("12092026_AddFrontierGateRunRewardsAndMerit", {
+		p->execSqlSync("ALTER TABLE user_frontier_gate_run ADD COLUMN run_rewards TEXT NOT NULL DEFAULT '';");
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN achieve_point INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// The quest-prep screen's BONUS item slots (nAligJSQ), the second bar
+	// beside the battle items.  Same shape as user_equip_items, including the
+	// +100 second run ItemEditRequest::createBody writes.
+	migrate("12092026_CreateUserEquipBonusItems", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_equip_bonus_items ("
+			"user_id     TEXT    NOT NULL,"
+			"disp_order  INTEGER NOT NULL,"
+			"item_id     INTEGER NOT NULL,"
+			"item_num    INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, disp_order)"
+			");"
+		);
+	});
+
+	// Event tokens — the per-event currencies (token 8 "Rift Token" is the
+	// Frontier Gate's, paid by 505 F_FROGATE_REWARD_MST rows as present type
+	// 8004).  Token ids stay TEXT because the wire form is a string and the
+	// client normalises "0008" to "8" itself (readParam @0x1C492EC).
+	migrate("12092026_CreateUserEventTokens", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_event_tokens ("
+			"user_id  TEXT    NOT NULL,"
+			"token_id TEXT    NOT NULL,"
+			"count    INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, token_id)"
+			");"
+		);
+	});
+
+	// Where each Grand Quest deck stands on the map.  The client owns the
+	// position while a run is on screen and reports it back in the Yusr3Zg5
+	// group of CampaignSave / CampaignBattleEnd / CampaignEnd
+	// (createBodySaveDataPos @0x13B4170); CampaignStart sends it back so a
+	// resumed run picks up where it stopped instead of at point 0.
+	migrate("13092026_CreateUserCampaignDeckPos", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_campaign_deck_pos ("
+			"user_id       TEXT    NOT NULL,"
+			"deck_num      INTEGER NOT NULL,"
+			"now_point_num INTEGER NOT NULL DEFAULT 0,"
+			"arrival_order INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, deck_num)"
+			");"
+		);
+	});
+
+	// Randall Achievements.  `reward_received` is the claim latch: an
+	// achievement's Merit Points are paid once, by AchievementRewardReceive, and
+	// the row exists only once something has happened to it (progress itself is
+	// derived from the counters, not stored).
+	migrate("13092026_CreateUserAchievementSubjects", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_achievement_subjects ("
+			"user_id         TEXT    NOT NULL,"
+			"subject_id      TEXT    NOT NULL,"
+			"reward_received INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, subject_id)"
+			");"
+		);
+	});
+
+	// Purchases from the Merit Point shop, counted against
+	// AchievementTradeMst.limit_count.
+	migrate("13092026_CreateUserAchievementTrades", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_achievement_trades ("
+			"user_id  TEXT    NOT NULL,"
+			"trade_id TEXT    NOT NULL,"
+			"count    INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, trade_id)"
+			");"
+		);
+	});
+
+	// Merit Point deliveries -- the Trade Zel / Karma / Units / Spheres screens.
+	//
+	// One row per (user, flow, day).  `points` is what the ceiling is measured
+	// against: DefineMst carries a separate per-day maximum for each flow
+	// (max_achieve_point_zel_per_day and friends), and it is a cap on POINTS
+	// EARNED that day, not on goods handed over.  `amount` is the goods
+	// themselves -- zel, karma, or a count of units/spheres -- and the lifetime
+	// total the "Traded 10000 Zel Total" achievements measure is the SUM of it
+	// across days, so no second table is needed to track them.
+	//
+	// `kind` is the request's cond_type, which is what the client sends to say
+	// which of the four screens it came from: 4 zel, 5 karma, 6 sphere, 8 unit.
+	migrate("15092026_CreateUserAchievementDeliver", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_achievement_deliver ("
+			"user_id TEXT    NOT NULL,"
+			"kind    INTEGER NOT NULL,"
+			"day     TEXT    NOT NULL,"
+			"points  INTEGER NOT NULL DEFAULT 0,"
+			"amount  INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, kind, day)"
+			");"
+		);
+	});
+
+	// Dual Brave Burst bonds -- one row per PAIR, keyed by the main unit.
+	//
+	// Keyed that way because the client is: UserUnitDbbInfoList is a dictionary
+	// on the main user_unit_id and builds its own reverse map for the sub, so a
+	// mirror row would make each unit claim the other as its partner.  dbb_id
+	// is cached on the row rather than rediscovered, because the level list is
+	// keyed by it and a unit can be fused away under a stored bond.
+	migrate("13092026_CreateUserUnitDbb", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_unit_dbb ("
+			"user_id             TEXT    NOT NULL,"
+			"user_unit_id        INTEGER NOT NULL,"
+			"bonded_user_unit_id INTEGER NOT NULL,"
+			"dbb_id              TEXT    NOT NULL,"
+			"bond_level          INTEGER NOT NULL DEFAULT 1,"
+			"PRIMARY KEY (user_id, user_unit_id)"
+			");"
+		);
+	});
+
+	// Alternate unit art the player has unlocked (Merit shop reward type 15).
+	//
+	// Kept apart from user_unit_dictionary even though the flag it produces
+	// lives on that row: a dictionary row means "this player has SEEN this
+	// species", and inserting one to hold an art purchase would put an
+	// un-obtained unit in the Unit Guide.  The purchase is recorded here and
+	// the flag is derived at read time, so buying art for a unit you do not
+	// own yet simply lights up when you get it.
+	migrate("13092026_CreateUserUnitAltArt", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_unit_alt_art ("
+			"user_id TEXT    NOT NULL,"
+			"unit_id INTEGER NOT NULL,"
+			"PRIMARY KEY (user_id, unit_id)"
+			");"
+		);
+	});
+
+	// Honor ("Friend Point") lifetime totals -- trophies 100090 and 100100.
+	//
+	// Trophies.hpp already pointed 100090/100100 at UserTeamArchive::friend_p_get
+	// and friend_p_use, but no column fed them, so both trophies read 0 and
+	// Achievements.hpp had to leave the 2000 band (Honor Points accumulated)
+	// at -1 with a note saying user_info.friend_points is the CURRENT balance
+	// and falls when spent.  friend_p_get is that missing lifetime total.
+	migrate("13092026_AddUserTeamArchiveHonorCounters", {
+		for (const auto* col : {
+			"friend_p_get INTEGER NOT NULL DEFAULT 0",
+			"friend_p_use INTEGER NOT NULL DEFAULT 0" })
+		{
+			p->execSqlSync(std::string("ALTER TABLE user_team_archive ADD COLUMN ") + col + ";");
+		}
+	});
+
+	// Which Summoner Helper the open mission borrowed, so MissionEnd can pay
+	// the Honor for it.
+	//
+	// MissionEnd's request does not carry the helper -- MissionEndRequest::
+	// createBody @0x13A78F8 sends 75 keys and h7eY3sAK is not among them -- so
+	// the id has to survive from MissionStart, which does carry it (captures
+	// show "0" for a solo run and the helper's user id otherwise).  It is
+	// durable rather than in-memory on purpose: a battle can outlive the
+	// process, and a crashed client still ends its mission on the next launch.
+	migrate("13092026_AddUserInfoReinforceUserId", {
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN reinforce_user_id TEXT NOT NULL DEFAULT '';");
+	});
+
+	// Hunter Orbs -- the Frontier Gate / Frontier Hunter attempt currency.
+	//
+	// They are NOT team_info's fight_point (that is the Arena Orbs, per
+	// ShopHelFightScene's "Arena Orbs" title).  They live in the client's
+	// ChallengeHeaderInfo singleton, written only by the kN2i7qds response,
+	// which this server had never sent -- so the count sat at 0 forever and
+	// FrontierGateConditionScene::startCheck took its no-orbs branch on every
+	// entry.
+	//
+	// Stored the way energy is: the count, plus the unix time the orb currently
+	// regenerating will land.  `rest_ts` 0 means nothing is pending (the count
+	// is at the cap, or has never been spent).  Starting the column at the cap
+	// rather than 0 so an existing save is not retroactively broke; the cap
+	// itself is DefineMst max_frohun_p, read at runtime.
+	migrate("13092026_AddUserInfoHunterOrbs", {
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN hunter_orbs INTEGER NOT NULL DEFAULT 3;");
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN hunter_orb_rest_ts INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// An interrupted battle, so the next login can offer to resume it.
+	//
+	// The battle STATE is the client's -- MissionRestartScene reloads the blob
+	// from its own SaveData -- but the trigger is not: LoginScene only reaches
+	// the resume screen when the server's 5PR2VmH1 carries a non-zero state.
+	// Without somewhere to keep that, a revival paid for in gems is forgotten
+	// the moment the client closes.
+	//
+	// One battle at a time, so these live on user_info rather than a table:
+	// MissionInfo is a client singleton and the player cannot be in two.
+	// `state` 0 means nothing open, which is also the column's default, so an
+	// existing save is untouched until it actually pays for a continue.
+	// Music House tracks the player has bought.
+	//
+	// The purchase is client-local -- MyTownSoundRoomScene::confirmAnswerYes
+	// adds the row to its own UserSoundInfoList and decrements Zel itself --
+	// and only reaches the server as a comma list on the next TownUpdate.  With
+	// nowhere to put it, every track the player paid Zel for vanished at the
+	// next launch, because d98mjNDc is a FULL REPLACE and this server was
+	// sending it empty.
+	migrate("13092026_CreateUserSounds", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_sounds ("
+			"user_id  TEXT    NOT NULL,"
+			"sound_id INTEGER NOT NULL,"
+			"PRIMARY KEY (user_id, sound_id)"
+			");"
+		);
+	});
+
+	migrate("13092026_AddUserInfoMissionBreak", {
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN mission_break_serial TEXT NOT NULL DEFAULT '';");
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN mission_break_info TEXT NOT NULL DEFAULT '';");
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN mission_break_state INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// The gift inbox.  One row per gift a friend has sent this player.
+	//
+	// `id` IS the wire's gift_identify_id (gNE76SLp), which is what
+	// FixGiftInfo names when claiming, so it has to be stable and unique per
+	// row rather than per gift kind.
+	//
+	// `day` is what keeps the daily drop idempotent: the simulated friend
+	// sends once per UTC day, and a second login on the same day must not
+	// mint another gift.
+	// The friend roster.
+	//
+	// Deliberately small: a row names WHO the friend is, never what they field.
+	// The unit is derived at read time from the player's own progression, so
+	// friends grow with the player without a migration and a levelled save
+	// needs no backfill.  The handbook's rule -- keep persistent state minimal,
+	// derive views from authoritative state.
+	//
+	// `base_unit_id` is the LOWEST-rarity form of that friend's evolution
+	// chain.  How far up the chain they are shown is a function of the player,
+	// not of this row.
+	migrate("15092026_CreateUserFriends", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_friends ("
+			"user_id       TEXT    NOT NULL,"
+			"friend_id     TEXT    NOT NULL,"
+			"handle_name   TEXT    NOT NULL,"
+			"base_unit_id  INTEGER NOT NULL,"
+			"is_dev        INTEGER NOT NULL DEFAULT 0,"
+			"favorite      INTEGER NOT NULL DEFAULT 0,"
+			"added_day     TEXT    NOT NULL DEFAULT '',"
+			"PRIMARY KEY (user_id, friend_id)"
+			");"
+		);
+	});
+
+	migrate("17092026_AddUserInfoStarterSelector", {
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN starter_selector_granted INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	migrate("17092026_AddUserFriendsSpheres", {
+		// Spheres are LOCKED IN when a friend is added, like a Pokemon IV -- see
+		// gme::friendSpheresFor.  0 means "not rolled yet", which is what every
+		// existing roster row gets and what the next read backfills.
+		p->execSqlSync("ALTER TABLE user_friends ADD COLUMN sphere_1 INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_friends ADD COLUMN sphere_2 INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// THE DBB SLOT, unlocked by fusing an Elemental Golem of the unit's own
+	// element.  Global wiki, Bonding: "players must first fuse it with an
+	// Elemental Golem of the same element type.  Doing this will now permanently
+	// unlock the unit's DBB Slot."
+	//
+	// It lives on user_units and not on user_unit_dbb because it is a property
+	// of ONE unit and survives being unbonded -- user_unit_dbb holds pairs, and
+	// a released pair deletes its row.
+	// THE SUMMONER AVATAR ARC.
+	//
+	// `user_summoner` held one column, `sp`, and loadSummonerInfo sent the other
+	// 31 fields at the values UserSummonerInfo::init() @0x127E9E8 assigns — so
+	// the whole arc was a constant.  That is why 94 Randall achievements read 0
+	// forever, and it was NOT because the subsystem cannot draw: 33
+	// layout_summoner_*.csv files ship in _dlcbundle and the block is fully
+	// modelled and already on the wire.
+	//
+	// The columns mirror the wire block one for one (wiki: Summoner Avatar —
+	// gender, hairstyle, element, level, EXP, stats, SP, weapon, Leader Skill,
+	// Summoning Arts), so nothing here is invented shape:
+	//   level/exp            the avatar's own level      (achievement band 52000)
+	//   level1..6 / exp1..6  the SIX ELEMENT levels      (bands 56000-61000,
+	//                        Fire=1 .. Dark=6, which is the order of the bands)
+	//   sp                   Skill Points                (band 54000)
+	//   friend_point         Summoner Training Points    (band 53000)
+	//   summon_limit         Summoning Pedestals unlocked(band 63000)
+	//   ability_info         Parameters, packed          (band 65000)
+	//   arm_id               the equipped Weapon         (band 55000 reads its level)
+	//   ls_spheres_created   a COUNTER, not a holding    (band 62000)
+	migrate("20092026_ExtendUserSummoner", {
+		for (const auto& column : {
+			"sex INTEGER NOT NULL DEFAULT 1",
+			"element INTEGER NOT NULL DEFAULT 1",
+			"hair_id TEXT NOT NULL DEFAULT ''",
+			"level INTEGER NOT NULL DEFAULT 1",
+			"exp INTEGER NOT NULL DEFAULT 0",
+			"level1 INTEGER NOT NULL DEFAULT 1", "exp1 INTEGER NOT NULL DEFAULT 0",
+			"level2 INTEGER NOT NULL DEFAULT 1", "exp2 INTEGER NOT NULL DEFAULT 0",
+			"level3 INTEGER NOT NULL DEFAULT 1", "exp3 INTEGER NOT NULL DEFAULT 0",
+			"level4 INTEGER NOT NULL DEFAULT 1", "exp4 INTEGER NOT NULL DEFAULT 0",
+			"level5 INTEGER NOT NULL DEFAULT 1", "exp5 INTEGER NOT NULL DEFAULT 0",
+			"level6 INTEGER NOT NULL DEFAULT 1", "exp6 INTEGER NOT NULL DEFAULT 0",
+			"friend_point INTEGER NOT NULL DEFAULT 0",
+			"summon_limit INTEGER NOT NULL DEFAULT 1",
+			"ability_info TEXT NOT NULL DEFAULT ''",
+			"arm_id TEXT NOT NULL DEFAULT '10'",
+			"eqp_item_id TEXT NOT NULL DEFAULT ''",
+			"extra_passive_skill_id TEXT NOT NULL DEFAULT ''",
+			"extra_passive_skill_id2 TEXT NOT NULL DEFAULT ''",
+			"ls_spheres_created INTEGER NOT NULL DEFAULT 0",
+		})
+		{
+			p->execSqlSync(std::string("ALTER TABLE user_summoner ADD COLUMN ") + column + ";");
+		}
+	});
+
+	// The Summoner's weapons, each with its own level.  Band 55000 asks for the
+	// BEST weapon level reached, so the row has to survive unequipping.
+	migrate("20092026_CreateUserSummonerArms", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_summoner_arm_levels ("
+			"user_id TEXT    NOT NULL,"
+			"arm_id  TEXT    NOT NULL,"
+			"lv      INTEGER NOT NULL DEFAULT 1,"
+			"exp     INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, arm_id)"
+			");"
+		);
+	});
+
+	// "CLEARED WITHOUT CONTINUING" and the per-quest high scores.
+	//
+	// Both exist because MissionEnd is the only place that knows how a battle
+	// actually went, and neither fact survives anywhere today: the clear history
+	// records THAT a mission was cleared, not how, and the battle result is
+	// parsed and thrown away.
+	migrate("20092026_CreateBattleRecords", {
+		// A continue is recorded against the MISSION rather than the battle
+		// serial: MissionContinueReq carries mission_num.serial_id and no
+		// serial, and a run is bounded by MissionStart/MissionEnd anyway, so
+		// the mission id is enough to scope it.  Rows are transient — Start
+		// clears, End consumes.
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_mission_continues ("
+			"user_id    TEXT    NOT NULL,"
+			"mission_id TEXT    NOT NULL,"
+			"PRIMARY KEY (user_id, mission_id)"
+			");"
+		);
+		// The per-quest SPARK maximum.  Its two siblings already exist --
+		// b_crystal_max and h_crystal_max were added for trophies 100290/100300
+		// -- so this joins them rather than starting a table of its own.
+		//
+		// ⚠ NOT battle_turn_max_spark, which is the best single TURN, and not
+		// battle_spark_cnt, which is the lifetime total.  "1000 Sparks Produced
+		// in 1 Quest" is a third number and neither of those answers it.
+		p->execSqlSync(
+			"ALTER TABLE user_team_archive"
+			" ADD COLUMN spark_cnt_max INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	migrate("20092026_AddNoContinueClear", {
+		// Sticky once set: the achievement asks whether it has EVER been done
+		// cleanly, so a later sloppy clear must not take it away.
+		p->execSqlSync(
+			"ALTER TABLE user_campaign_missions"
+			" ADD COLUMN no_continue INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// DAILY TASKS.  Two tables because the two halves expire differently: task
+	// progress resets every UTC day, a claim is permanent.
+	//
+	// Progress is keyed on the TASK CODE (AV/QE/VV/CM/UU/PU) rather than on a
+	// row id, because the rotation picks which codes are offered today and the
+	// same code can be offered again tomorrow with a different target.  Keying
+	// on a row id would lose a player's progress the moment the pool rotated.
+	migrate("20092026_CreateUserDailyTasks", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_daily_tasks ("
+			"user_id         TEXT    NOT NULL,"
+			"task_key        TEXT    NOT NULL,"
+			"times_completed INTEGER NOT NULL DEFAULT 0,"
+			"utc_day         INTEGER NOT NULL DEFAULT 0,"
+			"rewarded        INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, task_key)"
+			");"
+		);
+		// `claim_count` rather than a boolean: the regular shop prizes are
+		// repeatable (max_claim_count runs to 4294967295), and one of them caps
+		// at 5, so the count is the thing that has to be enforced.
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_daily_task_claims ("
+			"user_id     TEXT    NOT NULL,"
+			"prize_id    INTEGER NOT NULL,"
+			"claim_count INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, prize_id)"
+			");"
+		);
+	});
+
+	migrate("19092026_AddUserUnitsDbbUnlocked", {
+		p->execSqlSync(
+			"ALTER TABLE user_units ADD COLUMN dbb_unlocked INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	migrate("17092026_CreateUserGuilds", {
+		// guild_id is the client-facing id (GuildInfo.sD73jd20), so it is an
+		// INTEGER PRIMARY KEY and lets SQLite assign it.
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_guilds ("
+			"guild_id       INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"owner_user_id  TEXT    NOT NULL,"
+			"name           TEXT    NOT NULL,"
+			"description    TEXT    NOT NULL DEFAULT '',"
+			"guild_art_id   INTEGER NOT NULL DEFAULT 1,"
+			"experience     INTEGER NOT NULL DEFAULT 0,"
+			"prestige_point INTEGER NOT NULL DEFAULT 0,"
+			"created_day    TEXT    NOT NULL DEFAULT ''"
+			");"
+		);
+		// The founder is stored here too, so membership has exactly one source.
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_guild_members ("
+			"guild_id   INTEGER NOT NULL,"
+			"member_id  TEXT    NOT NULL,"
+			"joined_day TEXT    NOT NULL DEFAULT '',"
+			"PRIMARY KEY (guild_id, member_id)"
+			");"
+		);
+	});
+
+	migrate("17092026_CreateUserLoginCampaign", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_login_campaign ("
+			"user_id      TEXT    NOT NULL PRIMARY KEY,"
+			"current_day  INTEGER NOT NULL DEFAULT 0,"
+			"last_day     TEXT    NOT NULL DEFAULT ''"
+			");"
+		);
+	});
+
+	migrate("15092026_CreateUserGifts", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_gifts ("
+			"id           INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"user_id      TEXT    NOT NULL,"
+			"from_user_id TEXT    NOT NULL,"
+			"gift_id      INTEGER NOT NULL,"
+			"day          TEXT    NOT NULL,"
+			"received     INTEGER NOT NULL DEFAULT 0"
+			");"
+		);
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_gifts_user"
+			" ON user_gifts (user_id, received);");
+	});
+
+    migrate("25092026_CreateExchangePurchases", {
+        p->execSqlSync("ALTER TABLE user_info ADD COLUMN guild_tokens INTEGER NOT NULL DEFAULT 0");
+        p->execSqlSync("CREATE TABLE IF NOT EXISTS user_exchange_purchases ("
+            "user_id TEXT NOT NULL, shop TEXT NOT NULL, offer_id TEXT NOT NULL,"
+            "count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id,shop,offer_id));");
+    });
+
+    migrate("25092026_CreateUserEnteredFeatures", {
+        p->execSqlSync("CREATE TABLE IF NOT EXISTS user_entered_features ("
+            "user_id TEXT NOT NULL, feature_id INTEGER NOT NULL CHECK(feature_id >= 0),"
+            "dungeon_id INTEGER NOT NULL CHECK(dungeon_id >= 0),"
+            "PRIMARY KEY(user_id, feature_id, dungeon_id),"
+            "CHECK(feature_id > 0 OR dungeon_id > 0));");
+    });
+
+	// A guild member's rank, GuildMemberInfo.member_type (gr48vsdJ): 1 Guild
+	// Master, 2 Vice Guild Master, 3 Officer, 4 Member (GUILD_RANK_NAME_<n>).
+	// Existing rows are all ordinary members; the founder is always reported as
+	// Guild Master from user_guilds.owner_user_id, so no backfill is needed.
+	migrate("27092026_AddUserGuildMembersMemberType", {
+		p->execSqlSync(
+			"ALTER TABLE user_guild_members ADD COLUMN member_type INTEGER NOT NULL DEFAULT 4;");
+	});
+
+	// The battle MissionStart opened and MissionEnd has not yet settled:
+	// the mission id while it is open, 0 once its result has been paid, NULL
+	// for saves from before this column (a battle in flight across the upgrade
+	// is still paid once).  Lets a repeated MissionEnd -- a client retry after
+	// a lost reply -- answer without paying, dropping or spending twice.
+	migrate("29092026_AddUserInfoOpenMission", {
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN open_mission_id INTEGER;");
+	});
+
+	// Preserve old real warehouse ids. Extra rows are allocated from this one
+	// namespace, never derived by modulo/stride. Quantity splitting uses MST
+	// limits at first access, after the cache has been loaded. The aggregate
+	// user_items table remains compatible with existing rewards and recipes.
+	migrate("29092026_PersistentWarehouseRows", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_warehouse_rows ("
+			"instance_id INTEGER PRIMARY KEY AUTOINCREMENT CHECK(instance_id BETWEEN 1 AND 2147483647),"
+			"user_id TEXT NOT NULL, item_id INTEGER NOT NULL,"
+			"item_num INTEGER NOT NULL DEFAULT 0 CHECK(item_num >= 0),"
+			"favorite_flg INTEGER NOT NULL DEFAULT 0, disp_order INTEGER NOT NULL DEFAULT 0,"
+			"equip_unit_id INTEGER NOT NULL DEFAULT 0, equip_slot INTEGER NOT NULL DEFAULT 0);");
+		p->execSqlSync("CREATE INDEX IF NOT EXISTS warehouse_owner_item ON user_warehouse_rows(user_id,item_id);");
+		p->execSqlSync(
+			"CREATE UNIQUE INDEX IF NOT EXISTS warehouse_equipment ON user_warehouse_rows(user_id,equip_unit_id,equip_slot)"
+			" WHERE equip_unit_id != 0;");
+		p->execSqlSync(
+			"INSERT OR IGNORE INTO user_warehouse_rows(instance_id,user_id,item_id,item_num,favorite_flg,disp_order)"
+			" SELECT instance_id,user_id,item_id,item_num,favorite_flg,disp_order FROM user_items;");
+	});
+
+	// The newest warehouse row id the client has been sent (advanced by
+	// gme::loadWarehouseSnapshot).  Rows above it are the ones the client can
+	// still only name by its INT_MAX - itemId placeholder (see
+	// gme::warehousePlaceholderItem).  0 until the first list goes out, which
+	// every login's UserInfo does.
+	migrate("29092026_AddWarehouseSeenMark", {
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN warehouse_seen_id INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// Omni enhancement SP (UserUnitInfo bFQbZh3x / 3RgneFpP / GIO9DTif; see
+	// net/user.kdl).  The fe_bp / fe_max_usable_bp pair from 02072026 never
+	// reached the wire and carried invented defaults (100 / 200) that also
+	// apply to every newly inserted unit, so they are left unused and these
+	// carry the Global wiki's values instead (Unit Skills rev 656738): 10 SP to
+	// start, nothing spent, a 100 SP limit.
+	migrate("29092026_UnitEnhancementPoints", {
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN fe_sp INTEGER NOT NULL DEFAULT 10;");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN fe_used_sp INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN fe_max_sp INTEGER NOT NULL DEFAULT 100;");
+	});
+
+	// Battle serials (gme/common/MissionRuns.hpp).  The sequence is seeded so
+	// the first serial is 1000000001, above every mission id; the client echoes
+	// it verbatim.  open_mission_serial is the serial of the battle MissionStart
+	// last opened: NULL on a save from before this, whose open battle still
+	// carries the mission id as its serial and keeps the open_mission_id rule.
+	migrate("29092026_MissionRunSerials", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_mission_runs ("
+			"serial INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"user_id TEXT NOT NULL, mission_id INTEGER NOT NULL,"
+			"started_at INTEGER NOT NULL DEFAULT 0);");
+		p->execSqlSync(
+			"INSERT INTO sqlite_sequence (name, seq) SELECT 'user_mission_runs', 1000000000"
+			" WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'user_mission_runs');");
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN open_mission_serial INTEGER;");
+	});
+
+	// The warehouse reads (gme/common/Warehouse.cpp) want only LIVE rows --
+	// in storage or on a unit.  Spent copies stay behind as tombstones so a
+	// spent id is never reused, and a long-lived save gathers thousands; this
+	// partial index lets those reads skip them instead of visiting each one.
+	// Its WHERE is spelt exactly as the queries spell theirs, which is what
+	// lets SQLite choose it.
+	migrate("30092026_WarehouseLiveRowIndex", {
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS warehouse_live_rows ON user_warehouse_rows(user_id,instance_id)"
+			" WHERE item_num>0 OR equip_unit_id!=0;");
+	});
+
+	// A unit's acquired SP enhancements, UserUnitInfo.fe_skill_info
+	// (Fnxab5CN): "<category>@<skill>:<skill>/..." as the client's
+	// setFeSkillInfo parses it.  Written by FeSkillGet, cleared by ShopUse
+	// type 9; '' is "none", which the client reads the same way.
+	migrate("30092026_UnitFeSkillInfo", {
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN fe_skill_info TEXT NOT NULL DEFAULT '';");
+	});
+
+	// Every revival MissionContinue has judged, per battle run, so a delayed
+	// copy of an earlier revival is recognised however many genuine ones came
+	// after it (gme/handlers/MissionBreak.cpp).  The request carries no nonce:
+	// its body is built once, when the request object is created, and a client
+	// retry re-sends that same object, so a retry repeats the serial, status
+	// and suspend blob byte for byte.  `fingerprint` is the SHA-256 of
+	// "<status>:<blob>"; `run_serial` is the serial the client continued (an
+	// issued run serial, or the mission id of a battle that predates serials).
+	// `seq` is the order the run first saw each revival in, `accepted` whether
+	// it was charged (1) or refused for want of gems (0).  Nothing is pruned:
+	// a closed run's rows can never match an owned battle again.
+	migrate("02102026_MissionContinueReceipts", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_mission_continue_receipts ("
+			"user_id      TEXT    NOT NULL,"
+			"run_serial   TEXT    NOT NULL,"
+			"fingerprint  TEXT    NOT NULL,"
+			"seq          INTEGER NOT NULL,"
+			"accepted     INTEGER NOT NULL,"
+			"gems_charged INTEGER NOT NULL DEFAULT 0,"
+			"first_seen   INTEGER NOT NULL,"
+			"last_seen    INTEGER NOT NULL,"
+			"deliveries   INTEGER NOT NULL DEFAULT 1,"
+			"PRIMARY KEY (user_id, run_serial, fingerprint)"
+			");");
+	});
+
+	// One gumi Live user per device instead of one per server.  device_key is a
+	// SHA-256 of the client's stable device identifier (never the raw value);
+	// token_hash is a SHA-256 of the session token minted at each guest login.
+	// Existing rows keep NULLs and are adopted by the first device to log in.
+	migrate("15102026_GumiLiveDeviceAccounts", {
+		p->execSqlSync("ALTER TABLE gumi_live_users ADD COLUMN device_key TEXT;");
+		p->execSqlSync("ALTER TABLE gumi_live_users ADD COLUMN token_hash TEXT;");
+		p->execSqlSync("ALTER TABLE gumi_live_users ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE gumi_live_users ADD COLUMN last_login_at INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync(
+			"CREATE UNIQUE INDEX IF NOT EXISTS gumi_live_users_device_key "
+			"ON gumi_live_users(device_key) WHERE device_key IS NOT NULL;");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS user_info_gumi_user_id ON user_info(gumi_user_id);");
+	});
+
+	// Account transfer codes (gme/handlers/Transfer.cpp).  Neither the code
+	// nor the password is stored: code_hash is SHA-256("code:"+digits), which
+	// is enough for a CSPRNG code, and the 4-12 character password gets
+	// PBKDF2 because it is guessable.  One active code per account.
+	//
+	// account_transfer_attempts feeds the rate limits and is pruned to a day.
+	// account_transfers is the audit trail and what makes a retried Transfer
+	// idempotent.  transfer_device_claims binds a device that had no session
+	// at transfer time on its next guest login, keyed on the advertising id
+	// (the only identifier TransferRequest carries).
+	//
+	// A transfer moves gumi_live_users.device_key rather than re-pointing
+	// user_info.gumi_user_id, so unbound_at marks the row it left behind --
+	// legacy adoption must never hand that row to a new device.
+	// model_change_count is echoed by the client and otherwise cosmetic.
+	migrate("15102026_AccountTransferCodes", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS account_transfer_codes("
+			"user_id TEXT PRIMARY KEY NOT NULL,"
+			"code_hash TEXT NOT NULL,"
+			"password_hash TEXT NOT NULL,"
+			"issued_at INTEGER NOT NULL,"
+			"expires_at INTEGER NOT NULL,"
+			"failed_attempts INTEGER NOT NULL DEFAULT 0,"
+			"locked_until INTEGER NOT NULL DEFAULT 0,"
+			"last_check_ok_at INTEGER NOT NULL DEFAULT 0);");
+		p->execSqlSync(
+			"CREATE UNIQUE INDEX IF NOT EXISTS account_transfer_codes_code "
+			"ON account_transfer_codes(code_hash);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS account_transfer_attempts("
+			"id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"requester TEXT NOT NULL, kind TEXT NOT NULL,"
+			"ok INTEGER NOT NULL, at INTEGER NOT NULL);");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS account_transfer_attempts_req "
+			"ON account_transfer_attempts(requester, kind, at);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS account_transfers("
+			"id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"from_gumi_user_id TEXT, from_user_id TEXT NOT NULL DEFAULT '',"
+			"from_token_hash TEXT, claim_vid_hash TEXT,"
+			"to_gumi_user_id TEXT NOT NULL, to_user_id TEXT NOT NULL,"
+			"via TEXT NOT NULL, created_at INTEGER NOT NULL);");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS account_transfers_from "
+			"ON account_transfers(from_gumi_user_id, created_at);");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS account_transfers_claim "
+			"ON account_transfers(claim_vid_hash, created_at);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS transfer_device_claims("
+			"vid_hash TEXT PRIMARY KEY NOT NULL,"
+			"to_gumi_user_id TEXT NOT NULL,"
+			"created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);");
+		p->execSqlSync("ALTER TABLE gumi_live_users ADD COLUMN unbound_at INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN model_change_count INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// Classic Arena (gme/handlers/Arena.cpp, docs/features/ARENA_SPEC.md).
+	//
+	// user_arena is created lazily per player: a missing row reads as rank 1
+	// with zero points, so existing accounts need no backfill.  offer_user_id
+	// is the opponent the last Matching showed, which BattleStart must match.
+	//
+	// arena_battle keeps the enemy snapshot as the exact JSON text the client
+	// parsed, so Restart can resend it byte for byte and a settled battle
+	// keeps a record of who was fought.  status: 0 open, 1 won, 2 lost,
+	// 3 retired.  result_json caches the BattleEnd reply so a resent
+	// BattleEnd is answered identically instead of paying out twice.
+	migrate("16102026_CreateArenaTables", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_arena("
+			"user_id TEXT PRIMARY KEY NOT NULL,"
+			"rank_id INTEGER NOT NULL DEFAULT 1,"
+			"max_rank_id INTEGER NOT NULL DEFAULT 1,"
+			"points INTEGER NOT NULL DEFAULT 0,"
+			"battle_cnt INTEGER NOT NULL DEFAULT 0,"
+			"win_cnt INTEGER NOT NULL DEFAULT 0,"
+			"battle_cnt_accept INTEGER NOT NULL DEFAULT 0,"
+			"win_cnt_accept INTEGER NOT NULL DEFAULT 0,"
+			"atk_series_win INTEGER NOT NULL DEFAULT 0,"
+			"max_atk_series_win INTEGER NOT NULL DEFAULT 0,"
+			"def_series_win INTEGER NOT NULL DEFAULT 0,"
+			"max_def_series_win INTEGER NOT NULL DEFAULT 0,"
+			"defeat_unit_cnt INTEGER NOT NULL DEFAULT 0,"
+			"max_turn_damage INTEGER NOT NULL DEFAULT 0,"
+			"max_turn_spark INTEGER NOT NULL DEFAULT 0,"
+			"sum_b_crystal INTEGER NOT NULL DEFAULT 0,"
+			"sum_h_crystal INTEGER NOT NULL DEFAULT 0,"
+			"offer_user_id TEXT NOT NULL DEFAULT '',"
+			"orb_ts INTEGER NOT NULL DEFAULT 0,"
+			"updated_at INTEGER NOT NULL DEFAULT 0);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS arena_battle("
+			"battle_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"attacker_id TEXT NOT NULL,"
+			"defender_id TEXT NOT NULL,"
+			"is_bot INTEGER NOT NULL DEFAULT 0,"
+			"enemy_points INTEGER NOT NULL DEFAULT 0,"
+			"enemy_team TEXT NOT NULL,"
+			"enemy_party TEXT NOT NULL,"
+			"enemy_units TEXT NOT NULL,"
+			"enemy_message TEXT NOT NULL DEFAULT '',"
+			"my_party TEXT NOT NULL DEFAULT '[]',"
+			"my_units TEXT NOT NULL DEFAULT '[]',"
+			"bonus_type TEXT NOT NULL DEFAULT '',"
+			"bonus_param TEXT NOT NULL DEFAULT '',"
+			"status INTEGER NOT NULL DEFAULT 0,"
+			"result_json TEXT NOT NULL DEFAULT '',"
+			"created_at INTEGER NOT NULL DEFAULT 0,"
+			"settled_at INTEGER NOT NULL DEFAULT 0);");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS arena_battle_attacker "
+			"ON arena_battle(attacker_id, status);");
+	});
+
+	// Classic Raid slice 1 (docs/features/RAIDS_SPEC.md 5.1).  No boss or field
+	// tables yet: those arrive with RaidMissionStart.  aube_ts is when `aube`
+	// was last written; regeneration is derived from it on read.
+	migrate("16102026_RaidSchema", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_user("
+			"user_id TEXT PRIMARY KEY NOT NULL,"
+			"rc INTEGER NOT NULL DEFAULT 1,"
+			"agreement INTEGER NOT NULL DEFAULT 0,"
+			"login_world_id TEXT NOT NULL DEFAULT '',"
+			"login_room_id TEXT NOT NULL DEFAULT '',"
+			"aube INTEGER NOT NULL DEFAULT 3,"
+			"aube_ts INTEGER NOT NULL DEFAULT 0);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_room("
+			"room_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"world_id TEXT NOT NULL,"
+			"master_user_id TEXT NOT NULL,"
+			"mission_id TEXT NOT NULL DEFAULT '',"
+			"quick_start INTEGER NOT NULL DEFAULT 0,"
+			"playstyle_id TEXT NOT NULL DEFAULT '1',"
+			"comment TEXT NOT NULL DEFAULT '',"
+			"password TEXT NOT NULL DEFAULT '',"
+			"min_rc INTEGER NOT NULL DEFAULT 1,"
+			"min_lv INTEGER NOT NULL DEFAULT 1,"
+			"kick_flg INTEGER NOT NULL DEFAULT 0,"
+			"midway_joinable INTEGER NOT NULL DEFAULT 0,"
+			"quick_matching INTEGER NOT NULL DEFAULT 0,"
+			"status INTEGER NOT NULL DEFAULT 0,"
+			"helper_json TEXT NOT NULL DEFAULT '',"
+			"created_at INTEGER NOT NULL,"
+			"updated_at INTEGER NOT NULL);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_room_member("
+			"room_id INTEGER NOT NULL,"
+			"user_id TEXT NOT NULL,"
+			"ready INTEGER NOT NULL DEFAULT 0,"
+			"kicked INTEGER NOT NULL DEFAULT 0,"
+			"mission_status INTEGER NOT NULL DEFAULT 0,"
+			"joined_at INTEGER NOT NULL,"
+			"last_seen INTEGER NOT NULL,"
+			"PRIMARY KEY(room_id, user_id));");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_clear("
+			"user_id TEXT NOT NULL,"
+			"mission_id TEXT NOT NULL,"
+			"cleared_at INTEGER NOT NULL,"
+			"PRIMARY KEY(user_id, mission_id));");
+	});
+
+	// Friends between real players (docs/features/FRIENDS_SPEC.md §3).
+	//
+	// friend_id is the PUBLIC id typed into Add Friend.  It is assigned lazily
+	// on the next login packet (gme::ensurePublicFriendId) instead of
+	// backfilled here, so the CSPRNG draw and its retry-on-collision live in
+	// one place.  The edit box is decimal-only, hence digits.
+	//
+	// user_relations stores one relation as TWO rows, one per side, so each
+	// side's favorite flag and pending direction (2 sent / 3 received, the
+	// client's own friend_type values) is a single-row read.  NPC friends stay
+	// in user_friends: the two id namespaces never share a table.
+	migrate("16102026_FriendRelations", {
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN friend_id TEXT;");
+		p->execSqlSync(
+			"CREATE UNIQUE INDEX IF NOT EXISTS user_info_friend_id "
+			"ON user_info(friend_id) WHERE friend_id IS NOT NULL;");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_relations("
+			"user_id TEXT NOT NULL, other_id TEXT NOT NULL,"
+			"state INTEGER NOT NULL, favorite INTEGER NOT NULL DEFAULT 0,"
+			"created_at INTEGER NOT NULL,"
+			"PRIMARY KEY (user_id, other_id));");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS user_relations_other "
+			"ON user_relations(other_id, state);");
+	});
+
+	// The NPC roster is seeded ONCE per account.  Re-seeding whenever
+	// user_friends was empty handed a player who deleted their last NPC five
+	// new ones in the same reply, past their cap now that real friends share
+	// the slots.  Accounts that already hold any friend count as seeded.
+	//
+	// user_units had no user_id index, so every per-player unit lookup in the
+	// social lists (stranger picks, player cards) was a full table scan.
+	migrate("16102026_FriendRosterSeedOnce", {
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN friends_seeded INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync(
+			"UPDATE user_info SET friends_seeded = 1"
+			" WHERE id IN (SELECT user_id FROM user_friends)"
+			" OR id IN (SELECT user_id FROM user_relations WHERE state = 1);");
+		p->execSqlSync("CREATE INDEX IF NOT EXISTS user_units_user_id ON user_units(user_id);");
+	});
+
+	// The unit curves owned units' base_* were last computed from, one row per
+	// unit id.  Unit-balance publishing changes unit_mst at boot; comparing the
+	// effective table against this is how gme::syncUnitStatBasis (run right
+	// after these migrations) knows which owned units to re-curve and from
+	// what.  imp_caps is the unit_mst param_max string, "HP:ATK:DEF:REC".
+	migrate("16102026_CreateUnitStatBasis", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS unit_stat_basis("
+			"unit_id INTEGER PRIMARY KEY,"
+			"max_lv INTEGER NOT NULL,"
+			"min_hp INTEGER NOT NULL,"
+			"max_hp INTEGER NOT NULL,"
+			"min_atk INTEGER NOT NULL,"
+			"max_atk INTEGER NOT NULL,"
+			"min_def INTEGER NOT NULL,"
+			"max_def INTEGER NOT NULL,"
+			"min_rec INTEGER NOT NULL,"
+			"max_rec INTEGER NOT NULL,"
+			"imp_caps TEXT NOT NULL DEFAULT '');");
+	});
+
+	// Classic Raid round 2, the field (docs/features/RAIDS_ROUND2_CORE.md 6.1).
+	//
+	// Every piece of in-mission state is keyed by room mission, not by player,
+	// so a shared room later reuses the same rows: one raid_room_mission per
+	// run, a raid_mission_user / raid_mission_party row set per member, one
+	// raid_mission_boss per boss placement whose HP is what the players share.
+	// raid_mission_event dedupes the client's re-sent battle events (the client
+	// keeps re-sending an event until it sees its id acked).
+	migrate("16102026_RaidField", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_room_mission("
+			"room_mission_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"room_id INTEGER NOT NULL,"
+			"mission_id TEXT NOT NULL,"
+			"result INTEGER NOT NULL DEFAULT 1,"
+			"started_at INTEGER NOT NULL,"
+			"time_limit INTEGER NOT NULL,"
+			"ended_at INTEGER NOT NULL DEFAULT 0);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_mission_user("
+			"room_mission_id INTEGER NOT NULL,"
+			"user_id TEXT NOT NULL,"
+			"now_point INTEGER NOT NULL,"
+			"dst_point INTEGER NOT NULL,"
+			"player_rest INTEGER NOT NULL DEFAULT 3,"
+			"camp_flg INTEGER NOT NULL DEFAULT 0,"
+			"search_info TEXT NOT NULL DEFAULT '',"
+			"battle_serial INTEGER NOT NULL DEFAULT 0,"
+			"battle_boss INTEGER NOT NULL DEFAULT 0,"
+			"battle_boss_id TEXT NOT NULL DEFAULT '',"
+			"battle_point INTEGER NOT NULL DEFAULT 0,"
+			"last_event_id INTEGER NOT NULL DEFAULT 0,"
+			"warp_pending INTEGER NOT NULL DEFAULT 0,"
+			"boss_escape INTEGER NOT NULL DEFAULT 0,"
+			"status INTEGER NOT NULL DEFAULT 1,"
+			"ended INTEGER NOT NULL DEFAULT 0,"
+			"drops TEXT NOT NULL DEFAULT '',"
+			"result_json TEXT NOT NULL DEFAULT '',"
+			"PRIMARY KEY(room_mission_id, user_id));");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_mission_party("
+			"room_mission_id INTEGER NOT NULL,"
+			"user_id TEXT NOT NULL,"
+			"disp_order INTEGER NOT NULL,"
+			"user_unit_id TEXT NOT NULL,"
+			"unit_id TEXT NOT NULL,"
+			"unit_lv INTEGER NOT NULL DEFAULT 1,"
+			"member_type INTEGER NOT NULL DEFAULT 1,"
+			"friend_id TEXT NOT NULL DEFAULT '',"
+			"unit_type_id TEXT NOT NULL DEFAULT '',"
+			"img_type INTEGER NOT NULL DEFAULT 0,"
+			"max_hp INTEGER NOT NULL,"
+			"now_hp INTEGER NOT NULL,"
+			"hel INTEGER NOT NULL DEFAULT 0,"
+			"bb_gauge INTEGER NOT NULL DEFAULT 0,"
+			"sb_gauge INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY(room_mission_id, user_id, disp_order));");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_mission_boss("
+			"room_mission_id INTEGER NOT NULL,"
+			"mission_boss_id TEXT NOT NULL,"
+			"boss_id TEXT NOT NULL,"
+			"current_point INTEGER NOT NULL,"
+			"visible INTEGER NOT NULL DEFAULT 1,"
+			"parts_json TEXT NOT NULL,"
+			"PRIMARY KEY(room_mission_id, mission_boss_id));");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_mission_event("
+			"room_mission_id INTEGER NOT NULL,"
+			"user_id TEXT NOT NULL,"
+			"event_id INTEGER NOT NULL,"
+			"type INTEGER NOT NULL,"
+			"applied_at INTEGER NOT NULL,"
+			"PRIMARY KEY(room_mission_id, user_id, event_id));");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_mission_bag("
+			"room_mission_id INTEGER NOT NULL,"
+			"user_id TEXT NOT NULL,"
+			"frame_id INTEGER NOT NULL,"
+			"item_id TEXT NOT NULL,"
+			"num INTEGER NOT NULL,"
+			"PRIMARY KEY(room_mission_id, user_id, frame_id));");
+		p->execSqlSync("ALTER TABLE raid_room ADD COLUMN mission_start_flg INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE raid_room ADD COLUMN current_room_mission_id INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE raid_room ADD COLUMN closed_at INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// Classic Raid round 2, shared rooms (docs/features/RAIDS_ROUND2_MULTIPLAYER.md 3.1).
+	//
+	// raid_room.status gains 2 (the room's quest is running) and the time the
+	// master set out, which opens the mid-quest join window.  A member's helper
+	// pick (RaidFrlendSelect) is stored server-built on the member row.  Chat
+	// keeps created_at in MILLISECONDS for the per-user rate limit; log ids are
+	// global so they also rise per room.  raid_user_stat holds the
+	// RaidUserTeamArchiveInfo records under their wire keys.
+	migrate("16102026_RaidMultiplayer", {
+		p->execSqlSync("ALTER TABLE raid_room ADD COLUMN mission_started_at INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE raid_room ADD COLUMN password_flg INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE raid_room_member ADD COLUMN helper_json TEXT NOT NULL DEFAULT '';");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_chat("
+			"log_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"room_id INTEGER NOT NULL,"
+			"user_id TEXT NOT NULL,"
+			"chat_type TEXT NOT NULL,"
+			"content TEXT NOT NULL,"
+			"created_at INTEGER NOT NULL);");
+		p->execSqlSync("CREATE INDEX IF NOT EXISTS raid_chat_room ON raid_chat(room_id, log_id);");
+		p->execSqlSync("CREATE INDEX IF NOT EXISTS raid_chat_user ON raid_chat(user_id, created_at);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_blacklist("
+			"user_id TEXT NOT NULL,"
+			"target_user_id TEXT NOT NULL,"
+			"created_at INTEGER NOT NULL,"
+			"PRIMARY KEY(user_id, target_user_id));");
+		p->execSqlSync("CREATE INDEX IF NOT EXISTS raid_blacklist_target ON raid_blacklist(target_user_id);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_user_stat("
+			"user_id TEXT NOT NULL,"
+			"stat TEXT NOT NULL,"
+			"value INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY(user_id, stat));");
+	});
+
+	// Classic Raid round 2, camp rest and raid items (docs/features/RAIDS_ROUND2_CAMP_ITEMS.md 7.1).
+	//
+	// raid_equip_items holds the persistent raid item set (kind 0, Fihk73ZR)
+	// and reserve (kind 1, GvV1w4yM).  Like user_equip_items they are OUT of
+	// the warehouse: RoonItemEdit moves the difference from/to user_items.
+	// The camp's lazy heal clock lives on the run member row next to camp_flg.
+	migrate("16102026_RaidCampItems", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_equip_items("
+			"user_id TEXT NOT NULL,"
+			"kind INTEGER NOT NULL,"
+			"disp_order INTEGER NOT NULL,"
+			"item_id INTEGER NOT NULL,"
+			"item_num INTEGER NOT NULL,"
+			"PRIMARY KEY(user_id, kind, disp_order));");
+		p->execSqlSync("ALTER TABLE raid_mission_bag ADD COLUMN new_flg INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE raid_mission_user ADD COLUMN camp_since INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE raid_mission_user ADD COLUMN healed_until INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// Classic Raid round 2: monsters defeated per run, for RaidMisCondClearMst
+	// type-2 targets ("2:<monsterId>:<count>", e.g. mission 2003).  Shared by
+	// the room like boss HP; BattleEnd adds each closed battle's 6RxkwBv7 once.
+	migrate("16102026_RaidKills", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS raid_mission_kill("
+			"room_mission_id INTEGER NOT NULL,"
+			"monster_id TEXT NOT NULL,"
+			"num INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY(room_mission_id, monster_id));");
+	});
+
+	// Research Lab trial squads (TrialDeckGet / TrialDeckEdit): decks 0-2 are
+	// the three Trial Zone squads, 10 the Ep3 trial's and 99 the new trial's.
+	// Kept out of user_decks because UserInfo sends every user_decks row as a
+	// normal party.
+	migrate("17102026_TrialDecks", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_trial_decks ("
+			"user_id      TEXT    NOT NULL,"
+			"deck_num     INTEGER NOT NULL,"
+			"disp_order   INTEGER NOT NULL,"
+			"member_type  INTEGER NOT NULL,"
+			"user_unit_id INTEGER NOT NULL,"
+			"PRIMARY KEY (user_id, deck_num, disp_order)"
+			");"
+		);
+	});
+
+	// Unit box rule change (owner, 2026-10-17): 300 base slots (kBaseUnitBoxSlots,
+	// added on the fly) plus 20 per gem step instead of 5.  max_unit_count holds
+	// only bought slots, every one bought at 5 per gem step, so 20 per step is
+	// exactly four times what each player already has.  Runs once.
+	migrate("17102026_UnitBoxRebase", {
+		p->execSqlSync("UPDATE user_info SET max_unit_count = max_unit_count * 4 WHERE max_unit_count > 0;");
+	});
+
+	// Guilds between real players (docs/features/GUILDS_SOCIAL_2026-10-17.md).
+	//
+	// user_guild_requests: a join APPLICATION (kind 1, the applicant asks) or an
+	// INVITE (kind 2, a member asks the invitee).  request_id is the integer the
+	// client sends back to accept or decline (GuildInviteManage 7ad38bad), so it
+	// is an INTEGER PRIMARY KEY.  One open request per (guild, player, kind).
+	//
+	// user_guild_board: the guild message board, newest post last by post_id.
+	migrate("17102026_GuildSocial", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_guild_requests ("
+			"request_id   INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"guild_id     INTEGER NOT NULL,"
+			"user_id      TEXT    NOT NULL,"
+			"kind         INTEGER NOT NULL,"
+			"from_user_id TEXT    NOT NULL DEFAULT '',"
+			"created_at   INTEGER NOT NULL DEFAULT 0,"
+			"UNIQUE (guild_id, user_id, kind)"
+			");"
+		);
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_guild_requests_user"
+			" ON user_guild_requests (user_id, kind);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_guild_board ("
+			"post_id    INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"guild_id   INTEGER NOT NULL,"
+			"user_id    TEXT    NOT NULL,"
+			"message    TEXT    NOT NULL,"
+			"created_at INTEGER NOT NULL DEFAULT 0"
+			");"
+		);
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_guild_board_guild"
+			" ON user_guild_board (guild_id, post_id);");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_guild_members_member"
+			" ON user_guild_members (member_id);");
+		// The newest post this member has seen, for GuildInfo's unread badge
+		// (b6D19bg9): set when they open the board.
+		p->execSqlSync(
+			"ALTER TABLE user_guild_members ADD COLUMN board_seen_post INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// Friend gifts between real players (gme::sendGifts): the once-a-day check
+	// per sender and recipient, and the sender's "sent today" rows that every
+	// gift list now carries.  Not UNIQUE: the old read-then-insert could leave
+	// two simulated gifts on one day, and deleting either would take a gift.
+	migrate("18102026_UserGiftsSendIndexes", {
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_gifts_from_day"
+			" ON user_gifts (from_user_id, day);");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_gifts_pair_day"
+			" ON user_gifts (user_id, from_user_id, day);");
+	});
+
+	// Honor paid to a LENDER when another player clears with their unit as
+	// the helper (gme::creditHelperLender).  One row per lender (user_id),
+	// borrower and day (giftToday's key, the 08:00 UTC game day since
+	// 18102026_DailySpinAndGiftsDayAt0800): the key is what limits one borrower
+	// to one credit a day, and the day's SUM is the lender's daily cap.
+	migrate("18102026_HelperLends", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_helper_lends ("
+			"user_id     TEXT    NOT NULL,"
+			"borrower_id TEXT    NOT NULL,"
+			"day         TEXT    NOT NULL,"
+			"honor       INTEGER NOT NULL,"
+			"created_at  INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, borrower_id, day));");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_helper_lends_borrower"
+			" ON user_helper_lends (borrower_id);");
+	});
+
+	// The Hunter Orb a Frontier Hunter MissionStart spent (gme::chargeHunterOrb):
+	// the request it was charged to, so a client RESEND of that same request
+	// is not charged again.  0 / '' on every run that paid none.
+	migrate("18102026_MissionRunHunterOrb", {
+		p->execSqlSync(
+			"ALTER TABLE user_mission_runs ADD COLUMN hunter_orb_paid_at INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync(
+			"ALTER TABLE user_mission_runs ADD COLUMN hunter_orb_tag TEXT NOT NULL DEFAULT '';");
+	});
+
+	// The daily Challenges (gme/common/DailyChallenges.hpp): one row per
+	// challenge a player STARTED, keyed on the window it was started in.  The
+	// window is part of the key because the same ids come back every week, and
+	// a row of last Monday must neither pay this Monday's reward nor carry its
+	// progress over.  state 1 = in progress, 2 = finished; an id with no row is
+	// not started.  fail_notified latches the one "expired" notice.
+	migrate("18102026_CreateUserDailyChallenges", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_daily_challenges ("
+			"user_id         TEXT    NOT NULL,"
+			"window_day      INTEGER NOT NULL,"
+			"subject_id      INTEGER NOT NULL,"
+			"state           INTEGER NOT NULL DEFAULT 1,"
+			"progress        INTEGER NOT NULL DEFAULT 0,"
+			"reward_received INTEGER NOT NULL DEFAULT 0,"
+			"fail_notified   INTEGER NOT NULL DEFAULT 0,"
+			"accepted_at     INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, window_day, subject_id));");
+	});
+
+	// Frontier Hunter scoring and rewards (gme/common/FrontierHunter.hpp,
+	// ticket #8).  One survey per week (cycle = weeks since Monday
+	// 1970-01-05 UTC):
+	// * user_frohun_scores: a player's week on one quest -- the best run, the
+	//   Frontier Service of every cleared run, entries, clears and the note
+	//   counters the MVP boards rank.  Each ranked value has a *_at column, the
+	//   time it last grew: a tie on a board goes to whoever got there first.
+	//   updated_at is the last cleared run.
+	// * user_frohun_rewards: the quest point rewards already paid that week.
+	// * user_frohun_claims: the weeks whose rank rewards were claimed, with the
+	//   final place and the Hunter Rank before and after.
+	// * user_info.hunter_rank: the Hunter Rank (HR 1 until the first claim).
+	migrate("18102026_FrontierHunterScores", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_frohun_scores ("
+			"user_id    TEXT    NOT NULL,"
+			"cycle      INTEGER NOT NULL,"
+			"mission_id INTEGER NOT NULL,"
+			"event_id   INTEGER NOT NULL DEFAULT 0,"
+			"best_score INTEGER NOT NULL DEFAULT 0,"
+			"service    INTEGER NOT NULL DEFAULT 0,"
+			"runs       INTEGER NOT NULL DEFAULT 0,"
+			"clears     INTEGER NOT NULL DEFAULT 0,"
+			"sparks     INTEGER NOT NULL DEFAULT 0,"
+			"overkills  INTEGER NOT NULL DEFAULT 0,"
+			"multikills INTEGER NOT NULL DEFAULT 0,"
+			"bbkills    INTEGER NOT NULL DEFAULT 0,"
+			"oneturns   INTEGER NOT NULL DEFAULT 0,"
+			"updated_at INTEGER NOT NULL DEFAULT 0,"
+			"best_at       INTEGER NOT NULL DEFAULT 0,"
+			"service_at    INTEGER NOT NULL DEFAULT 0,"
+			"runs_at       INTEGER NOT NULL DEFAULT 0,"
+			"sparks_at     INTEGER NOT NULL DEFAULT 0,"
+			"overkills_at  INTEGER NOT NULL DEFAULT 0,"
+			"multikills_at INTEGER NOT NULL DEFAULT 0,"
+			"bbkills_at    INTEGER NOT NULL DEFAULT 0,"
+			"oneturns_at   INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, cycle, mission_id));");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS idx_user_frohun_scores_cycle"
+			" ON user_frohun_scores (cycle, user_id);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_frohun_rewards ("
+			"user_id   TEXT    NOT NULL,"
+			"cycle     INTEGER NOT NULL,"
+			"reward_id INTEGER NOT NULL,"
+			"paid_at   INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, cycle, reward_id));");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_frohun_claims ("
+			"user_id    TEXT    NOT NULL,"
+			"cycle      INTEGER NOT NULL,"
+			"event_id   INTEGER NOT NULL DEFAULT 0,"
+			"final_rank INTEGER NOT NULL DEFAULT 0,"
+			"service    INTEGER NOT NULL DEFAULT 0,"
+			"hr_before  INTEGER NOT NULL DEFAULT 1,"
+			"hr_after   INTEGER NOT NULL DEFAULT 1,"
+			"claimed_at INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, cycle));");
+		p->execSqlSync(
+			"ALTER TABLE user_info ADD COLUMN hunter_rank INTEGER NOT NULL DEFAULT 1;");
+	});
+
+	// DAILY TASKS TURN OVER AT 08:00 UTC, the client's midnight, instead of
+	// 00:00 UTC.  user_daily_tasks keeps its day numbers; what changes is how
+	// today's number is worked out, and the shift recorded here keeps the day
+	// that is running at the switch on the number it already had, so nobody's
+	// tasks reset or come round twice.  See gme::DayClock.
+	//
+	// ⚠ DO NOT ROLL PROD BACK PAST THIS.  A build from before it numbers the
+	// days by midnight UTC and agrees with the recorded numbering only part of
+	// each day, so a rollback can reopen tasks already paid that day.  Retag
+	// bf-server:prev from a build that has this migration once it is live.
+	//
+	// server_state holds values the server decided once and has to keep.
+	migrate("18102026_DailyTaskDayAt0800", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS server_state ("
+			"name  TEXT    PRIMARY KEY NOT NULL,"
+			"value INTEGER NOT NULL"
+			");");
+		const int64_t shift = gme::gameDayShiftAt(gme::unixNow());
+		// OR IGNORE: a recorded shift is never changed, not even by a rerun.
+		p->execSqlSync(
+			"INSERT OR IGNORE INTO server_state (name, value) VALUES ($1, $2);",
+			std::string{ gme::dayClockKey(gme::DayClock::DailyTasks) }, shift);
+		LOG_INFO << "Daily tasks now turn over at 08:00 UTC (day shift " << shift << ")";
+	});
+
+	// THE DAILY SPIN AND giftToday() TURN OVER AT 08:00 UTC too: the spin's
+	// day number (user_daily_spin.last_spin_utc_day) and the "YYYY-MM-DD" key
+	// behind the login bonus, friend gifts, helper lends and the friend
+	// picker.  Each clock records its own shift (gme::DayClock), taken now, so
+	// the day running at this switch keeps the number and key it already had
+	// and nothing claimed today can be claimed again.  No rows are rewritten.
+	// Guild founding and join dates stay plain UTC dates (utcDateToday).
+	//
+	// ⚠ DO NOT ROLL PROD BACK PAST THIS, for the same reason as the Daily
+	// Tasks switch above.
+	migrate("18102026_DailySpinAndGiftsDayAt0800", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS server_state ("
+			"name  TEXT    PRIMARY KEY NOT NULL,"
+			"value INTEGER NOT NULL"
+			");");
+		const int64_t shift = gme::gameDayShiftAt(gme::unixNow());
+		// OR IGNORE: a recorded shift is never changed, not even by a rerun.
+		p->execSqlSync(
+			"INSERT OR IGNORE INTO server_state (name, value) VALUES ($1, $2);",
+			std::string{ gme::dayClockKey(gme::DayClock::DailySpin) }, shift);
+		p->execSqlSync(
+			"INSERT OR IGNORE INTO server_state (name, value) VALUES ($1, $2);",
+			std::string{ gme::dayClockKey(gme::DayClock::Gifts) }, shift);
+		LOG_INFO << "The daily spin and the gift day now turn over at 08:00 UTC (day shift " << shift << ")";
+	});
+
+	// ELGIF SKILLS (ticket #38, gme/common/ExtraSkills.hpp).
+	//   user_units.extra_passive_skill_id2     the skill an Elgif gave the unit
+	//   user_units.add_extra_passive_skill_id  the skill an Elgif copy carries
+	//   user_presents.unit_extra_skill         the skill a queued Elgif carries
+	// Every Elgif granted before this had none (1,006 on 219 accounts on
+	// 2026-10-19, nearly all monster drops, which name none anyway), so each
+	// gets one of the drop skills.  Not refunded here: the Elgifs and Zel spent
+	// on fusions that gave nothing.
+	migrate("19102026_UnitExtraPassiveSkills", {
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN extra_passive_skill_id2 INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN add_extra_passive_skill_id INTEGER NOT NULL DEFAULT 0");
+		p->execSqlSync("ALTER TABLE user_presents ADD COLUMN unit_extra_skill INTEGER NOT NULL DEFAULT 0");
+		const auto filled = p->execSqlSync(
+			"UPDATE user_units SET add_extra_passive_skill_id = " + gme::randomElgifSkillSql() +
+			" WHERE CAST(unit_id AS INTEGER) = $1 AND add_extra_passive_skill_id = 0;",
+			gme::kElgifUnitId);
+		const auto queued = p->execSqlSync(
+			"UPDATE user_presents SET unit_extra_skill = " + gme::randomElgifSkillSql() +
+			" WHERE present_type = 6 AND CAST(target_id AS INTEGER) = $1 AND is_receipt = 0;",
+			gme::kElgifUnitId);
+		LOG_INFO << "Elgif skills: " << filled.affectedRows() << " Elgif(s) and "
+			<< queued.affectedRows() << " unclaimed Elgif present(s) given a skill";
+	});
+
+	// THE 50-GEM UNIT PICK (gme/common/UnitPick.hpp): one row per account that
+	// has used it.  The primary key is the once-per-account rule; a reset
+	// deletes the row (the admin tooling OWNED_TABLES), which is
+	// what makes the pick available again.  reply_json is the reply that pick
+	// sent, returned as-is if the same pick arrives again (a lost reply).
+	migrate("19102026_CreateUserUnitPick", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_unit_pick ("
+			"user_id      TEXT    NOT NULL PRIMARY KEY,"
+			"unit_id      INTEGER NOT NULL,"
+			"unit_type    INTEGER NOT NULL,"
+			"ticket_id    TEXT    NOT NULL,"
+			"user_unit_id INTEGER,"
+			"reply_json   TEXT,"
+			"picked_at    INTEGER NOT NULL"
+			");"
+		);
+	});
+
+	// The in-game account reset (gme/common/AccountReset.hpp, ticket #53).
+	// A player's confirmed request waits here until Balance Forge runs the
+	// admin tooling's reset (the admin tooling) and sets state to
+	// done, gone or failed.  Rows stay as the record of who asked and when, so
+	// a reset never deletes them.  the admin tooling's playerdb.py must know this
+	// table before a server with it is deployed: it refuses to reset accounts
+	// while the save holds a table it does not know.
+	migrate("19102026_AccountResetQueue", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS account_reset_queue("
+			"id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"user_id TEXT NOT NULL,"
+			"gumi_user_id TEXT NOT NULL DEFAULT '',"
+			"requested_at INTEGER NOT NULL,"
+			"state TEXT NOT NULL DEFAULT 'queued',"
+			"handled_at INTEGER,"
+			"note TEXT NOT NULL DEFAULT '');");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS account_reset_queue_state "
+			"ON account_reset_queue(state, user_id);");
+	});
+
+	// FriendGet's "recently active strangers" (gme::unrelatedPlayers) walks
+	// players newest login first and stops at the tenth: without this index it
+	// sorted every account on every call, 9 ms on the 1,547-account save
+	// (2026-10-20) and over half the SQLite thread's time under load.
+	migrate("20102026_GumiLiveUsersLastLoginIndex", {
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS gumi_live_users_last_login "
+			"ON gumi_live_users(last_login_at);");
+	});
+
+	// Every Merit Point a player has EARNED, uncapped and never spent
+	// (ticket #76).  "Gather a total of 1,000,000 Merit Points" read the
+	// balance, which stops at 999,999 and drops when the shop is used.  Seeded
+	// with what is provably earned: the balance plus what the Merit Shop rows
+	// record as bought, at each offer's price (the cache is loaded before
+	// migrations run).  This must run before the weekly restock below can start
+	// a row's count again.
+	migrate("20102026_MeritPointLifetimeTotal", {
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN achieve_point_total INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("CREATE TEMP TABLE merit_seed_prices (trade_id TEXT PRIMARY KEY, price INTEGER NOT NULL);");
+		for (const auto& offer : theServer()->cache().achievementTradeMst())
+			p->execSqlSync("INSERT OR REPLACE INTO merit_seed_prices (trade_id, price) VALUES ($1, $2);",
+				std::to_string(offer.id), static_cast<int64_t>(offer.price));
+		p->execSqlSync(
+			"UPDATE user_info SET achieve_point_total = achieve_point + COALESCE(("
+			"SELECT SUM(t.count * m.price) FROM user_achievement_trades t"
+			" JOIN merit_seed_prices m ON m.trade_id = t.trade_id"
+			" WHERE t.user_id = user_info.id), 0);");
+		p->execSqlSync("DROP TABLE merit_seed_prices;");
+	});
+
+	// The week a Merit Shop row's count belongs to, for the evolution
+	// materials that restock every Monday 08:00 UTC (ticket #75,
+	// gme/common/MeritShop.hpp).  0 on every other offer, and on the rows
+	// bought before this: a weekly offer's old count is spent at once.
+	// "CLEARED IN N TURNS" (ticket #46).  The fewest turns any won
+	// clear of the mission took, from MissionEnd's per-wave turn list; 0 means
+	// no clear has reported one yet.  Kept per mission like no_continue.
+	migrate("20102026_BestClearTurns", {
+		p->execSqlSync(
+			"ALTER TABLE user_campaign_missions"
+			" ADD COLUMN best_turns INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	migrate("20102026_AchievementTradePeriod", {
+		p->execSqlSync("ALTER TABLE user_achievement_trades ADD COLUMN period INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// Item box rule change (owner, 2026-10-21): the unit box's treatment for
+	// items too -- the starting 100 slots become 200 (gme::kBaseItemBoxSlots)
+	// and a gem step grants 20 slots instead of 5.  Unlike the unit box,
+	// max_warehouse_count holds the whole capacity (start + bought), every
+	// player started at 100 and every bought slot cost 5 per step, so this
+	// rescales each player to what the new rules would have given them:
+	// 200 + 4 x bought, under DefineMst's 3200 cap.  Runs once.
+	migrate("21102026_ItemBoxRebase", {
+		p->execSqlSync(
+			"UPDATE user_info SET max_warehouse_count ="
+			" MIN(3200, 200 + 4 * MAX(max_warehouse_count - 100, 0));");
+	});
+
+	// Where an owned unit came from: 'drop' for a mission capture, '' for
+	// everything else (summons, gifts, and every row from before this).  A
+	// dropped copy trades in for less Merit (ticket #82).
+	migrate("21102026_UserUnitSource", {
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN source TEXT NOT NULL DEFAULT '';");
+	});
+
+	// THE RACE TO LEVEL 999 (owner, 2026-10-21): the first three accounts to
+	// reach summoner level 999 win gems, paid by the admin tooling
+	// (the admin tooling) for the Discord #leaderboard.  MissionEnd,
+	// the only place a player levels, adds the row in the transaction that
+	// levels them, so `seq` is the order those level-ups committed in, whatever
+	// the bot's poll timing.  One row per account, ever.  Accounts already at
+	// 999 get none: the race counts from this migration on, recorded as
+	// server_state 'level_race_started'.  A reset or delete leaves the table
+	// alone (it is the race's record; the admin tooling).
+	migrate("21102026_LevelRace", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS level_race ("
+			"seq        INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"user_id    TEXT    NOT NULL UNIQUE,"
+			"reached_at INTEGER NOT NULL"
+			");");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS server_state ("
+			"name  TEXT    PRIMARY KEY NOT NULL,"
+			"value INTEGER NOT NULL"
+			");");
+		p->execSqlSync(
+			"INSERT OR IGNORE INTO server_state (name, value) VALUES ('level_race_started', $1);",
+			gme::unixNow());
+	});
+
+	// THE LEVEL 999 RACE PICK (owner, 2026-10-22): one free pick from every 7★
+	// and Omni unit for the first ten accounts to reach level 999.  The
+	// admin tooling adds the row (playerdb op 'race_pick', INSERT OR IGNORE, so a
+	// retry gives nothing twice); UnitSelectorGachaTicket fills in the pick.
+	// picked_at 0 = not picked yet.  A reset or delete removes the row.
+	migrate("22102026_RacePick", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_race_pick ("
+			"user_id      TEXT    NOT NULL PRIMARY KEY,"
+			"place        INTEGER NOT NULL,"
+			"granted_at   INTEGER NOT NULL,"
+			"unit_id      INTEGER,"
+			"unit_type    INTEGER,"
+			"ticket_id    TEXT,"
+			"user_unit_id INTEGER,"
+			"reply_json   TEXT,"
+			"picked_at    INTEGER NOT NULL DEFAULT 0"
+			");");
+	});
+
+	// Omni+ Boost level (UserUnitInfo 49sa3sld): 0 never boosted, +1..+3.
+	// UnitOmniEvo is the one writer; see gme/common/OmniPlus.hpp.
+	migrate("22102026_UnitOmniLevel", {
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN omni_level INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// A device recognized again after its ANDROID_ID changes: BlueStacks and
+	// MuMu hand out a new one after a crash or a long session, and that used
+	// to start a new account (ticket #69).  device_hint hashes the
+	// advertising id with altvid as the last guest login sent them,
+	// device_hint_key is the device_key they came with
+	// (AccountController.cpp, rebindByDeviceHint).
+	migrate("23102026_GumiDeviceHint", {
+		p->execSqlSync("ALTER TABLE gumi_live_users ADD COLUMN device_hint TEXT;");
+		p->execSqlSync("ALTER TABLE gumi_live_users ADD COLUMN device_hint_key TEXT;");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS gumi_live_users_device_hint "
+			"ON gumi_live_users(device_hint) WHERE device_hint IS NOT NULL;");
+	});
+
+	// One-off Unit Guide backfill: every form a player owns is a form they
+	// have seen.  UnitEvo rewrote unit_id in place without recording the new
+	// form, so evolved units never reached the guide (ticket #118);
+	// UnitEvo records it now.  OR IGNORE keeps every existing row, alternate
+	// art flags included.
+	migrate("23102026_UnitDictionaryOwnedForms", {
+		p->execSqlSync(
+			"INSERT OR IGNORE INTO user_unit_dictionary (user_id, unit_id) "
+			"SELECT DISTINCT user_id, CAST(unit_id AS INTEGER) FROM user_units "
+			"WHERE CAST(unit_id AS INTEGER) > 0;");
+	});
+
+	// The Colosseum (gme/common/Colosseum.cpp): per-player CBP and ticket day,
+	// per-class squads and season standing, archived season results, matches
+	// and the exchange's one-off rewards.
+	migrate("23102026_CreateColosseumTables", {
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_colosseum("
+			"user_id TEXT PRIMARY KEY NOT NULL,"
+			"cbp INTEGER NOT NULL DEFAULT 0,"
+			"total_cbp INTEGER NOT NULL DEFAULT 0,"
+			"ticket_day INTEGER NOT NULL DEFAULT 0,"
+			"notice TEXT NOT NULL DEFAULT '',"
+			"last_enemy TEXT NOT NULL DEFAULT '');");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_colosseum_class("
+			"user_id TEXT NOT NULL,"
+			"class_id INTEGER NOT NULL,"
+			"season_id TEXT NOT NULL DEFAULT '',"
+			"points INTEGER NOT NULL DEFAULT 0,"
+			"season_battle_cnt INTEGER NOT NULL DEFAULT 0,"
+			"battle_cnt INTEGER NOT NULL DEFAULT 0,"
+			"win_cnt INTEGER NOT NULL DEFAULT 0,"
+			"battle_cnt_accept INTEGER NOT NULL DEFAULT 0,"
+			"win_cnt_accept INTEGER NOT NULL DEFAULT 0,"
+			"atk_series_win INTEGER NOT NULL DEFAULT 0,"
+			"max_atk_series_win INTEGER NOT NULL DEFAULT 0,"
+			"all_win_cnt INTEGER NOT NULL DEFAULT 0,"
+			"all_series_win INTEGER NOT NULL DEFAULT 0,"
+			"max_all_series_win INTEGER NOT NULL DEFAULT 0,"
+			"atk_party TEXT NOT NULL DEFAULT '[]',"
+			"def_party TEXT NOT NULL DEFAULT '[]',"
+			"atk_formation INTEGER NOT NULL DEFAULT 101,"
+			"atk_support INTEGER NOT NULL DEFAULT 600,"
+			"def_formation INTEGER NOT NULL DEFAULT 201,"
+			"def_support INTEGER NOT NULL DEFAULT 400,"
+			"updated_at INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, class_id));");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS user_colosseum_class_rank"
+			" ON user_colosseum_class(class_id, season_id, points);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_colosseum_season("
+			"user_id TEXT NOT NULL,"
+			"season_id TEXT NOT NULL,"
+			"class_id INTEGER NOT NULL,"
+			"points INTEGER NOT NULL DEFAULT 0,"
+			"position INTEGER NOT NULL DEFAULT 0,"
+			"battle_cnt INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, season_id, class_id));");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS user_colosseum_season_rank"
+			" ON user_colosseum_season(season_id, class_id, points);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS colosseum_battle("
+			"battle_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+			"attacker_id TEXT NOT NULL,"
+			"defender_id TEXT NOT NULL,"
+			"class_id INTEGER NOT NULL,"
+			"season_id TEXT NOT NULL DEFAULT '',"
+			"is_bot INTEGER NOT NULL DEFAULT 0,"
+			"tickets INTEGER NOT NULL DEFAULT 1,"
+			"enemy_json TEXT NOT NULL DEFAULT '',"
+			"party_json TEXT NOT NULL DEFAULT '',"
+			"bonus_type TEXT NOT NULL DEFAULT '',"
+			"bonus_param TEXT NOT NULL DEFAULT '',"
+			"status INTEGER NOT NULL DEFAULT 0,"
+			"result_json TEXT NOT NULL DEFAULT '',"
+			"created_at INTEGER NOT NULL DEFAULT 0,"
+			"settled_at INTEGER NOT NULL DEFAULT 0);");
+		p->execSqlSync(
+			"CREATE INDEX IF NOT EXISTS colosseum_battle_attacker ON colosseum_battle(attacker_id, status);");
+		p->execSqlSync(
+			"CREATE TABLE IF NOT EXISTS user_colosseum_reward("
+			"user_id TEXT NOT NULL,"
+			"reward_id INTEGER NOT NULL,"
+			"received_at INTEGER NOT NULL DEFAULT 0,"
+			"PRIMARY KEY (user_id, reward_id));");
+	});
+
+	// The Unit Guide reveals a line's lower forms too: a 7* seen means its 5*
+	// and 6* are seen, however it was obtained (ticket #118;
+	// gme::recordUnitDictionary does this from now on).  The unit tables are
+	// loaded before migrations run (standalone_frontend/main.cpp).  Each pass
+	// adds one step down every line; it stops when a pass adds nothing.
+	// The Colosseum exchange's "Go to Next Stage" moves a player on to the
+	// next vault, leaving what they did not buy behind (gme/common/Colosseum.cpp).
+	migrate("24102026_ColosseumRewardStage", {
+		p->execSqlSync("ALTER TABLE user_colosseum ADD COLUMN reward_stage INTEGER NOT NULL DEFAULT 1;");
+	});
+
+	migrate("23102026_UnitDictionaryLowerForms", {
+		std::string pairs;
+		for (const auto& row : theServer()->cache().unitEvoMst())
+		{
+			if (!pairs.empty()) pairs += ',';
+			pairs += '(' + std::to_string(row.unit_id) + ',' + std::to_string(row.evo_unit_id) + ')';
+		}
+		if (pairs.empty())
+		{
+			LOG_ERROR << "UnitDictionaryLowerForms: no unit evolution table; nothing backfilled";
+			return;
+		}
+		p->execSqlSync("CREATE TEMP TABLE evo_lower (lower_id INTEGER NOT NULL, evo_id INTEGER NOT NULL);");
+		p->execSqlSync("INSERT INTO evo_lower (lower_id, evo_id) VALUES " + pairs + ";");
+		p->execSqlSync("CREATE INDEX temp.evo_lower_evo ON evo_lower (evo_id);");
+		size_t total = 0;
+		for (int pass = 0; pass < 16; ++pass)
+		{
+			const auto added = p->execSqlSync(
+				"INSERT OR IGNORE INTO user_unit_dictionary (user_id, unit_id) "
+				"SELECT d.user_id, e.lower_id FROM user_unit_dictionary d "
+				"JOIN evo_lower e ON e.evo_id = d.unit_id;").affectedRows();
+			total += added;
+			if (added == 0)
+				break;
+		}
+		p->execSqlSync("DROP TABLE temp.evo_lower;");
+		LOG_INFO << "UnitDictionaryLowerForms: " << total << " lower forms added";
+	});
+
+	// Classic Raid: how often each run member has fought each boss,
+	// "missionBossId:count,..." as RaidMissionUesrInfo 5soj5vGI carries it.
+	migrate("23102026_RaidBossEncounters", {
+		p->execSqlSync("ALTER TABLE raid_mission_user ADD COLUMN boss_encounters TEXT NOT NULL DEFAULT '';");
+	});
+
+	// Sandbox mode (ticket #137, gme/common/Sandbox.hpp): when the
+	// account confirmed it, 0 for a normal account (nothing sets it back), and
+	// when the Serial Code screen last asked for the confirmation.  The partial
+	// index serves every pool filter's "SELECT id ... WHERE sandbox_at > 0".
+	migrate("24102026_SandboxMode", {
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN sandbox_at INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN sandbox_asked_at INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("CREATE INDEX IF NOT EXISTS user_info_sandbox ON user_info(id) WHERE sandbox_at > 0;");
+	});
+
+	// The art a unit is SHOWING (UserUnitInfo.unit_img_type, 2pAyFjmZ): 2 for
+	// the alternate art, 0 for the base (the client reads 0 as its own base, 1).
+	// UnitFavorite carries every unit showing alt art; login sends it back, so
+	// the choice survives a restart (ticket #145).
+	migrate("24102026_UnitImgType", {
+		p->execSqlSync("ALTER TABLE user_units ADD COLUMN unit_img_type INTEGER NOT NULL DEFAULT 0;");
+	});
+
+	// SUMMONER TRAINING POINTS, lifetime.  user_summoner.friend_point is the
+	// spendable ST balance on the wire (J3stQ7jd); the "N Summoner Training
+	// Points Accumulated" records (53000 band) count what was ever earned, so
+	// they need their own total (ticket #143).
+	migrate("24102026_SummonerStPointsTotal", {
+		p->execSqlSync("ALTER TABLE user_summoner ADD COLUMN st_points_total INTEGER NOT NULL DEFAULT 0;");
+		p->execSqlSync("UPDATE user_summoner SET st_points_total = MAX(friend_point, 0);");
+	});
+
+	// THE BURST TOKENS THE BRAVE BURST CALENDAR SHOWED (ticket #44).
+	// Its odd days draw "Burst Token x200 / x400 / x500" (the client's
+	// Feb2022_login_icon_dayN art) but login_campaign.json paid that amount as
+	// Honor, so nobody ever held a Burst Token (event token 61).  The calendar
+	// now pays tokens; this sends every player who already passed those days the
+	// tokens their cells showed, as ONE present each.  The Honor they got stays.
+	// The calendar never repeats (a run ends after day 25), so current_day is
+	// exactly the days claimed.
+	migrate("25102026_BurstCalendarTokens", {
+		// ⚠ No brace lists in here: `migrate` is a macro and their commas
+		// would split its arguments.  Odd days pay 200 (days 1-3), 400 (5-21)
+		// and 500 (23-25) -- deploy/archive/login_campaign.json.
+		std::string owed = "CASE";
+		int32_t total = 0;
+		for (int32_t day = 1; day <= 25; ++day)
+		{
+			if (day % 2 == 1)
+				total += day <= 3 ? 200 : (day <= 21 ? 400 : 500);
+			owed += " WHEN c.current_day = " + std::to_string(day) + " THEN " + std::to_string(total);
+		}
+		owed += " ELSE " + std::to_string(total) + " END";
+		p->execSqlSync(
+			"INSERT INTO user_presents (user_id, present_type, target_id, target_cnt, receipt_type,"
+			" description, present_date)"
+			" SELECT c.user_id, 8004, '61', " + owed + ", 0,"
+			" 'Burst Tokens from the Brave Burst login calendar', CAST(strftime('%s', 'now') AS INTEGER)"
+			" FROM user_login_campaign c JOIN user_info i ON i.id = c.user_id"
+			" WHERE c.current_day >= 1;");
+	});
+
+	// AUTO-SELL (ticket #27, gme/common/AutoSell.hpp): 1 when the
+	// player turned it on with the AUTOSELL serial code.
+	migrate("25102026_AutoSell", {
+		p->execSqlSync("ALTER TABLE user_info ADD COLUMN auto_sell INTEGER NOT NULL DEFAULT 0;");
+	});
+
+}
+
+/*!
+* Gets all the runned migration (and optionally create the table)
+* @param p Database pointer
+* @param hash Output where to store all the hashes
+*/
+static void GetMigrationStatus(drogon::orm::DbClientPtr& p, std::vector<std::string>& hash)
+{
+	p->execSqlSync(
+		"CREATE TABLE IF NOT EXISTS migration_status("
+		"hash TEXT PRIMARY KEY NOT NULL"
+		");"
+	);
+	auto res = p->execSqlSync(
+		"SELECT hash FROM migration_status;"
+	);
+	if (res.size() > 0)
+	{
+		for (const auto& x : res)
+		{
+			const auto& str = x[0].as<std::string>();
+			LOG_DEBUG << "Migration found: " << str;
+			hash.emplace_back(str);
+		}
+	}
+}
+
+void MigrationManager::RunMigrations(drogon::orm::DbClientPtr ptr)
+{
+	MigrationMap migrations;
+	RegisterMigrations(migrations);
+
+	// Migrations are a vector so they run in declared order (a hash map ran them
+	// unordered).  The vector doesn't dedup, so guard the uniqueness the map used
+	// to give us: a duplicate name would run twice / mask an intended migration.
+	std::vector<std::string> seenNames;
+	for (const auto& [name, _] : migrations)
+	{
+		if (std::find(seenNames.begin(), seenNames.end(), name) != seenNames.end())
+		{
+			LOG_ERROR << "Duplicate migration name: " << name;
+			drogon::app().quit();
+			return;
+		}
+		seenNames.push_back(name);
+	}
+
+	std::vector<std::string> runnedMigratons;
+	GetMigrationStatus(ptr, runnedMigratons);
+
+	try
+	{
+		for (const auto& [k, v] : migrations)
+		{
+			if (std::find(runnedMigratons.begin(), runnedMigratons.end(), k) != runnedMigratons.end())
+				continue;
+
+			LOG_INFO << "Execute migration " << k;
+			v(ptr);
+			ptr->execSqlSync("INSERT INTO migration_status(hash) VALUES ($1);", k);
+		}
+	}
+	catch (drogon::orm::DrogonDbException ex)
+	{
+		LOG_ERROR << "Cannot execute migration: " << ex.base().what();
+		drogon::app().quit();
+	}
+
+}
+

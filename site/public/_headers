@@ -1,0 +1,21 @@
+# no-transform: stops Cloudflare from rewriting responses, which includes injecting
+# the Web Analytics beacon into the HTML (the page must stay tracker-free).
+/*
+  Cache-Control: no-transform
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+/
+  Cache-Control: max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: max-age=0, must-revalidate
+
+/assets/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/og.jpg
+  Cache-Control: public, max-age=86400

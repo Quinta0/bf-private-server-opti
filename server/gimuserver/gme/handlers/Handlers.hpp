@@ -1,0 +1,372 @@
+#pragma once
+
+/*!
+* Class to hold results of an handler.
+*/
+struct HandleResult
+{
+	/*!
+	* Success JSON.
+	*/
+	std::string successJson;
+
+	/*!
+	* Error message.
+	*/
+	std::string errorMsg;
+
+	/*!
+	* Exception message.
+	*/
+	std::string exceptionMsg;
+
+	/*!
+	* An error the player can walk away from.  Every other error goes out as
+	* GmeErrorCommand::Close, and GameScene::noticeOK (@0x16098AC) answers that
+	* with CommonUtils::appExit; this one goes out as ReturnToGame, which
+	* GameScene::checkResponseMessage (@0x1615E4C) maps to notice -3992, whose
+	* OK rebuilds HomeScene2 (outside a raid) -- the message, then Home.
+	*/
+	bool returnHome = false;
+
+	/*!
+	* An error that leaves the player on the screen that sent the request.
+	* Goes out as GmeErrorCommand::Retry (2); GameScene::checkResponseMessage
+	* maps it to notice -4000 (-0xfa0), which GameScene::noticeOK ignores (its
+	* jump table covers -3999..-3989), so what happens next is the scene's own
+	* noticeOK.  Only MissionGameOverScene::noticeOK @0x17FB62C gives it a
+	* meaning: back to initContinueConfirm (state 2; 4 in Frontier Gate) -- the
+	* client's refusal path for a revival.  A scene that does not handle
+	* -4000 just stays where it was, so use this only where that is decoded.
+	*/
+	bool retry = false;
+
+	/*!
+	* Checks if it's in error.
+	* @return true if the result is an error, otherwise false
+	*/
+	constexpr bool isError() const { return !errorMsg.empty(); }
+
+	/*!
+	* Create an error result
+	* @param error Error message
+	* @param ex Exception
+	* @return An error result
+	*/
+	static inline HandleResult error(const std::string& error, const std::string& ex = "") {
+		return HandleResult("", error, ex);
+	}
+
+	/*!
+	* Create a refusal the client survives: `error` is shown to the player as
+	* written and OK returns them Home (see returnHome).  Only for a request the
+	* player could legitimately send from stale client state, refused before
+	* anything changed.
+	* @param error Player-facing message
+	* @param ex Detail for the server log
+	* @return An error result that returns the client Home
+	*/
+	static inline HandleResult refuseToHome(const std::string& error, const std::string& ex = "") {
+		HandleResult result("", error, ex);
+		result.returnHome = true;
+		return result;
+	}
+
+	/*!
+	* Create a refusal that keeps the player where they are: `error` is shown
+	* as written and the requesting scene's own noticeOK decides what follows
+	* (see retry).  For the game-over screen that is the Continue prompt again.
+	* @param error Player-facing message
+	* @param ex Detail for the server log
+	* @return An error result sent as GmeErrorCommand::Retry
+	*/
+	static inline HandleResult refuseToRetry(const std::string& error, const std::string& ex = "") {
+		HandleResult result("", error, ex);
+		result.retry = true;
+		return result;
+	}
+
+	/*!
+	* Create a successfull result
+	* @param success Success message
+	* @return A success result
+	*/
+	static inline HandleResult success(const std::string& success) {
+		return HandleResult(success, "", {});
+	}
+
+private:
+	/*!
+	* Private constructor for a result.
+	* @param success Success JSON (or empty in case of no success)
+	* @param error Error message (or empty in case of a success)
+	* @param ex Optional glaze error
+	*/
+	explicit HandleResult(const std::string& success, const std::string& error, const std::string& ex) : successJson(success), errorMsg(error), exceptionMsg(ex)
+	{}
+};
+
+/*!
+* Defines how an handler function is constructer.
+* @param session Drogon session handler
+* @param json Decrypted input JSON
+* @return Output decrypted JSON
+*/
+using HandlerFunc = std::function<drogon::Task<HandleResult>(drogon::SessionPtr session, std::string json)>;
+
+/*!
+* Session key holding the current request's GmeHeader.client_id (aV6cLn3v).
+*
+* GmeController::Handle stores it just before calling the handler; read it
+* (requestTag below) before the handler's first co_await.  It names the client's
+* REQUEST OBJECT: the same on a retry of that request, new for every new one
+* (gme.kdl, client_id), which is what lets MissionStart tell a resent Frontier
+* Hunter start from a new entry.
+*/
+inline constexpr const char* kRequestTagSessionKey = "gme.request_tag";
+
+/*! The current request's client_id, "" when there is no session to carry it. */
+inline std::string requestTag(const drogon::SessionPtr& session)
+{
+	if (!session)
+		return {};
+	return session->getOptional<std::string>(kRequestTagSessionKey).value_or(std::string{});
+}
+
+/*!
+* Defines the prototype of an handler.
+* @param name Name of the handler
+*/
+#define HANDLE(name) drogon::Task<HandleResult> name(drogon::SessionPtr session, std::string json)
+
+/*!
+* Defines the prototype of an handler with namespace.
+* @param name Name of the handler
+*/
+#define HANDLEF(name) HANDLE(GmeHandlers::name)
+
+// list all available handlers
+namespace GmeHandlers
+{
+	HANDLE(Initialize);
+	HANDLE(GetPlayerInfo);
+	HANDLE(BadgeInfo);
+	HANDLE(ChallengeArenaResetInfo);
+	HANDLE(ControlCenterEnter);
+	HANDLE(DeckEdit);
+	HANDLE(FriendGet);
+	HANDLE(GachaAction);
+	HANDLE(GachaList);
+	HANDLE(UnitSelectorGachaTicket);
+	HANDLE(HomeInfo);
+	HANDLE(MissionEnd);
+	HANDLE(MissionStart);
+	HANDLE(ItemEdit);
+	HANDLE(ItemSphereEqp);
+	HANDLE(ItemFavorite);
+	HANDLE(ItemSell);
+	HANDLE(ItemMix);
+	HANDLE(NgwordCheck);
+	HANDLE(CreateUser);
+	HANDLE(TutorialSkip);
+	HANDLE(TutorialUpdate);
+	HANDLE(UpdateInfoLight);
+	HANDLE(UpdateInfo);
+	HANDLE(NoticeUpdate);
+	HANDLE(UserLoginCampaignInfo);
+	// Guild -- the create-and-invite slice.  Wire shapes in net/guild.kdl.
+	HANDLE(GuildInfo);
+	HANDLE(GuildCreate);
+	HANDLE(GuildRecomendedMember);
+	HANDLE(GuildMemberUpdate);
+	HANDLE(GuildJoin);
+HANDLE(GuildRanking);
+HANDLE(GuildRankingDetail);
+	HANDLE(InboxMessageManage);
+	// Guilds between real players (GuildSocialHandlers.cpp).
+	HANDLE(GuildSearch);
+	HANDLE(GuildMemberGuildInfo);
+	HANDLE(GuildJoinedList);
+	HANDLE(GuildInviteManage);
+	HANDLE(GuildUpdate);
+	HANDLE(GuildBoardInfo);
+	HANDLE(GuildBoardPost);
+	HANDLE(GuildUnimplemented);
+	HANDLE(UserInfo);
+	HANDLE(UnitFavorite);
+	HANDLE(UnitEvo);
+	HANDLE(FeSkillGet);
+HANDLE(UnitOmniEvo);
+	HANDLE(UnitMix);
+	HANDLE(UnitSell);
+	HANDLE(TownUpdate);
+	HANDLE(TownFacilityUpdate);
+	HANDLE(EventTokenInfo);
+	HANDLE(EventExchangeInfo);
+	HANDLE(EventExchangePurchase);
+	HANDLE(GuildTrade);
+	HANDLE(AreaInfo);
+	HANDLE(CampaignStart);
+	HANDLE(CampaignMissionGet);
+	HANDLE(CampaignDeckGet);
+	HANDLE(CampaignBattleStart);
+	HANDLE(CampaignBattleEnd);
+	HANDLE(CampaignReceipt);
+	HANDLE(CampaignEnd);
+	HANDLE(CampaignDeckEdit);
+	HANDLE(CampaignItemEdit);
+	HANDLE(CampaignSave);
+	HANDLE(CampaignRestart);
+	HANDLE(TrialDeckGet);
+	HANDLE(TrialDeckEdit);
+	HANDLE(ChallengeBase);
+	HANDLE(ChallengeRanking);
+	HANDLE(ChallengeRankReward);
+	HANDLE(ChallengeUserInfo);
+	HANDLE(MissionContinue);
+	HANDLE(MissionRestart);
+	HANDLE(ShopUse);
+	HANDLE(FrontierGateInfo);
+	HANDLE(FrontierGateStart);
+	HANDLE(FrontierGateContinue);
+	HANDLE(FrontierGateSave);
+	HANDLE(FrontierGateEnd);
+	HANDLE(FrontierGateRetry);
+	HANDLE(FrontierGateRestart);
+	HANDLE(FixGiftInfo);
+	HANDLE(DungeonEventUpdate);
+	HANDLE(GetScenarioPlayingInfo);
+	HANDLE(RaidUpScenarioInfo);
+
+	// Classic Raid slice 1: entry screens and the solo quick-start room
+	// (Raid.cpp).
+	HANDLE(RaidUserInfo);
+	HANDLE(RaidAgreement);
+	HANDLE(RaidWorloInfo);
+	HANDLE(RaidRoomFriendGet);
+	HANDLE(RaidQuickStart);
+	HANDLE(RaidRoonItemEdit);
+	HANDLE(RaidUpDateCash);
+	HANDLE(RaidExit);
+	HANDLE(RaidRoomDissolve);
+	HANDLE(RaidRoomInfo);
+	// Classic Raid round 2, band "core": the run (RaidFieldHandlers.cpp,
+	// RaidBattleHandlers.cpp, docs/features/RAIDS_ROUND2_CORE.md).
+	HANDLE(RaidMissionStart);
+	HANDLE(RaidMissionInfo);
+	HANDLE(RaidMissionInfoLight);
+	HANDLE(RaidMissionHarvest);
+	HANDLE(RaidMissionUseItem);
+	HANDLE(RaidLimitedUseItem);
+	HANDLE(RaidMissionExit);
+	HANDLE(RaidMissionSelect);
+	HANDLE(RaidMissionBattleStart);
+	HANDLE(RaidMissionBattleRestart);
+	HANDLE(RaidUpdateProgress);
+	HANDLE(RaidMissionBattleEnd);
+	HANDLE(RaidMissionEnd);
+	// Round 2, band "multiplayer": shared rooms, chat, blacklist, helpers
+	// (RaidRoomHandlers.cpp, RaidSocialHandlers.cpp, RAIDS_ROUND2_MULTIPLAYER.md).
+	HANDLE(RaidRoomList);
+	HANDLE(RaidUpDataRoomInfo);
+	HANDLE(RaidEnter);
+	HANDLE(RaidUpDataUserReady);
+	HANDLE(RaidRoomKick);
+	HANDLE(RaidGetPlayerInfo);
+	HANDLE(RaidSendChat);
+	HANDLE(RaidGetChatLog);
+	HANDLE(RaidUpdateBlackList);
+	HANDLE(RaidFriendRemove);
+	HANDLE(RaidFrlendSelect);
+	// Round 2, band "camp_items": camp rest, raid items, raid shop
+	// (RaidCampItemsHandlers.cpp, RAIDS_ROUND2_CAMP_ITEMS.md).
+	HANDLE(RaidCampRestStart);
+	HANDLE(RaidCampRestGet);
+	HANDLE(RaidCampRestEnd);
+	HANDLE(RaidItemEdit);
+	HANDLE(RaidItemMix);
+	HANDLE(RaidItemDelete);
+	HANDLE(RaidShopUse);
+
+	// Present box.  Declared and implemented, NOT yet registered — PresentList
+	// is GroupId YPBU7MD8 but its AES key is unknown, and PresentReceipt's
+	// GroupId is unknown too.  See the header comment in Present.cpp for how to
+	// recover both.
+	HANDLE(PresentList);
+	HANDLE(PresentReceipt);
+
+	// Randall achievements: the catalogue, the Merit Point loop, and the
+	// Start/Give Up buttons — see Achievement.cpp and AchievementAction.cpp.
+	HANDLE(GetAchievementInfo);
+	HANDLE(AchievementRewardReceive);
+	HANDLE(AchievementTrade);
+	HANDLE(AchievementAccept);
+	HANDLE(AchievementDeliver);
+	HANDLE(GetGiftInfo);
+	HANDLE(ArenaInfo);
+	HANDLE(ArenaStart);
+	HANDLE(ArenaMatching);
+	HANDLE(ArenaBattleStart);
+	HANDLE(ArenaBattleRestart);
+	HANDLE(ArenaBattleEnd);
+	HANDLE(ArenaRetire);
+	HANDLE(ArenaFriendList);
+	HANDLE(ColosseumDeckEdit);
+	HANDLE(ColosseumBattleStart);
+	HANDLE(ColosseumBattleRestart);
+	HANDLE(ColosseumBattleEnd);
+	HANDLE(ColosseumFriendList);
+	HANDLE(ColosseumGetRewardInfo);
+	HANDLE(ColosseumRewardReceipt);
+	HANDLE(FriendDelete);
+	HANDLE(FriendApply);
+	HANDLE(FriendGetAgree);
+	HANDLE(FriendAgree);
+	HANDLE(FriendRefuse);
+	HANDLE(FriendSearch);
+	HANDLE(FriendRandomSearch);
+	HANDLE(FriendFavorite);
+	HANDLE(VideoAdSlotsClaimBonus);
+	HANDLE(UserGemShardInfo);
+	HANDLE(UserEnteredFeature);
+
+	// Dual Brave Burst — see gme/common/Dbb.hpp.
+	HANDLE(DbbBond);
+	HANDLE(UnitBondBoost);
+	HANDLE(BannerClick);
+	HANDLE(NoticeList);
+	HANDLE(NoticeReadUpdate);
+
+	// Brave Points & Rewards (daily tasks / milestones / BP prize shop).
+	HANDLE(DailyTaskUserInfo);
+	HANDLE(DailyTaskClaimReward);
+	HANDLE(UserSummonerInfoEdit);
+	HANDLE(SummonerMix);
+	HANDLE(SummonerSkillGet);
+	HANDLE(UpdatePermitPlaceInfo);
+	HANDLE(UpdateEventInfo);
+	HANDLE(Chronology);
+	HANDLE(GetDistributeDungeonKeyInfo);
+	HANDLE(DungeonKeyReceipt);
+	HANDLE(DungeonKeyUse);
+
+	// Rewards menu — the tiles that had no handler at all.  Probes for now:
+	// they log the body and answer {}.  See RewardsMenu.cpp for the tile/tag
+	// map and where each request is fired from.
+	HANDLE(SlotAction);
+	HANDLE(MysteryBoxList);
+	HANDLE(MysteryBoxClaim);
+	HANDLE(DailyLogin);
+
+	// Summoner Journal — tag 0, the last tile with no handler.  Probes: they
+	// log the body and answer {}.  See SummonerJournal.cpp for the request
+	// shapes and the six response classes the screen expects.
+	HANDLE(SummonerJournalInfo);
+	HANDLE(SummonerJournalTaskRewards);
+	HANDLE(SummonerJournalMilestoneRewards);
+
+	// Account transfer codes — see Transfer.cpp and net/transfer.kdl.
+	HANDLE(TransferCodeIssue);
+	HANDLE(TransferCodeCheck);
+	HANDLE(Transfer);
+}

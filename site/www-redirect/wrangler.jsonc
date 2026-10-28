@@ -1,0 +1,12 @@
+// www.example.com -> https://example.com (301, path and query kept).
+// Deploy: ../../cdn-worker/node_modules/.bin/wrangler deploy --config wrangler.jsonc   (see ../README.md)
+{
+  "name": "bf-site-www",
+  "main": "index.js",
+  "compatibility_date": "2026-10-01",
+  "routes": [
+    { "pattern": "www.example.com", "custom_domain": true }
+  ],
+  "workers_dev": false,
+  "preview_urls": false
+}

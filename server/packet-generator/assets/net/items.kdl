@@ -1,0 +1,197 @@
+// Item action packets: favorite/lock, sell, sphere equip.
+// Sources: bfdata/createbody/Item{Favorite,Sell,SphereEqp}Request.txt (request
+// shapes), response_mappings.json ItemFavoriteResponse (VSRPkdId params
+// n6E8iMf3 + 5JbjC3Pp), and the legacy fork's Item*RequestHandler classes
+// (GroupIds/AES keys, captured wire notes).
+//
+// All numeric fields ride the JsonNode::addParam(int) overload, which
+// STRINGIFIES every value (handbook §3.1 quoted-int trap) — hence *::str types.
+
+json ItemFavorite {
+    doc "One favorited warehouse stack.  Shared by the ItemFavorite request/response (root key VSRPkdId) and UserInfoResp.itemFavorite — the client's readParam for VSRPkdId reads both params per node (response_mappings.json ItemFavoriteResponse)."
+
+    field instance_id type="u32::str" {
+        key "n6E8iMf3"
+        doc "user_items.instance_id of the favorited stack (UserWarehouseInfo.instance_id)."
+    }
+
+    field favorite type="i32::str" {
+        key "5JbjC3Pp"
+        doc "Favorite/lock flag.  The request only ever carries entries with 1 — the client sends the COMPLETE current favorite set each call (ItemFavoriteRequest::createBody skips getFavoFlg()!=1 rows), so absent instance ids mean unfavorited."
+    }
+}
+
+json ItemFavoriteReq {
+    doc "Favorite/lock update.  Wire: {\"VSRPkdId\":[{\"n6E8iMf3\":\"5\",\"5JbjC3Pp\":\"1\"},...]}.  The list is the full favorite set; the server clears favorite_flg for the user and re-sets it for the listed instance ids."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field entries type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc "Complete favorite set (only flag=1 entries are sent)."
+    }
+}
+
+json ItemFavoriteResp {
+    doc "Echo of the favorite set, same shape as the request group.  The legacy fork's ItemFavoriteResponse serialised an array of {n6E8iMf3} under VSRPkdId; the client readParam also accepts 5JbjC3Pp per node."
+
+    field entries type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc "Favorited stacks after the update."
+    }
+}
+
+json ItemSellEntry {
+    doc "One stack being sold."
+
+    field instance_id type="u32::str" {
+        key "n6E8iMf3"
+        doc "user_items.instance_id of the stack (UserWarehouseInfo.instance_id)."
+    }
+
+    field item_num type="u32::str" {
+        key "wgV86x1q"
+        doc "Quantity to sell from this stack."
+    }
+}
+
+json ItemEditReq {
+    doc "ItemEdit (ruoB7bD8) — the battle-item loadout the player sets on the quest-prep screen.  Shape from ItemEditRequest::createBody @ 0x13A5C2C: addGroup(\"71U5wzhI\") holding UserEquipItemInfo nodes {kixHbe54 item_id, XuJL4pc5 disp_order, wgV86x1q item_num}.  createBody writes TWO runs into that one group — the main loadout at disp_order 0..n and a second run at disp_order+100 — so slot numbers are stored verbatim rather than being renumbered.  The request also carries addGroup(\"nAligJSQ\") (UserEquipBonusItemInfo: h7eY3sAK/kixHbe54/XuJL4pc5/wgV86x1q); the server does not consume bonus items, so the lenient read skips it.  Note this key matches the UserInfoResp.equipInfo response key — unusual (handbook §6.1) but both carry the same UserEquipItemInfo list class."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field equipItems type="[UserEquipItemInfo]" {
+        key "71U5wzhI"
+        doc "The chosen loadout, one node per occupied slot.  An empty/absent group means the player cleared every slot."
+    }
+
+    field bonusItems type="[UserEquipBoostItemInfo]" {
+        key "nAligJSQ"
+        doc "The BONUS-item slots of the same screen, same shape and same full-replace rule.  Used to be skipped by the lenient read, so the player's bonus picks were dropped and came back empty; they are persisted now and reported as UserInfoResp.equipBoostItemInfo."
+    }
+}
+
+json ItemSellReq {
+    doc "Sell warehouse items for zel.  Wire: {\"M73i1c5U\":[{\"n6E8iMf3\":\"5\",\"wgV86x1q\":\"3\"},...]}.  Zel credit per unit = ItemMst.sell_price.  Legacy fork acked with an empty body and the client applies the zel/count changes locally, so no Resp struct exists."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field entries type="[ItemSellEntry]" {
+        key "M73i1c5U"
+        doc "Stacks to sell."
+    }
+}
+
+json ItemSphereEqpNode {
+    doc "Single node of the sphere-equip group."
+
+    field packed type="str" {
+        key "a2utCvs8"
+        doc """
+        Packed per-unit equip ops: comma-separated segments of
+        frame1:frame2:user_unit_id:item_id1:item_id2, one per unit the screen
+        changed (UserState::getChgUserUnitInfoList).
+
+        Each field is the unit's own string, copied verbatim -- createBody
+        @0x13A7054 calls UserUnitInfoBase::getEquipItemFrameID (vtable +0x1d0),
+        getEquipItemFrameID2 (+0x1f0), getUserUnitID (+0x30), getEquipItemID
+        (+0x1e0) and getEquipItemID2 (+0x200), resolved through the vtable's
+        relocations.  So a field holds whatever that string holds:
+
+          frame   the warehouse row (item index) of the copy in the slot, which
+                  ItemSphereSelectScene::eqpSphere @0x1738980 writes when the
+                  player picks one; an INT32_MAX - item placeholder for a copy the
+                  client crafted itself; "0" for an empty slot; "-1" for the
+                  second slot of a unit with no Sphere Frog (kNoSecondSphereSlot)
+          item    an ItemMst id, "0", or "" for an id the unit never held
+
+        The last forms are NOT rare: every unit without a Sphere Frog sends
+        frame2 "-1", and an unequip sends empty items.  Live captures:
+        "19:-1:1000:31000:0", "0:0:1000::", "0:-1:1000::,0:-1:1550::0".
+        The October 2 handler parsed every field as unsigned and refused all of
+        these silently, so equips on one-slot units never persisted and the next
+        HomeInfo unit rebuild took the sphere off the unit.
+        """
+    }
+}
+
+json ItemSphereEqpReq {
+    doc """
+    Equip/unequip spheres on units.  Wire root key wx1ZLFj9
+    (ItemSphereEqpRequest::createBody).  Server updates user_units.eqip_item_id[2]
+    + eqip_item_frame_id[2] (frame = the equipped copy's warehouse row id; see
+    UserUnitInfo.equipitem_frame_id) and adjusts user_items counts.  Response is
+    an empty ack: the client has already applied the change to its own unit.
+
+    SLOT 2 IS GATED on the unit having earned it from a Sphere Frog: the handler
+    refuses an equip there and holds eqip_item_frame_id2 at the -1 "no slot"
+    sentinel (UserUnitInfo.equipitem_frame_id2).  The gate matters less for the
+    refusal — the client hides the slot anyway — than for NOT writing 0 into that
+    field while equipping slot 1, which used to hand out the slot by accident.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[ItemSphereEqpNode]" {
+        key "wx1ZLFj9"
+        doc "Equip operations (the client batches changed units into one node's packed string)."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ItemMix  (id: 4P5GELTF)
+// Synthesis at the town's Synthesis facility and its sphere counterpart.
+// Shape from ItemMixRequest::createBody @0x13A663C — one param, built by
+// ItemMixRequest::itemCsvData @0x13A67AC.
+// ---------------------------------------------------------------------------
+
+json ItemMixEntry {
+    doc "Single-element array wrapper holding the whole craft batch as one CSV."
+
+    field recipe_csv type="str" {
+        key "4HqhTf3a"
+        doc """
+        "<recipeId>:<count>,<recipeId>:<count>,..." — what to craft and how many
+        of each.
+
+        itemCsvData walks the client's ItemMixResultInfo list, dedupes on
+        getRecipeID(), counts the repeats, and joins the pairs with ',' after
+        appending ':' + IntToString(count).  The repeats come from
+        MyTownItemMixScene::continueMix, which is the "craft again" button.
+
+        The key is the same 4HqhTf3a that PermitRecipeResponse::readParam feeds
+        to setRecipeID, so the id space is confirmed to be ReceipeMst.id rather
+        than an item id.
+        """
+    }
+}
+
+json ItemMixReq {
+    doc "Craft one or more recipes.  Server consumes ReceipeMst.materials and karma from the player and credits the results; the client applies its own copy optimistically."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field mix type="[ItemMixEntry]::size(1)" {
+        key "JTf2jY5o"
+        doc "The craft batch."
+    }
+}
+
+json ItemMixResp {
+    doc "Empty response — the client already applied the craft locally.  The next UserInfo carries the authoritative warehouse and karma."
+}

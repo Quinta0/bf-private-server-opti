@@ -1,0 +1,43 @@
+# Repository labels. Synced by .github/workflows/labels.yml.
+- name: bug
+  color: "d73a4a"
+  description: Something is not working
+- name: enhancement
+  color: "a2eeef"
+  description: New feature or improvement
+- name: missing-content
+  color: "f9d0c4"
+  description: Game content that is not restored yet
+- name: needs-triage
+  color: "ededed"
+  description: New issue a maintainer has not reviewed yet
+- name: documentation
+  color: "0075ca"
+  description: Improvements or additions to documentation
+- name: security
+  color: "b60205"
+  description: Security hardening or fix
+- name: dependencies
+  color: "0366d6"
+  description: Dependency updates
+- name: good first issue
+  color: "7057ff"
+  description: Good for newcomers
+- name: help wanted
+  color: "008672"
+  description: Extra attention is needed
+- name: skip-changelog
+  color: "ededed"
+  description: Leave out of the release notes
+- name: server
+  color: "1d76db"
+  description: C++ game server (server/)
+- name: cdn-worker
+  color: "f9a825"
+  description: Cloudflare Workers (cdn-worker/)
+- name: site
+  color: "0e8a16"
+  description: Static site and unit finder (site/)
+- name: tools
+  color: "c5def5"
+  description: Scripts and tooling (tools/)

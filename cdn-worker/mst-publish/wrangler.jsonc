@@ -1,0 +1,12 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "bf-mst-publish",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  // The production host's public addresses (IPv4 and IPv6, comma separated).
+  "vars": { "ALLOWED_IPS": "203.0.113.11,2001:db8::11" },
+  "r2_buckets": [
+    { "binding": "ASSETS", "bucket_name": "bf-assets" }
+  ]
+}

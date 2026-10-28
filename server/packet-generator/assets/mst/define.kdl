@@ -1,0 +1,552 @@
+// @keyjson(key_group = "VkoZ5t3K", array=ArrayStep.Single)
+json DefineMst {
+    doc "TODO"
+
+    field max_zel type="i64::str" {
+        key "DXm2W8vY"
+        doc "TODO"
+    }
+
+    field max_karma type="i64::str" {
+        key "jSxdlwqd"
+        doc "TODO"
+    }
+
+    field max_friend_points type="i64::str" {
+        key "4YCzox9t"
+        doc "TODO"
+    }
+
+    field max_team_lv type="i32::str" {
+        key "Kt8H4LN7"
+        doc "TODO"
+    }
+
+    field max_arena_rank type="i32::str" {
+        key "tzCfGX83"
+        doc "TODO"
+    }
+
+    field max_unit_count type="i32::str" {
+        key "ouXxIY63"
+        doc "Hard cap on unit-box capacity (4000).  ShopUnitBoxExtScene::confirmAnswerYes reads it via DefineMst::getMaxUnitCnt @0x1AD98E4 next to UserTeamInfo::getSumUnitCnt to bound the Expand slider; ShopUse type 2 enforces it server-side."
+    }
+
+    field max_warehouse_count type="i32::str" {
+        key "5pjoGBC4"
+        doc "Hard cap on item-box capacity (3200).  ShopItemBoxExtScene::confirmAnswerYes reads it via DefineMst::getMaxWarehouseCnt @0x1AD0488 next to UserTeamInfo::getMaxWarehouseCnt; ShopUse type 3 enforces it server-side."
+    }
+
+    field default_unit_count type="i32::str" {
+        key "k0xrd38b"
+        doc "50 in our data.  The server's starting unit box is its own kBaseUnitBoxSlots (100), sent as team_info add_unit_count."
+    }
+
+    // // number of free unit slots when creating an account
+    field default_warehouse_count type="i32::str" {
+        key "8U93zxsf"
+        doc "TODO"
+    }
+
+    // // number of free warehouse slot when creating an account
+    // // TODO: what's this ?
+    field friendpoint_rein_friend type="i32::str" {
+        key "2oD1fmuX"
+        doc "TODO"
+    }
+
+    field friendpoint_rein_friend_rate type="f32::str" {
+        key "PnE6xo93"
+        doc "TODO"
+    }
+
+    field friendpoint_rein_friend_my type="i32::str" {
+        key "86sx4FfJ"
+        doc "TODO"
+    }
+
+    field friendpoint_rein_friend_my_rate type="f32::str" {
+        key "JBR0Po3b"
+        doc "TODO"
+    }
+
+    field friendpoint_rein_other type="i32::str" {
+        key "K10QSeuj"
+        doc "TODO"
+    }
+
+    field friendpoint_rein_other_rate type="f32::str" {
+        key "6p4YW7oc"
+        doc "TODO"
+    }
+
+    field friendpoint_rein_other_my type="i32::str" {
+        key "VkA3nu0b"
+        doc "TODO"
+    }
+
+    field friendpoint_rein_other_my_rate type="f32::str" {
+        key "mI1jW0X7"
+        doc "TODO"
+    }
+
+    field permit_invitation type="i32::str" {
+        key "02IgM6ib"
+        doc "TODO"
+    }
+
+    field ext_plus_max_count type="i32::str" {
+        key "4t3qX2kT"
+        doc "TODO"
+    }
+
+
+    field action_point_heal_count type="i32::str" {
+        key "C8KkHGa7"
+        doc "Gem price of a full Energy refill (1).  Every energy prompt reads it via getActionPointHealCnt and sends it as the ShopUse type 1 / 10 cost (ShopHelActionScene::touchBegan, MissionSelectShortageStaminaScene::touchBegan, MissionResultRepeatCheckScene::recoverStamina)."
+    }
+ // energy
+    field fight_point_heal_count type="i32::str" {
+        key "sy9G24Su"
+        doc "Gem price of a full Arena Orb restore (1).  ShopHelFightScene::touchBegan reads it via getFightPointHealCnt for ShopUse type 4."
+    }
+ // arena points
+    field unit_box_ext_count type="i32::str" {
+        key "I73XkAQi"
+        doc "Gem price of ONE 5-slot unit-box expansion step (1).  ShopUnitBoxExtScene::confirmAnswerYes reads it via getUnitBoxExtCnt @0x1AD9998 to price the purchase; the 5-slot step itself is the 5.0f its ctor loads @0x1AD6ACC.  Captured ShopUse type 2 prices (1/19/20 gems for 5/95/100 slots) agree."
+    }
+
+    field item_box_ext_count type="i32::str" {
+        key "CA01vo2Q"
+        doc "Gem price of ONE 5-slot item-box expansion step (1).  ShopItemBoxExtScene::confirmAnswerYes reads it via getItemBoxExtCnt @0x1AD053C; the 5-slot step is the 5.0f its ctor loads @0x1ACD870."
+    }
+    field continue_dia_count type="i32::str" {
+        key "QW3HiNv8"
+        doc "setContinuDiaCnt @0x131A884-adjacent (the DefineMst readParam pairs this key with it @0x13D54C0).  THE PRICE OF A REVIVAL -- 1 gem in this data.  MissionGameOverScene::initContinueConfirm @0x17F8720 reads it back through DefineMst::getContinuDiaCnt to fill the confirm window's \"use_dia_num\" against \"hava_dia_num\", so it is the number the player is shown before tapping CONTINUE; the server charges the same value in MissionContinue."
+    }
+
+    // // TODO: number of continues?
+    field initial_unit type="str" {
+        key "21ovwqYT"
+        doc "TODO"
+    }
+
+    // // TODO: I'm sure this is not JUST a string
+    field tutorial_dungeon_id type="i32::str" {
+        key "91nRcYWT"
+        doc "TODO"
+    }
+
+
+    // // TODO: what's this?
+    field recover_time_action type="i32::str" {
+        key "Ieq49JDy"
+        doc "TODO"
+    }
+
+    field recover_time_fight type="i32::str" {
+        key "0BPn68DG"
+        doc "TODO"
+    }
+
+    field arena_battle_time_limit type="i32::str" {
+        key "YR4HI56k"
+        doc "TODO"
+    }
+
+    field arena_need_mission_id type="i32::str" {
+        key "yFRYDj67"
+        doc "TODO"
+    }
+ // mission to unlock the arena
+    field max_party_deck_count type="i32::str" {
+        key "WHy3BSm9"
+        doc "TODO"
+    }
+
+    field arena_tutorial_npc_info type="str" {
+        key "6W4PdoJY"
+        doc "TODO"
+    }
+ // TODO: I'm sure this is not JUST a string
+    field verify_flag type="i32::str" {
+        key "6GXx4LgZ"
+        doc "TODO"
+    }
+
+    field unit_mix_great_exp_rate type="f32::str" {
+        key "2inP0tCg"
+        doc """
+        Exp multiplier applied when a fusion rolls Great Success.  Our data: 1.5.
+
+        // IDENTIFIED 2026-09-07 — was `TODO`.  Pairs with
+        // UserOpeResult.success_type (6hMI5xeF), whose tiers are CONFIRMED from
+        // UnitMixPlayScene::ConvSuccessSet @0x1C200A4 (0 normal / 1 great /
+        // 2 super).  Consumed by the UnitMix handler, which multiplies the
+        // computed exp by this when the roll lands on that tier.
+        //
+        // The matching PROBABILITY is not in this table or any other — only the
+        // two multipliers exist — so the roll itself is server-side.
+        """
+    }
+
+    field unit_mix_super_exp_rate type="f32::str" {
+        key "zn65EXYF"
+        doc """
+        Exp multiplier applied when a fusion rolls Super Success.  Our data: 2.0.
+
+        // IDENTIFIED 2026-09-07 — was `TODO`.  Pairs with
+        // UserOpeResult.success_type (6hMI5xeF), whose tiers are CONFIRMED from
+        // UnitMixPlayScene::ConvSuccessSet @0x1C200A4 (0 normal / 1 great /
+        // 2 super).  Consumed by the UnitMix handler, which multiplies the
+        // computed exp by this when the roll lands on that tier.
+        //
+        // The matching PROBABILITY is not in this table or any other — only the
+        // two multipliers exist — so the roll itself is server-side.
+        """
+    }
+
+    field recover_time_frohun type="i32::str" {
+        key "3xAsgHL8"
+        doc "setRecoverTimeFrohun @0x131A7D8 (the DefineMst readParam pairs this key with it @0x13D58A8).  Seconds to regenerate ONE Hunter Orb -- 10800 here, three hours.  ChallengeHeaderInfo::decFightRestTimer @0x1258270 is the consumer: it ticks AubeRestTimer down a second at a time and, every time the remainder divides by this, grants an orb and reloads the timer with this value (stopping at max_frohun_p).  ChallengeHeaderInfo::getFightRecoveryTime @0x1258210 also takes the rest timer modulo this to render the minutes-remaining label."
+    }
+
+    field recover_time_raid type="i32::str" {
+        key "zkD98Hfy"
+        doc "TODO"
+    }
+
+    field raid_max_p type="i32::str" {
+        key "S92Hcor3"
+        doc "TODO"
+    }
+
+    field raid_bag_count type="i32::str" {
+        key "09EbcDmX"
+        doc "TODO"
+    }
+
+    field friend_ext_count type="i32::str" {
+        key "3Ep5akHJ"
+        doc "Gem price of ONE 5-slot friend-capacity step (1).  ShopFriendExtScene::touchBegan reads it via getFriendExtCnt and sends ShopUse type 7 with ext_cnt 5.  How many steps a level allows is UserLevelMst add_friend_count."
+    }
+
+    field medal_max_num type="i32::str" {
+        key "xq0fSrw3"
+        doc "TODO"
+    }
+
+     // // which one?
+    field compaign_flag type="str" {
+        key "MFz8YRS6"
+        doc "TODO"
+    }
+
+    // // note: are this the conversion rates?
+    field max_achieve_point type="i32::str" {
+        key "1JFcDr05"
+        doc "TODO"
+    }
+
+    field zel_per_achieve_point type="i32::str" {
+        key "SAb3m9wo"
+        doc "TODO"
+    }
+
+    field karma_per_achieve_point type="i32::str" {
+        key "KCG5f1AN"
+        doc "TODO"
+    }
+
+    field max_achieve_point_zel_per_day type="i32::str" {
+        key "4ARtfF7x"
+        doc "TODO"
+    }
+
+    field max_achieve_point_karma_per_day type="i32::str" {
+        key "K0sUIn8R"
+        doc "TODO"
+    }
+
+    field max_achieve_point_item_per_day type="i32::str" {
+        key "M1AJuFU6"
+        doc "setMaxAchievePointItemPerDay -- the Merit POINTS a player may earn in one day from trading ITEMS (spheres).  Named 2026-09-15 from DefineMstResponse::readParam."
+    }
+
+    field max_achievement_challenge_accept_count type="i32::str" {
+        key "p3pXbuHA"
+        doc "TODO"
+    }
+
+    field max_achievement_record_challenge_accept_count type="i32::str" {
+        key "kmxPgJu9"
+        doc "TODO"
+    }
+
+    field tutorial_gacha_id type="i32::str" {
+        key "uALQnngx"
+        doc "TODO"
+    }
+
+    field parse_overdrive_param type="str" {
+        key "QylsZTpE"
+        doc "TODO"
+    }
+
+    // this is NOT just a string
+    field colosseum_shop_ticket type="i32::str" {
+        key "OjAiNSoh"
+        doc "TODO"
+    }
+
+    field max_colosseum_ticket type="i32::str" {
+        key "924iwrJ9"
+        doc "TODO"
+    }
+
+    field max_cbp type="i32::str" {
+        key "woxAcRoH"
+        doc "TODO"
+    }
+
+    field reset_fe_skill_dia_count type="i32::str" {
+        key "5csFoG1G"
+        doc "THE PRICE OF AN SP-ENHANCEMENT RESET -- 1 gem in this data.  DefineMst::getResetFeSkillDiaCnt has three call sites in two functions: UnitDetailVirtuallyInfoScene::resetDialog @0x1BDF278 (the shortage dialog when UserTeamInfo's gems are below it, otherwise UNIT_VIRTUALLY_RESET with this value as the price parameter) and resetConnect @0x1BDEBDC, which sends it as ShopUse type 9's 03UGMHxF.  The server charges this value, not the claim."
+    }
+
+    field max_blacklist_count type="i32::str" {
+        key "DYMUxgt8"
+        doc "TODO"
+    }
+
+    // bf chapter 3?
+    field init_summoner_arm_id type="[i32::str]::sep(comma)"  {
+        key "deYOowYJ"
+        doc "TODO"
+    }
+
+    field max_summoner_sp type="i64::str" {
+        key "QhV0G2zu"
+        doc "TODO"
+    }
+
+    field max_summoner_friend_point type="i64::str" {
+        key "W9bwut7Q"
+        doc "TODO"
+    }
+
+    field max_multi_p type="i32::str" {
+        key "6id2v7eN"
+        doc "TODO"
+    }
+
+    field dbb_crystal_values type="str" {
+        key "jFdW1ipx"
+        doc "TODO"
+    }
+
+    // this is NOT just a string
+    field dbb_fixed_settings_value type="str" {
+        key "7o6lcc66"
+        doc "TODO"
+    }
+
+    // this is NOT just a string
+    field action_point_recover_fixed type="i32::int" {
+        key "hAiXsSPF"
+        doc "Only the header's gem energy refill reads it: GameScene::touchBegan @0x1616378 puts it in the confirm text as <param=energy_fixed>.  Absent from our data, so the client keeps its ctor 0; the server's refill (ShopUse type 1) fills energy to the level max, and the ENERGY_RECOVER_GEM_RECOVER_ENERGY text we add does not quote it."
+        optional #true
+        // TODO(anri): look at this
+        // "default": DefaultType.Omit
+    }
+
+    field action_point_threshold type="i32::int" {
+        key "eRQvzLeF"
+        doc "Tapping the header's Energy gauge (GameScene::touchBegan @0x16162E4) shows ENERGY_RECOVER_GEM_MAX_THRESHOLD instead of the refill prompt when current energy >= this.  Absent from our data and 0 in the ctor, so every tap said \"max\".  The server sends the player's own max energy through DefineEnergyRecover instead (UserInfo, HomeInfo, MissionEnd)."
+        // TODO(anri): look at this
+        // "default": DefaultType.Omit
+        optional #true
+    }
+
+    field unk type="i32::str" {
+        key "hx87WCbQ"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk2 type="i32::str" {
+        key "Z76WIr8m"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk3 type="f32::str" {
+        key "xv1Lyw9h"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk4 type="i32::str" {
+        key "p1TQ6XhR"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk5 type="f32::str" {
+        key "nwXMZ3Q1"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk6 type="str" {
+        key "sRjt0k2L"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk7 type="str" {
+        key "h2C6eFm8"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk8 type="str" {
+        key "bi4gV4Ki"
+        doc "TODO"
+    }
+
+    field unk9 type="i32::str" {
+        key "7enK28Q5"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk10 type="i32::str" {
+        key "mE81UBVk"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk11 type="str" {
+        key "t8Cc0uMo"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk12 type="i32::str" {
+        key "A8L9VERN"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk13 type="str" {
+        key "s79JGu2M"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk14 type="str" {
+        key "gEn3GX4C"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field max_frohun_p type="i32::str" {
+        key "SziK4Xg1"
+        doc "setMaxfrohunP @0x131A884 (paired with this key in the DefineMst readParam @0x13D58D4).  The HUNTER ORB CAP -- 3 in this data.  ChallengeHeaderInfo::getAubeMax @0x125819C is a straight forward to it, and decFightRestTimer stops regenerating once the count reaches it.  Note this is the cap the CLIENT clamps to, which is why an earlier probe sending 4/5/6 read back as 3/3/3 and could not tell the three Aube fields apart."
+    }
+
+    field max_achieve_point_unit_per_day type="i32::str" {
+        key "j1zaSBm7"
+        doc """
+        setMaxAchievePointUnitPerDay -- the Merit POINTS a player may earn in one
+        day from trading UNITS.
+
+        RENAMED from `unk16` 2026-09-15, which carried "TODO / not used in last
+        version".  It is used: `deliverDailyCap` had no unit column to read, so
+        units fell back to the ITEM ceiling and the Trade Units screen quoted
+        the wrong field.  Both are 99999 in this data, so nothing was ever
+        mis-enforced.
+
+        Recovered from DefineMstResponse::readParam with tools/readparam_map.py.
+        Adding it as a NEW field rather than renaming this one is what broke the
+        build: two fields on one key makes Glaze fail to build its key hash
+        (`static assertion failed: bool(hash_info<T>.type)`), which is what that
+        error means.
+
+        NOTE the two halves of the client's "Trade Limit x/y" do not agree: y is
+        this POINTS cap, x is the deliver subject's progress, which counts
+        UNITS.  Settling that wants a capture from the live game.
+        """
+    }
+
+    field unk18 type="i32::str" {
+        key "CjaJUSrs"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk19 type="str" {
+        key "CeTSDBO2"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field unk20 type="i32::str" {
+        key "25aTznBk"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+}
+
+json DefineEnergyRecover {
+    doc "A one-field DefineMst block (response key VkoZ5t3K) carrying just the header energy-refill threshold.  DefineMstResponse::readParam @0x13D5068 never resets the singleton — each key has its own strcmp and setter — so this updates the threshold and leaves every other define as Initialize set it.  Sent by UserInfo, HomeInfo and MissionEnd so the threshold follows the player's level."
+
+    field action_point_threshold type="i32::str" {
+        key "eRQvzLeF"
+        doc "The player's own max energy (UserLevelMst energy for their level): the header then says ENERGY_RECOVER_GEM_MAX_THRESHOLD exactly when energy is at or above max, and offers the refill below it."
+    }
+}
+
+json FunctionReleaseMst {
+    doc """
+    F_FUNCTION_RELEASE_MST — WHICH FEATURE EACH `function_id` IS, AND WHAT
+    UNLOCKS IT.  12 rows, function ids 8-19, read 2026-09-20 out of the
+    client's own cached `Ver10_FA69am2p.dat` (encode key `tLaGZ8h3`).
+
+    ★ ROW 9 IS THE SUMMONER AVATAR ARC: its condition is `2:10864`, and 10864
+    is "The Holy Emperor" — the Karna Masta fight in Menon that the wiki names
+    as what opens the arc.  That is what finally pinned the arc's gate down.
+
+    NO WIRE KEY, like FrontierGateRewardMst: the client loads this from its own
+    MST store and the binary defines no FunctionReleaseMstResponse, so the
+    wrapper `F_FUNCTION_RELEASE_MST` is server-side only.  The server cannot
+    change these conditions -- it can only EVALUATE them and report the result
+    through `UserReleaseInfo` (Dp0MjKAf) on UserInfoResp, which is the only
+    lever it has over feature locks.
+
+    Ids 1-7 never appear here; those are the client's hardcoded early gates.
+    """
+    hash "F_FUNCTION_RELEASE_MST"
+
+    field function_id type="i32::str" {
+        key "JHYubaBP"
+        doc "The client function this row gates.  Joins to UserReleaseInfo.function_id."
+    }
+
+    field param type="str" {
+        key "t5R47iwj"
+        doc "Empty on all 12 shipped rows.  // UNVERIFIED: no consumer read."
+        optional #true
+    }
+
+    field condition type="str" {
+        key "eyOHR7lB"
+        doc """
+        `type:param`.  **type 2 = the mission named by param has been cleared**
+        (eleven of the twelve rows).  Type 4 appears once, as "4:4", on row 8
+        and is not decoded.  An unrecognised type must be treated as NOT
+        released rather than as released, or a feature opens for free.
+        """
+    }
+}

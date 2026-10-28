@@ -1,0 +1,146 @@
+#include "UnitArchiver.hpp"
+
+#include <gimuserver/utils/JsonFile.hpp>
+
+#include <drogon/drogon.h>
+
+#include <algorithm>
+#include <exception>
+#include <string>
+#include <utility>
+#include <vector>
+
+UnitArchiver& UnitArchiver::instance()
+{
+	static UnitArchiver instance;
+	return instance;
+}
+
+void UnitArchiver::setup(const Json::Value& serverObj)
+{
+	LOG_INFO << "Setting up unit archiver cache. "
+		"If you see this after initialization, it is a bug.";
+
+	const auto archiveRoot = serverObj["archive_root"].asString();
+	if (archiveRoot.empty())
+	{
+		LOG_ERROR << "Unable to set up unit archiver cache: archive_root is empty";
+		return;
+	}
+
+	std::vector<UnitRecord> units;
+	try
+	{
+		units = LoadJson<std::vector<UnitRecord>>(archiveRoot, "unit.json");
+	}
+	catch (const std::exception& ex)
+	{
+		LOG_ERROR << "Unable to set up unit archiver cache: " << ex.what();
+		return;
+	}
+
+	cache_.clear();
+	cache_.reserve(units.size());
+	for (auto& unit : units)
+	{
+		cache_.insert_or_assign(unit.id, std::move(unit));
+	}
+
+	LOG_INFO << "Loaded " << cache_.size()
+		<< " unit archive records from " << archiveRoot << "/unit.json";
+}
+
+void UnitArchiver::applyBalanceStats(const std::vector<UnitMst>& rows)
+{
+	// The archive stores stats unsigned; a negative MST value would wrap, so
+	// it is floored at zero rather than handed out as four billion HP.
+	const auto toStats = [](int32_t hp, int32_t atk, int32_t def, int32_t rec) {
+		const auto clamp = [](int32_t v) { return static_cast<uint32_t>(std::max(v, 0)); };
+		return UnitRecordStats{ clamp(hp), clamp(atk), clamp(def), clamp(rec) };
+	};
+
+	size_t patched = 0, missing = 0;
+	for (const auto& row : rows)
+	{
+		const auto it = cache_.find(static_cast<UnitId>(row.id));
+		if (it == cache_.end() || it->second.stats.empty())
+		{
+			// 32 MST ids have no archive record; nothing grants those from here.
+			++missing;
+			continue;
+		}
+
+		auto& stats = it->second.stats;
+		stats[0] = toStats(row.min_hp, row.min_atk, row.min_def, row.min_rec);
+		if (stats.size() > 1)
+			stats[1] = toStats(row.max_hp, row.max_atk, row.max_def, row.max_rec);
+		++patched;
+	}
+
+	if (!rows.empty())
+		LOG_INFO << "balance: patched archive stats for " << patched << " unit(s), "
+			<< missing << " override(s) without an archive record";
+}
+
+std::optional<UnitRecord> UnitArchiver::lookup(UnitId unit_id) const
+{
+	const auto it = cache_.find(unit_id);
+	if (it == cache_.end())
+	{
+		LOG_ERROR << "Unable to find unit archive record " << unit_id;
+		return std::nullopt;
+	}
+
+	return it->second;
+}
+
+bool UnitArchiver::populatePacket(
+	const UnitRecord& unitRecord,
+	UnitType unit_type_id,
+	UserUnitInfo& unit)
+{
+	// Grab the base stats for the given unit type.
+	const auto& stats = unitRecord.stats[0];
+
+	// TODO: Accept a unit level here and compute
+	// stats from both the unit type and level.
+
+	unit.unit_id = unitRecord.id;
+	unit.unit_lvl = 1;
+	unit.unit_type_id = unit_type_id;
+
+	// Brave Burst.  bb_id is unit_mst's skill_id (nj9Lw7mV) and every value in
+	// the archive is checked to exist in skill_mst — a unit whose id is not a
+	// real skill gets an empty string rather than a dangling reference, because
+	// the client resolves this against its own skill table.  Materials and
+	// enhancers (Ghosts, Frogs, Imps, Metals) legitimately have none.
+	//
+	// sbb_id now comes from unit_mst's iEFZ6H19 (see tools/gen_unit_archive.py):
+	// non-zero for rarity 6 and up and, below that, for exactly one unit —
+	// 810212 Nice Burny, which is the single exception the wiki names.  The old
+	// comment here claimed unit_mst carried one skill per unit and there was no
+	// verified SBB source; it carries three (BB nj9Lw7mV, SBB iEFZ6H19, UBB
+	// cb0P4mp1) and 1195 archived units now have a real SBB id.
+	//
+	// ⚠ A NEW UNIT'S SUPER BRAVE BURST STARTS LOCKED, at level 0, even when it
+	// has an id.  Global wiki, Unit Skills: "The normal Brave Burst must first
+	// be levelled to 10 (MAX), after which the Super Brave Burst will become
+	// available, at Level 1."  UnitMix is what performs that transition.
+	// Granting it at 1 would hand every 6-star reward a burst the player is
+	// supposed to earn.
+	unit.bb_id = unitRecord.bb_id;
+	unit.bb_lvl = unitRecord.bb_id.empty() ? 0 : 1;
+	unit.sbb_id = unitRecord.sbb_id;
+	unit.sbb_lvl = 0;
+	unit.base_hp = stats.hp;
+	unit.base_atk = stats.atk;
+	unit.base_def = stats.def;
+	unit.base_rec = stats.rec;
+	unit.ext_hp = 0;
+	unit.ext_atk = 0;
+	unit.ext_def = 0;
+	unit.ext_rec = 0;
+
+	return true;
+}
+

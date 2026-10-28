@@ -1,0 +1,205 @@
+// Town action handlers
+
+// ---------------------------------------------------------------------------
+// TownUpdate  (id: CuQ5oB8U)
+// The resource-tile tap report.  MyTownTopScene::collectItem queues one of
+// these after every tap on a sparkling tile (0x18F2A78), so it fires on
+// harvesting, not on town entry or navigation.
+// Shape from TownUpdateRequest::createBody @0x13AD1FC.
+// ---------------------------------------------------------------------------
+
+json TownCollectLog {
+    doc "Single-element array wrapper carrying everything TownUpdate reports."
+
+    field collect_log type="str" {
+        key "0mRaAo39"
+        doc """
+        "<locationId>:<tapCnt>,..." — how many taps the player has taken on each
+        tile since the last flush, built by walking MyTownCollectLogList
+        (getLocationID / getTapCnt per entry).
+
+        It reports counts only, never which items dropped: the server pre-rolled
+        the period's loot into UserTownLocationDetail.drop_item_info and the
+        client merely replayed it, so the server resolves the same entries by
+        index when applying the taps.
+        """
+    }
+
+    field bought_sound_ids type="[i32::str]::sep(comma)" {
+        key "LzKDI2i7"
+        doc "Sound-room purchases, from UserState::getBuySoundList — the jukebox tracks the player owns.  Unrelated to the resource tiles; flushed on the same request."
+    }
+}
+
+json TownUpdateReq {
+    doc "Resource-tile tap report — see TownCollectLog."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Standard user-info tag present on nearly every request."
+    }
+
+    field collect type="[TownCollectLog]::size(1)" {
+        key "EuY6L7AX"
+        doc "The tap log plus the owned-sound list."
+    }
+}
+
+json TownUpdateResp {
+    doc "Empty response — the client already applied the rewards locally off the pre-rolled drop list, so nothing has to come back.  The next UserInfo carries the authoritative warehouse, zel, karma and tap state."
+}
+
+// ---------------------------------------------------------------------------
+// TownFacilityUpdate  (id: 8v43tz7g)
+// Fires when the player confirms a batch of facility/location upgrades.
+// The client sends the COMPLETE desired new state (not a delta); the server
+// overwrites whatever the client says and deducts karma.
+// ---------------------------------------------------------------------------
+
+json TownKarmaPayment {
+    doc "Single-element array wrapper that carries the total karma cost for a TownFacilityUpdate batch."
+
+    field karma type="i64::str" {
+        key "HTVh8a65"
+        doc """
+        Karma SPENT across this batch — and the client has ALREADY deducted it
+        from its own balance before sending.
+
+        createBody @0x13ACF4C reads UserState::getInjectionKarma.  The producer
+        is MyTownFacilityExtScene2::injectionFacility, which does
+        UserTeamInfo::setKarma(getKarma() - w) @0x18F6C5C and then
+        UserState::addInjectionKarma(w) @0x18F6C70 with the SAME w.
+
+        It is per-batch, not cumulative: UserState::clear("8v43tz7g") zeroes the
+        counter (strcmp @0x1246454, store @0x1246490) and GameResponseParser::parse
+        calls it @0x1391CE0 when OUR RESPONSE ARRIVES.  So deducting it once
+        server-side is correct and cannot double-charge two batches in a session.
+
+        The per-row HTVh8a65 values are where it landed.
+        """
+    }
+}
+
+json TownFacilityUpdateEntry {
+    doc """
+    One facility entry inside a TownFacilityUpdate request.
+    TownFacilityUpdateRequest::createBody @0x13ACEEC sends the post-injection
+    state of every facility row.
+
+    NOT DECLARED HERE: createBody also emits h7eY3sAK = UserInfo::getUserID()
+    @0x13AD030 as the FIRST param of every node.  The handler ignores it
+    (error_on_unknown_keys = false) and resolves the caller from IKqx1Cn9
+    instead, so it is deliberately absent rather than missed.
+    """
+
+    field facility_id type="i32::str" {
+        key "y9ET7Aub"
+        doc "MST facility id — UserTownFacilityInfo::getFacilityID @0x13ACFB4."
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "POST-injection level — UserTownFacilityInfo::getLv @0x13ACFCC.  injectionFacility already applied the bump before the request is built."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc """
+        Karma ACCUMULATED toward the next level — a progress bar, not a price.
+
+        Sent from UserTownFacilityInfo::getKarma @0x13ACFE4.
+
+        MyTownFacilityExtScene2::injectionFacility (0x18F66D4) adds the injected
+        karma to UserTownFacilityInfo::getKarma(), and when the running total
+        reaches TownFacilityLvMst.karma it bumps the level and keeps the
+        remainder.  Dropping this field on the floor resets every player's
+        progress bar to 0 on the next login.
+        """
+    }
+}
+
+json TownLocationUpdateEntry {
+    doc """
+    One location entry inside a TownFacilityUpdate request.
+
+    NOT DECLARED HERE: createBody also emits h7eY3sAK = UserInfo::getUserID()
+    @0x13AD134 as the first param of every node; the handler ignores it.
+    """
+
+    field location_id type="i32::str" {
+        key "un80kW9Y"
+        doc "MST location id — UserTownLocationInfo::getLocationID @0x13AD0A8."
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "POST-injection level — UserTownLocationInfo::getLv @0x13AD0C0."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "Karma accumulated toward this location's next level — UserTownLocationInfo::getKarma @0x13AD0D8.  See TownFacilityUpdateEntry.karma."
+    }
+}
+
+json TownFacilityUpdateReq {
+    doc "Complete desired state sent by the client when confirming facility/location upgrades.  Server persists all entries and deducts karma."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Standard user-info tag."
+    }
+
+    field karmaPayment type="[TownKarmaPayment]::size(1)" {
+        key "EuY6L7AX"
+        doc "Total karma cost for the batch."
+    }
+
+    field facilities type="[TownFacilityUpdateEntry]" {
+        key "YRgx49WG"
+        doc "Full facility list with desired levels."
+    }
+
+    field locations type="[TownLocationUpdateEntry]" {
+        key "yj46Q2xw"
+        doc "Full location list with desired levels."
+    }
+}
+
+json TownFacilityUpdateResp {
+    doc """
+    The two lists an upgrade invalidates and the client cannot recompute itself.
+
+    injectionFacility already applied the new level and karma to its own
+    UserTownFacilityInfo / UserTownLocationInfo before sending, so echoing those
+    back would be noise.  These two are different:
+
+      * permitReceipes — the synthesis menu is derived server-side from facility
+        levels via TownFacilityLvMst.release_recipe.  Without it the newly
+        unlocked recipes only appear after a relaunch, because
+        PermitRecipeInfoList is otherwise filled once from UserInfo.
+      * townLocationDetail — a levelled-up tile's remaining taps are re-rolled
+        against its new drop pool, and drop_item_info is server-authored.
+
+    Both response classes replace their whole list: readParam calls
+    removeAllObjects() when (row 0, field 0) and addObject() on each row's last
+    field, with no per-row operation code (contrast the present box, handbook
+    6.20).  So sending the full set is a clean swap, not an append.
+    """
+
+    field permitReceipes type="[PermitReceipe]" {
+        key "51yQrDBR"
+        doc "Complete recipe set the player's facility levels now permit."
+    }
+
+    field townLocationDetail type="[UserTownLocationDetail]" {
+        key "s8TCo2MS"
+        doc "Complete harvest state for every tile, re-rolled where a level change invalidated the pre-rolled drops."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "The header after the upgrade.  KARMA IS SERVER-AUTHORITATIVE here -- the handler deducts the batch's cost with MAX(0, karma-cost), so the client's optimistic number can be wrong (it has no clamp) and, either way, nothing else on this screen refreshes the header."
+        optional #true
+    }
+}

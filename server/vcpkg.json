@@ -1,0 +1,14 @@
+{
+  "dependencies": [
+    {
+      "name": "drogon",
+      "features": [
+        "sqlite3",
+        "orm"
+      ]
+    },
+    "cryptopp",
+    "sqlite3",
+    "glaze"
+  ]
+}

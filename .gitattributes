@@ -1,0 +1,51 @@
+# Normalize line endings: every text file is stored and checked out with LF.
+# The Windows scripts in server/ (*.bat, *.ps1) are committed with LF today and
+# run fine that way, so they are not switched to CRLF here.
+* text=auto eol=lf
+
+# Explicit text types
+*.c       text diff=cpp
+*.cc      text diff=cpp
+*.cpp     text diff=cpp
+*.h       text diff=cpp
+*.hpp     text diff=cpp
+*.inl     text diff=cpp
+*.py      text diff=python
+*.js      text
+*.mjs     text
+*.css     text diff=css
+*.html    text diff=html
+*.md      text diff=markdown
+*.MD      text diff=markdown
+*.json    text
+*.jsonc   text
+*.yml     text
+*.yaml    text
+*.sh      text eol=lf
+*.tsv     text
+*.java    text diff=java
+*.s       text
+
+# Binary files (none are tracked; listed so accidental additions diff sanely)
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.webp    binary
+*.gif     binary
+*.ico     binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.otf     binary
+*.zip     binary
+*.gz      binary
+*.apk     binary
+*.so      binary
+*.sqlite  binary
+
+# GitHub Linguist: keep language stats about the code, not the notes
+re/notes/**          linguist-documentation
+server/docs/**       linguist-documentation
+docs/**              linguist-documentation
+*.tsv                linguist-documentation
+cdn-worker/package-lock.json  linguist-generated -diff

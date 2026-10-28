@@ -1,0 +1,112 @@
+// F_GUILD_* — the Guild subsystem master data: the guild level curve, the
+// member-skill catalog, and the guild-point exchange shop.  All 3 tables
+// ported 2026-07-19 from 2-mst-decoded to deploy/system/guild_*.json;
+// wrapper keys are each struct's `hash`, sourced from response_mappings.json
+// (mst_responses, response_class noted per struct).
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (180/4/8784 rows).
+//
+// Two Guild MSTs from the same source folder are NOT here: F_GUILD_ART_MST
+// and F_GUILD_SKILL_DETAILS_MST remain unported — several Guild*Mst response
+// classes are unclaimed and the mapping is ambiguous (see
+// tools/MST_PORTING_BACKLOG.md).
+//
+// Separator caution: `qA7M9EjP`/`SzV0Nps7` are DATETIME STRINGS here
+// ("2019-02-11 00:00:00"), while the same hashes carry raw unix seconds in
+// mst/frontier_gate.kdl.  The encoding is per-table.
+
+json GuildInfoMst {
+    doc "Guild level curve (wrapper hash p3bDi1jq, GuildInfoMstResponse).  180 rows — one per guild level, giving the exp band and the member cap."
+    hash "p3bDi1jq"
+
+    field level type="i32::str" {
+        key "osidufj5"
+        doc "Guild level 1..180."
+    }
+
+    field need_exp type="i32::str" {
+        key "grKTq15A"
+        doc "Lower bound of this level's exp band (0..605000).  Same hash/name as unit.kdl."
+    }
+
+    field need_exp_max type="i32::str" {
+        key "u3D9abe1"
+        doc "Upper bound of this level's exp band (4131..605000) — one less than the next row's `need_exp`."
+    }
+
+    field max_member type="i32::str" {
+        key "Nt38aDqi"
+        doc "// UNVERIFIED (named from value): member cap at this level, 10..60 in steps of 5."
+    }
+}
+
+json GuildMemberSkillMst {
+    doc "Guild member skill catalog (wrapper hash fDLao3cs, GuildMemberSkillMstResponse).  4 rows.  Source file is F_UNKNOWN_y38bDaMv, identified as F_GUILD_MEMBER_SKILL_MST per handbook 8.36."
+    hash "fDLao3cs"
+
+    field id type="i32::str" {
+        key "ibY38bDn"
+        doc "Skill id 1..4."
+    }
+
+    field name type="str" {
+        key "s35idar9"
+        doc "Skill name — \"Zel Boost\", \"Karma Boost\", \"EXP Boost\", \"Summoner Boost\".  Same hash/name as banner.kdl/gacha.kdl."
+    }
+
+    field thumbnail_img type="str" {
+        key "M2cv6dum"
+        doc "Skill icon — \"guild_zel_boost.png\", ...  (\"Summoner Boost\" reuses guild_exp_boost.png).  Same hash/name as dungeon_key.kdl."
+    }
+}
+
+json GuildPointExchangeMst {
+    doc "Guild point exchange shop (wrapper hash baD81eqw, GuildExchangeMstResponse — the only guild-exchange class in mst_responses; the class name is not an exact match, see backlog).  8784 rows."
+    hash "baD81eqw"
+
+    field id type="i32::str" {
+        key "Yxo3bEic"
+        doc "Exchange entry id (65..6000025)."
+    }
+
+    field name type="str" {
+        key "hQ1SJZU9"
+        doc "Entry display name — \"Premium Fire & Thunder Mystery Chest\", \"Dreadnought Shell Aleph\", ..."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Entry blurb (free text; contains commas, so this is a plain string and not a comma list).  Same hash/name as item.kdl/gacha.kdl."
+    }
+
+    field price type="i32::str" {
+        key "3EWLm0sA"
+        doc "// UNVERIFIED (named from context): guild-point cost, 50..8500."
+    }
+
+    field reward_info type="[str]::sep(colon)" {
+        key "qBAb07rh"
+        doc "// UNVERIFIED element shape: colon-packed reward — \"<type>:<id>:<count>:<a>:<b>\" for units/spheres (\"7:818938:1:0:0\") and \"<type>:<id>:<count>:<thumbnail>\" for chests (\"9000:321:1:chest_large_gold_thum.png\"), so the trailing element is not always numeric."
+    }
+
+    field limit_count type="i32::str" {
+        key "S8rdp9zk"
+        doc "// UNVERIFIED (named from context): purchase limit per user, 1..400."
+    }
+
+    field start_date type="datetime" {
+        key "qA7M9EjP"
+        doc "Availability start — \"2019-02-11 00:00:00\"; \"0000-00-00 00:00:00\" (handled as the epoch default) on always-on entries.  Same hash/name as banner.kdl/gift.kdl.  Raw unix seconds in mst/frontier_gate.kdl."
+    }
+
+    field end_date type="datetime" {
+        key "SzV0Nps7"
+        doc "Availability end — \"2019-03-10 23:59:59\"; \"9999-12-31 23:59:59\" on always-on entries.  Same hash/name as banner.kdl/gift.kdl."
+    }
+
+    field unk1 type="[str]::sep(comma)" {
+        key "ra4iFR6T"
+        doc "// UNVERIFIED: comma list of \"<a>:<id>\" pairs whose ids repeat the unit in `reward_info` (\"5:90001,7:90001\").  Empty on most rows; likely the preview/related-unit set shown on the entry."
+    }
+}

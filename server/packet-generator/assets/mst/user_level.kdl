@@ -1,0 +1,39 @@
+json UserLevelMst {
+    doc "F_USER_LEVEL_MST (deploy/system/user_level_mst.json). One row per level, lv 1-1000. Drives the BF level-up curve and the per-level caps (max energy, deck cost, max friend count). 1000 rows total."
+
+    field level type="i32::str" {
+        key "D9wXQI2V"
+        doc "Level number (1-1000). Primary key. // CAPTURED FROM: deploy/system/user_level_mst.json."
+    }
+
+    field exp type="i64::str" {
+        key "d96tuT2E"
+        doc "PER-LEVEL EXP CHUNK — exp the player must accumulate AT level N-1 to reach level N. NOT cumulative. Captured values: lv 1=0, lv 2=20, lv 3=40, lv 900=1009680, lv 901=1009853, lv 1000=1023143. The values across rows happen to be monotonically increasing but the small inter-row deltas (e.g. 1009853-1009680=173) are an artifact of the curve shape, not evidence of cumulative-ness — chunk[N] is the FULL amount needed to ding from level N-1, so at endgame each level requires ~1M exp on its own. userinfo.exp is the player's progress AT THE CURRENT LEVEL; on level-up the server subtracts the consumed chunk and the residual carries over. Seed userinfo.exp=1009680 leaves the player almost ready to ding lv 901 from lv 900 (1009680 of 1009853 needed). // CAPTURED FROM: deploy/system/user_level_mst.json. // HISTORY: this field's interpretation flipped three times during the MissionEnd level-up debugging — see comments in gimuserver/gme/MissionEnd.cpp for the full story. Per-level chunk is the final correct reading, anchored by the player's expectation that 'XP to next Lv' at endgame should be in the millions, not the hundreds."
+    }
+
+    field energy type="u32::str" {
+        key "0P9X1YHs"
+        doc "Maximum energy at this level. Used by team_info builder to set max_action_point. On level-up, the server should also refill current energy to this value (see MissionEnd handler). Captured: lv 1=15, lv 900=398, lv 1000=431."
+    }
+
+    field unk type="i32::str" {
+        key "YS2JG9no"
+        doc "Captured value=3 for every level. // UNVERIFIED: no observed variation; setter name not in IDA exports. NOTE: not used in last version."
+    }
+
+    field deck_cost type="i32::str" {
+        key "ziex06DY"
+        doc "Maximum deck cost (squad point cost cap) at this level. Captured: lv 1=100, lv 900=777, lv 1000=782."
+    }
+
+    field friend_count type="i32::str" {
+        key "oFQ3mbS6"
+        doc "Base friend capacity at this level, sent as team_info max_friend_count (3u41PhR2). 10 at lv 1, rising to 50 at lv 81 and flat after; the client announces the rise as MISSION_RESULT_FRIEND_UP. Level-ups raise no other capacity: the level-up strings are LV_UP, VIT_UP (energy), COST_UP and FRIEND_UP only."
+    }
+
+    field add_friend_count type="i32::str" {
+        key "GZ2rKW90"
+        doc "The most friend slots that can be BOUGHT at this level (0 until lv 81, then 50). UserLevelMst::getSumFriendCnt @0x135CD9C adds it to friend_count, and ShopFriendExtScene::touchBegan refuses the purchase (SHOP_FRIEND_EXT_MAX_CNT) once team_info's getSumFrdCnt reaches that sum. Not a grant: team_info add_friend_count carries what was actually bought."
+    }
+
+}

@@ -1,0 +1,4488 @@
+import "../mst/version_info.kdl"
+import "../mst/login_campaign.kdl"
+import "../mst/user_level.kdl"
+import "../mst/town.kdl"
+import "../mst/dungeon_key.kdl"
+import "../mst/arena.kdl"
+import "../mst/gacha.kdl"
+import "../mst/item.kdl"
+import "../mst/define.kdl"
+import "../mst/npc.kdl"
+import "../mst/slots.kdl"
+import "../mst/banner.kdl"
+import "../mst/excluded_dungeon.kdl"
+import "../mst/passive_skill.kdl"
+import "../mst/notice_info.kdl"
+import "../mst/daily_task.kdl"
+import "../mst/gift.kdl"
+import "../mst/unit.kdl"
+import "../mst/receipe.kdl"
+import "../mst/info.kdl"
+import "../mst/trophy.kdl"
+import "../mst/help.kdl"
+import "../mst/url.kdl"
+import "../mst/event.kdl"
+import "../mst/sound.kdl"
+import "../mst/first_desc.kdl"
+import "../mst/frontier_hunter.kdl"
+import "../mst/mission.kdl"
+import "../mst/grand_mission.kdl"
+import "../mst/raid.kdl"
+import "../mst/colosseum.kdl"
+import "../mst/dbb.kdl"
+import "../mst/guild.kdl"
+import "../mst/frontier_gate.kdl"
+import "../mst/purchase.kdl"
+import "../mst/summoner.kdl"
+// mst/skill.kdl and mst/mission_ep3.kdl were authored in the §8.37 pass but
+// never imported, so their structs were never generated.  NOT imported here:
+// mst/mission_npc_unit.kdl and mst/mission_script.kdl, whose wrapper hashes
+// are still placeholders (mission_script's collides with the real
+// scenario_info wire key N4XVE1uA) — see tools/MST_PORTING_BACKLOG.md.
+import "../mst/skill.kdl"
+import "../mst/mission_ep3.kdl"
+import "../mst/unit_evo.kdl"
+import "../mst/unit_ext.kdl"
+import "../mst/skill_ext.kdl"
+import "../mst/area.kdl"
+import "../mst/shop.kdl"
+import "../mst/scenario.kdl"
+import "../mst/achievement.kdl"
+import "../net/signal_key.kdl"
+import "../net/challenge_arena.kdl"
+import "../net/daily_login.kdl"
+import "../net/summoner_journal.kdl"
+import "../net/user.kdl"
+// Account transfer codes; needs SignalKey (signal_key.kdl, imported above).
+import "../net/transfer.kdl"
+// AFTER user.kdl: the guild request envelopes embed LoginInfoReq, and the
+// generator emits types in import order, so importing guild first left every
+// GuildXxxReq referencing an undefined struct.
+import "../net/guild.kdl"
+import "../net/items.kdl"
+import "../net/scenario.kdl"
+import "../net/present.kdl"
+import "../net/achievement.kdl"
+import "../net/notice.kdl"
+import "../net/dbb.kdl"
+import "../net/unit.kdl"
+import "../net/permit_place.kdl"
+import "../net/dungeon_key.kdl"
+import "../net/reinforcement_info.kdl"
+import "../net/mission.kdl"
+import "../net/gacha.kdl"
+import "../net/npc.kdl"
+import "../net/friends.kdl"
+// AFTER friends.kdl: FriendSocialResp embeds FriendInfo and FriendPointInfo.
+import "../net/friends_social.kdl"
+// Raid embeds FriendInfo (above) and LoginInfoReq, so it must come after both.
+import "../net/raid.kdl"
+import "../net/event.kdl"
+import "../net/featuring_gate.kdl"
+import "../net/town.kdl"
+import "../net/tutorial.kdl"
+import "../net/badge_info.kdl"
+import "../net/frontier_gate.kdl"
+// After user.kdl: the arena envelopes embed LoginInfoReq, UserArenaInfo and UserTeamInfo.
+import "../net/arena.kdl"
+
+json InitializeReq {
+    doc "Initialization command"
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "TODO"
+    }
+
+    field mstRequests type="[MstUrlList]" {
+        key "KeC10fuL"
+        doc "MST that should be sent"
+     }
+}
+
+json CampaignBattleEndReq {
+    doc "CampaignBattleEnd (pTNB6yw3) request.  CampaignBattleEndRequest::createBody @0x13AFCA4 sends CHd0w9WU, knPuw69N, w5vHLT0q, Yusr3Zg5, NjZ6ds1S, Nv94RF5q, RseDpY04 and the wVTBA6b5 archive — and NO mission id: only DeckEdit, Save and End carry 2I9V0o6J."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field missionId type=str {
+        key "j28VNcUW"
+        doc "Top-level mission id.  The real client never sends it (see above); wire tests do."
+    }
+
+    field archive type="[CampaignArchiveReq]" {
+        key "wVTBA6b5"
+        doc "The run's archive so far (createBodySaveDataArchive @0x13B0784) — cumulative for the run."
+    }
+
+    field deck_pos type="[CampaignDeckPosEntry]" {
+        key "Yusr3Zg5"
+        doc "Where each deck stands after the battle -- see CampaignDeckPosEntry."
+        optional #true
+    }
+}
+
+json CampaignArchiveReq {
+    doc "One CampaignMissionArchiveInfo node (wVTBA6b5).  Only the two currencies are modelled; the rest (47cJBUxz used items, hoG2ieT5/6PLsn8xo crystals, 4T0Q2Bh5 items, 3MAT6quo units, the turn/spark/skill/mimic counters, pJqG1B7b cheat info) is read past."
+
+    field get_zel type="i32::str" {
+        key "Najhr8m6"
+        doc "getGetZel — zel picked up in this run's battles so far."
+    }
+
+    field get_karma type="i32::str" {
+        key "HTVh8a65"
+        doc "getGetKarma — karma picked up so far."
+    }
+}
+
+json CampaignDeckPosEntry {
+    doc """
+    One campaign deck's position on the Grand Quest map -- the Yusr3Zg5 group,
+    built by createBodySaveDataPos (CampaignSaveRequest @0x13B4170, and the
+    identical bodies on CampaignBattleEndRequest @0x13B036C and
+    CampaignEndRequest @0x13B1E54).
+
+    This is where the party marker IS.  The client owns the position while a
+    run is on screen, reports it here at every save point, and reads it back
+    from the CampaignStart reply -- CampaignFieldInitScene::
+    missionEventInitCameraSet @0x14EA4A4 places the camera on it, and
+    CampaignMissionDeckInfoList::nextBattleDeckNum picks the next deck by it.
+    Nothing was storing it, so a resumed run always came back at point 0.
+    """
+
+    field deck_num type="i32::str" {
+        key "zsiAn9P1"
+        doc "getDeckNum -- which campaign deck this row is."
+    }
+
+    field now_point_num type="i32::str" {
+        key "7w0inC1R"
+        doc "getNowPointNum -- the GrandMissionSpotMst point_num the deck stands on."
+    }
+
+    field arrival_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "getArrivalOrder -- the order this deck reached its spot, which is how the client stacks several decks on one point."
+    }
+}
+
+json CampaignMissionRef {
+    doc "The 2I9V0o6J request group: one node naming the Grand Mission (CampaignInfo::getMissionMst()->getMissionID)."
+
+    field mission_id type=str {
+        key "j28VNcUW"
+        doc "Grand Mission id."
+    }
+}
+
+json CampaignNumInfoReq {
+    doc "The CHd0w9WU request group (createBodyNumInfo @0x13B1A84)."
+
+    field mission_num type=str {
+        key "C03bapzk"
+        doc "CampaignMissionNumInfo::getMissionNum — the run handle."
+    }
+
+    field mission_status type="i32::str" {
+        key "j3g5P4cq"
+        doc "CampaignEndRequest +0x20.  2 = cleared; 3 = failed or abandoned.  CampaignResultInitScene::initConnect @0x154C3BC sends 2, or 3 when either loss flag (+0x368 / +0x369) is set; CampaignFieldInitScene's give-up @0x14E9F5C sends 3."
+    }
+}
+
+json CampaignDeckEditEntry {
+    doc "One hT95cq8K node of CampaignDeckEditRequest::createBody @0x13B1528."
+
+    field deck_num type="i32::str" {
+        key "zsiAn9P1"
+        doc "Party number."
+    }
+
+    field user_unit_id type=str {
+        key "edy7fq3L"
+        doc "UserPartyInfo::getUserUnitID."
+    }
+
+    field member_type type="i32::str" {
+        key "gr48vsdJ"
+        doc "UserPartyInfo::getMemberType."
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "UserPartyInfo::getDispOrder."
+    }
+
+    field guest_id type=str {
+        key "1e6jxQzf"
+        doc "UserPartyInfo::getGuestID (the response's hT95cq8K spells guest id 7zyHb5h9)."
+    }
+}
+
+json CampaignItemReqEntry {
+    doc "One Grand Quest item slot as the client sends it: Ckf3Zx7E / 5EByfWJ4 in CampaignItemEdit, NjZ6ds1S (equipped) and Nv94RF5q (the bag) in CampaignSave / CampaignEnd, which also carry h7eY3sAK."
+
+    field user_id type=str {
+        key "h7eY3sAK"
+        doc "UserTeamInfo::getUserID — absent from CampaignItemEdit."
+    }
+
+    field item_id type=str {
+        key "kixHbe54"
+        doc "Item id."
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Slot order."
+    }
+
+    field item_num type="i32::str" {
+        key "wgV86x1q"
+        doc "Count."
+    }
+}
+
+json CampaignEventStatusReq {
+    doc "The RseDpY04 request group (createBodySaveDataStatus @0x13B352C)."
+
+    field mission_flg type=str {
+        key "JcKMjH64"
+        doc "CampaignMissionEventInfo::getMissionFlgCsv @0x12CBAF4 — the flags this run has set, comma-joined.  Each is a GrandMissionFlgMst flag id; the percents of the set flags are the run's completion (every mission's percents sum to exactly 100)."
+    }
+
+    field rest_time type="i32::str" {
+        key "8n7oG4fS"
+        doc "getRestTime."
+    }
+
+    field reserve_party_disp_flg type="i32::str" {
+        key "W1EkCyc3"
+        doc "Reserve-party display flag."
+    }
+}
+
+json CampaignDeckEditReq {
+    doc "CampaignDeckEdit (D74TYRf1 / e2k4s6jc) — the Grand Quest party, queued through ConnectRequestList by the party screens and MissionCheckScene::updateEvent.  Unregistered before 2026-09-11, so its 'Unsupported request' closed the session."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field mission type="[CampaignMissionRef]" {
+        key "2I9V0o6J"
+        doc "The Grand Mission being set up."
+    }
+
+    field decks type="[CampaignDeckEditEntry]" {
+        key "hT95cq8K"
+        doc "Every member of every party."
+    }
+}
+
+json CampaignItemEditReq {
+    doc "CampaignItemEdit (W2VU91I7 / 2Jd10iwn) — the Grand Quest item loadout, createBody @0x13B38BC.  The client has already moved the items out of (or back into) its warehouse (CampaignItemEditSelectCntScene::setEqpItem calls GameUtils::inc/decWarehouseItem)."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field eqp_items type="[CampaignItemReqEntry]" {
+        key "Ckf3Zx7E"
+        doc "Equipped items (CampaignEqpItemInfoList)."
+    }
+
+    field rsv_items type="[CampaignItemReqEntry]" {
+        key "5EByfWJ4"
+        doc "Reserve items (CampaignRsvItemInfoList)."
+    }
+}
+
+json CampaignSaveReq {
+    doc "CampaignSave (Utzc3oj5 / 6xc3GhQF) — sent by CampaignFieldInterruptScene when the player suspends.  The suspend data itself stays client-side (CampaignSceneBase::campaignEncodeSuspendData); only the mission and the item counts matter here."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field mission type="[CampaignMissionRef]" {
+        key "2I9V0o6J"
+        doc "The Grand Mission in progress."
+    }
+
+    field eqp_items type="[CampaignItemReqEntry]" {
+        key "NjZ6ds1S"
+        doc "Equipped items as they stand."
+    }
+
+    field deck_pos type="[CampaignDeckPosEntry]" {
+        key "Yusr3Zg5"
+        doc "Where each deck stands at the moment of the suspend -- see CampaignDeckPosEntry.  This is the block that makes a suspended run resume where it stopped."
+        optional #true
+    }
+}
+
+json CampaignRestartReq {
+    doc "CampaignRestart (Ht2jeWV8 / vm7LYZz4) — CampaignFieldInitScene's restart path; createBody @0x13B3C04 sends the base tags only."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json CampaignBattleStartReq {
+    doc "CampaignBattleStart (h1RjcD3S) request."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field missionId type=str {
+        key "j28VNcUW"
+        doc "Campaign mission id (reused across Campaign requests)."
+    }
+}
+
+json CampaignReceiptReq {
+    doc "CampaignReceipt (5Imq3wC0) request."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field missionId type=str {
+        key "j28VNcUW"
+        doc "Campaign mission id."
+    }
+}
+
+json CampaignDeckGetReq {
+    doc "CampaignDeckGet (C3a0VnQK) request — identifies the user."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json CampaignEndReq {
+    doc "CampaignEnd (jF9Kkro4) request, createBody @0x13B196C.  Also carries w5vHLT0q, Yusr3Zg5 and W6F9ECH5 (party, positions, units), read past here."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field mission type="[CampaignMissionRef]" {
+        key "2I9V0o6J"
+        doc "The Grand Mission that ended."
+    }
+
+    field num type="[CampaignNumInfoReq]" {
+        key "CHd0w9WU"
+        doc "Run handle and the ending status (2 cleared, 3 failed/abandoned)."
+    }
+
+    field eqp_items type="[CampaignItemReqEntry]" {
+        key "NjZ6ds1S"
+        doc "The equipped list after CampaignResultInitScene::eqpItemFull @0x154C400 has merged the bag into it — the loadout the next run starts with."
+    }
+
+    field bag type="[CampaignItemReqEntry]" {
+        key "Nv94RF5q"
+        doc "The bag (createBodySaveDataRsvItem — named RsvItem but it reads CampaignMissionBagInfoList), empty by the time it is sent because eqpItemFull ends in bagClean."
+    }
+
+    field event type="[CampaignEventStatusReq]" {
+        key "RseDpY04"
+        doc "The run's flags."
+    }
+
+    field deck_pos type="[CampaignDeckPosEntry]" {
+        key "Yusr3Zg5"
+        doc "Where each deck finished -- see CampaignDeckPosEntry."
+        optional #true
+    }
+}
+
+json CampaignMissionGetReq {
+    doc "CampaignMissionGet (RSm6p2d4) request — identifies the user."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json CampaignStartReq {
+    doc "CampaignStart (6Y0gaPQN) request — identifies the user."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Campaign response structs (previously hand-written glz::meta in the handlers).
+// ---------------------------------------------------------------------------
+
+json CampaignMissionEntry {
+    doc "One campaign mission's progress/state under response key 2I9V0o6J (CampaignMissionInfoResponse).  Shared by CampaignMissionGet and CampaignStart."
+
+    field mission_id type="str" {
+        key "j28VNcUW"
+        doc "Mission id (numeric string == mission_mst.id)."
+    }
+
+    field attain_percent type="i32::str" {
+        key "HUo4T7i8"
+        doc "Best clear percentage.  Quoted decimal integer on the wire."
+    }
+
+    field mission_on_flg type="str" {
+        key "JcKMjH64"
+        doc "Whether the mission is selectable (\"1\") or locked (\"0\")."
+    }
+
+    field state type="i32::str" {
+        key "j0Uszek2"
+        doc "Mission state (>=1 = unlocked/cleared).  Quoted decimal integer on the wire."
+    }
+
+    field get_reward type="str" {
+        key "JQ23rIvk"
+        doc "setGetReward — the once-only rewards already earned on this mission, comma-joined reward ids (CampaignRewardScene::isGetRewardCheck splits on ',' to mark them obtained).  user_campaign_missions.rewards_got."
+    }
+}
+
+json CampaignMissionGetResp {
+    doc """
+    CampaignMissionGet (RSm6p2d4) response — the per-mission progress list AND
+    the Grand Quest master tables.
+
+    ⚠ THE MASTER TABLES HAVE TO BE HERE, NOT ONLY ON CampaignStart.  This is the
+    FIRST request of the Grand Quest flow (the mission-select screen fires it on
+    open); CampaignStart is the LAST, after the quest and the deck are already
+    chosen.  `CampaignInfo` resolves its `CampaignMissionMst*` when the quest is
+    picked — between the two — so tables that arrive with CampaignStart arrive
+    after that pointer has already been taken, and taken as NULL.
+
+    That is what a client capture showed on 2026-09-13: DeckGet, DeckEdit and
+    CampaignStart all named mission 5008001 correctly (that id comes from the
+    per-user CampaignMissionInfo list), while the CampaignSave that followed
+    carried `2I9V0o6J:[{}]` — an EMPTY mission, because Save builds it from
+    `CampaignInfo::getMissionMst()->getMissionID()`.  With that pointer null,
+    CampaignFieldScene::fleldMapDraw @0x14F6B60 bails on its very first branch
+    (`ldr x8,[x19,#0x3e8]; cbz x8`) and the field draws no canvas and no spots —
+    reported as "I can see my player icon but the map and the tiles are gone".
+
+    They stay on CampaignStart as well: every one of these blocks is a REPLACE,
+    re-sending costs nothing, and it covers any path that reaches a run without
+    passing the menu.
+    """
+
+    field missions type="[CampaignMissionEntry]" {
+        key "2I9V0o6J"
+        doc "Mission progress/state entries."
+    }
+
+    field mission_mst type="[GrandMissionMst]" {
+        key "as8G75gK"
+        doc "CampaignMissionMstResponse — the mission catalogue the field scene resolves its map, spots and BGM through.  See this struct's doc for why it is on THIS request."
+    }
+
+    field map_mst type="[GrandMissionMapMst]" {
+        key "iyCP4N1h"
+        doc "CampaignMapMstResponse — the map canvas."
+    }
+
+    field spot_mst type="[GrandMissionSpotMst]" {
+        key "aqb6LS9y"
+        doc "CampaignMapSpotMstResponse — the tappable points."
+    }
+
+    field route_mst type="[GrandMissionRouteMst]" {
+        key "Ri1S0JQX"
+        doc "CampaignMapRouteMstResponse — the edges between spots."
+    }
+
+    field icon_mst type="[GrandMissionIconMst]" {
+        key "HUo5G8gz"
+        doc "CampaignMapIconMstResponse — boss/enemy/event icons."
+    }
+
+    field treasure_mst type="[GrandMissionTreasureMst]" {
+        key "hpGBs2R1"
+        doc "CampaignMapTreasureMstResponse — the chests a spot can hold."
+    }
+
+    field flg_mst type="[GrandMissionFlgMst]" {
+        key "27tgwCUN"
+        doc "CampaignFlgMstResponse — the story flags the visibility rules are written against."
+    }
+
+    field end_cnd_mst type="[GrandMissionEndCndMst]" {
+        key "0sT4d2zV"
+        doc "CampaignMissionEndCndMstResponse — what ends a run."
+    }
+
+    field event_mst type="[GrandMissionEventMst]" {
+        key "x3kCNR4Y"
+        doc "CampaignEventMstResponse — the scripted events a spot fires."
+    }
+
+    field reward_bonus_mst type="[GrandMissionRewardMst]" {
+        key "Q83eyrJM"
+        doc "CampaignRewardBonusMstResponse — the reward catalogue."
+    }
+}
+
+json CampaignDeckMember {
+    doc "One campaign party-deck member under response key w5vHLT0q (CampaignMissionPartyDeckInfoResponse)."
+
+    field deck_num type="i32::str" {
+        key "zsiAn9P1"
+        doc "Deck slot number.  Quoted decimal integer on the wire."
+    }
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "user_units instance id of this member.  Quoted decimal integer on the wire."
+    }
+
+    field member_type type="i32::str" {
+        key "gr48vsdJ"
+        doc "Member role/type.  Quoted decimal integer on the wire."
+    }
+
+    field disporder type="i32::str" {
+        key "XuJL4pc5"
+        doc "Display order within the deck.  Quoted decimal integer on the wire."
+    }
+
+    field now_hp type="i32::str" {
+        key "a3qJ6QhX"
+        doc "Current HP (0 — the client fills from its unit cache).  Quoted decimal integer on the wire."
+    }
+
+    field max_hp type="i32::str" {
+        key "3WMz78t6"
+        doc "Max HP (0 — client-filled).  Quoted decimal integer on the wire."
+    }
+
+    field bb_gauge type="i32::str" {
+        key "gU2xtQ0V"
+        doc "Brave-burst gauge (0 — client-filled).  Quoted decimal integer on the wire."
+    }
+
+    field sb_gauge type="i32::str" {
+        key "nIGZ1X9C"
+        doc "Super-burst gauge (0 — client-filled).  Quoted decimal integer on the wire."
+    }
+}
+
+json CampaignDeckGetResp {
+    doc "CampaignDeckGet (C3a0VnQK) response — the campaign party-deck composition."
+
+    field members type="[CampaignDeckMember]" {
+        key "w5vHLT0q"
+        doc "Campaign deck members."
+    }
+}
+
+json CampaignStartDeckEntry {
+    doc "One party-deck summary for the CampaignStart mission-select screen (response key hT95cq8K)."
+
+    field deck_num type="i32::str" {
+        key "zsiAn9P1"
+        doc "Deck slot number.  Quoted decimal integer on the wire."
+    }
+
+    field guest_id type="str" {
+        key "7zyHb5h9"
+        doc "Guest/friend id for this deck slot (empty when none)."
+    }
+
+    field user_unit_id type="str" {
+        key "edy7fq3L"
+        doc "setUserUnitID (CampaignPartyDeckListResponse::readParam @0x1425E58) — without it every party slot came back empty."
+    }
+
+    field member_type type="i32::str" {
+        key "gr48vsdJ"
+        doc "Member role/type.  Quoted decimal integer on the wire."
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "setDispOrder — the member's slot."
+    }
+}
+
+json CampaignStartMissionDeckEntry {
+    doc "One mission-deck slot for the CampaignStart deck-selector panel (response key Yusr3Zg5, CampaignMissionDeckInfoResponse::readParam @0x1423F34 -- a REPLACE list).  The same three fields the client sends back through CampaignDeckPosEntry."
+
+    field deck_num type="i32::str" {
+        key "zsiAn9P1"
+        doc "setDeckNum -- deck slot number."
+    }
+
+    field now_point_num type="i32::str" {
+        key "7w0inC1R"
+        doc "setNowPointNum -- the map spot this deck stands on, restored from what the client last reported."
+    }
+
+    field arrival_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "setArrivalOrder -- the order this deck arrived at its spot.  readParam reads it and nothing was sending it."
+    }
+}
+
+json CampaignStartEventInfo {
+    doc "CampaignStart event-flag object (response key RseDpY04 — a single object, not an array)."
+
+    field reserve_party_disp_flg type="i32::str" {
+        key "W1EkCyc3"
+        doc "Whether the reserve-party UI is shown.  Quoted decimal integer on the wire."
+    }
+}
+
+json CampaignRewardBonusEntry {
+    doc "One EARNED bonus under response key p04iC2wr (CampaignRewardBonusInfoResponse, readParam @0x1426160, a REPLACE list).  Its only readers are the result screens — CampaignResultScene, CampaignResultBonusScene (one setReward + bonusUpdateHeader per row), CampaignResultSceneBase's totals and MissionResultGuildScene — so it is what a run won, sent by CampaignEnd; the catalog the reward screen lists is the client's CampaignRewardBonusMst.  The six fields are the client-facing subset of GrandMissionRewardMst (mst/grand_mission.kdl); every numeric field is quoted on the wire."
+
+    field reward_id type="str" {
+        key "N1b6SUW4"
+        doc "setRewardID (std::string).  GrandMissionRewardMst.id."
+    }
+
+    field present_type type="i32::str" {
+        key "30Kw4WBa"
+        doc "setPresentType (uint32_t, stringified on the wire).  3=zel, 6=unit, 8=gem, 4/5/7=item domains — see CampaignReceipt.cpp for the grant dispatch."
+    }
+
+    field target_id type="str" {
+        key "TdDHf59J"
+        doc "setTargetID (std::string).  Rewarded entity id, interpreted per present_type."
+    }
+
+    field target_cnt type="i32::str" {
+        key "wJsB35iH"
+        doc "setTargetCnt (uint32_t, stringified on the wire).  Reward quantity."
+    }
+
+    field target_param type="str" {
+        key "37moriMq"
+        doc "setTargetParam (std::string).  GrandMissionRewardMst.param — kept string-typed because captured values include leading-zero colon forms (\"1:00\", \"1:01\")."
+    }
+
+    field reward_type type="i32::str" {
+        key "IkmC8gG2"
+        doc "setRewardType (uint32_t, stringified on the wire).  1=completion-percentage bonus, 2=treasure/flag reward, 4=first-clear bonus."
+    }
+}
+
+json CampaignItemEntry {
+    doc "One Grand Quest item slot as the client reads it: NjZ6ds1S / Ckf3Zx7E (CampaignEqpItemInfoResponse @0x1420C68) and 5EByfWJ4 (CampaignRsvItemInfoResponse @0x1426C5C) — both REPLACE lists with these three keys."
+
+    field item_id type="str" {
+        key "kixHbe54"
+        doc "Item id."
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Slot order."
+    }
+
+    field item_num type="i32::str" {
+        key "wgV86x1q"
+        doc "Count."
+    }
+}
+
+json CampaignStartResp {
+    doc "CampaignStart (6Y0gaPQN) response — mission catalog, party decks, item slots, mission decks, and event flags for the mission-select screen.  p04iC2wr is deliberately NOT here: it is the EARNED-bonus list only the result screens read (CampaignResultScene sums every row), and the reward catalog comes from the client's own CampaignRewardBonusMst (Q83eyrJM).  Sending the catalog here showed every reward as earned whenever a CampaignEnd reply did not replace it."
+
+    field missions type="[CampaignMissionEntry]" {
+        key "2I9V0o6J"
+        doc "Mission state list."
+    }
+
+    field party_decks type="[CampaignStartDeckEntry]" {
+        key "hT95cq8K"
+        doc "Party decks for the select screen."
+    }
+
+    field eqp_items type="[CampaignItemEntry]" {
+        key "NjZ6ds1S"
+        doc "The Grand Quest equipped loadout (user_campaign_state.eqp_items)."
+    }
+
+    field rsv_items type="[CampaignItemEntry]" {
+        key "5EByfWJ4"
+        doc "The Grand Quest reserve loadout (user_campaign_state.rsv_items)."
+    }
+
+    field mission_decks type="[CampaignStartMissionDeckEntry]" {
+        key "Yusr3Zg5"
+        doc "Mission-deck slots."
+    }
+
+    field event_info type="CampaignStartEventInfo" {
+        key "RseDpY04"
+        doc "Single-object event flags."
+    }
+
+    // ---------------------------------------------------------------------
+    // The Grand Quest master tables.
+    //
+    // These are MST catalogues, not per-player state, and nothing was sending
+    // them.  The client fills the ten lists below from exactly two places:
+    // DataMstManager::loadCampaignMsts @0x1213608, which reads a locally CACHED
+    // copy of each table through the same response class, and a live reply
+    // carrying the key.  There is no cached copy in this fork (the client's
+    // LocalState holds no MST files at all), so every one of the lists was
+    // empty -- which is why a Grand Quest map drew no spots to tap and no
+    // marker for where the party stands.  Reported from the client 2026-09-12.
+    //
+    // CampaignStart is the right carrier: it is the first request of the Grand
+    // Quest flow (the menu), it precedes both the mission-select screen and
+    // CampaignFieldDownloadScene (which sizes its download off
+    // CampaignMapMstList), and the tables are small -- about 900 rows in total.
+    // Every one of these blocks is a REPLACE, so re-sending them costs nothing.
+    // ---------------------------------------------------------------------
+
+    field mission_mst type="[GrandMissionMst]" {
+        key "as8G75gK"
+        doc "CampaignMissionMstResponse -- the mission catalogue behind the series tiles."
+    }
+
+    field map_mst type="[GrandMissionMapMst]" {
+        key "iyCP4N1h"
+        doc "CampaignMapMstResponse -- the map canvas.  CampaignFieldScene::fleldMapDraw @0x14F6BD4 reads it to lay out the tiles, and CampaignFieldDownloadScene::downloadFiles @0x14E9010 reads map_img to know which pieces to fetch."
+    }
+
+    field spot_mst type="[GrandMissionSpotMst]" {
+        key "aqb6LS9y"
+        doc "CampaignMapSpotMstResponse -- the tappable points on the map.  This is the block whose absence left the map with nothing to click: the party's position (now_point_num on the Yusr3Zg5 deck row) is an index into these."
+    }
+
+    field route_mst type="[GrandMissionRouteMst]" {
+        key "Ri1S0JQX"
+        doc "CampaignMapRouteMstResponse -- the edges between spots, which decide where the party may move next."
+    }
+
+    field icon_mst type="[GrandMissionIconMst]" {
+        key "HUo5G8gz"
+        doc "CampaignMapIconMstResponse -- boss/enemy/event icons anchored to spots."
+    }
+
+    field treasure_mst type="[GrandMissionTreasureMst]" {
+        key "hpGBs2R1"
+        doc "CampaignMapTreasureMstResponse -- the chests a spot can hold."
+    }
+
+    field flg_mst type="[GrandMissionFlgMst]" {
+        key "27tgwCUN"
+        doc "CampaignFlgMstResponse -- the story flags every spot/route/icon visibility rule is written against (the conditioned_flag columns)."
+    }
+
+    field end_cnd_mst type="[GrandMissionEndCndMst]" {
+        key "0sT4d2zV"
+        doc "CampaignMissionEndCndMstResponse -- what ends a run."
+    }
+
+    field event_mst type="[GrandMissionEventMst]" {
+        key "x3kCNR4Y"
+        doc "CampaignEventMstResponse -- the scripted events a spot fires."
+    }
+
+    field reward_bonus_mst type="[GrandMissionRewardMst]" {
+        key "Q83eyrJM"
+        doc "CampaignRewardBonusMstResponse -- the reward CATALOGUE the reward screen lists.  Distinct from p04iC2wr, which is what a run actually earned and belongs only to CampaignEnd."
+    }
+}
+
+json CampaignRewardSummary {
+    doc "The Grand Quest's share of MissionRewardInfo (response key F5Vs19mb, a singleton).  CampaignResultInitScene::initConnect @0x154C294 init()s MissionRewardInfo and sets before_lv / before_exp itself before sending CampaignEnd, so only what the run earned goes here — the full MissionRewardInfo would overwrite before_lv with 0 and fake a level-up."
+
+    field zel type="i32::str" {
+        key "Najhr8m6"
+        doc "Zel from the run's battles (the last CampaignBattleEnd archive)."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "Karma from the run's battles."
+    }
+}
+
+json CampaignEndResp {
+    doc "CampaignEnd (jF9Kkro4) response.  CampaignResultScene::initialize @0x154D51C takes MissionRewardInfo zel/karma and the p04iC2wr totals (getThetotalBonusZel/Karma/Dia sum target_cnt over EVERY row of present type 3/11/8) back off the header to count them up again, so team_info must already include all of it."
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "The header after every payout."
+    }
+
+    field reward type="[CampaignRewardSummary]::size(1)" {
+        key "F5Vs19mb"
+        doc "The run's battle zel and karma."
+    }
+
+    field bonuses type="[CampaignRewardBonusEntry]" {
+        key "p04iC2wr"
+        doc "The bonuses THIS run earned (CampaignRewardBonusInfoResponse clears the list at row 0).  Omitted when none: an empty list never reaches readParam, so it could not clear an older list anyway."
+        optional #true
+    }
+
+    field missions type="[CampaignMissionEntry]" {
+        key "2I9V0o6J"
+        doc "Every Grand Mission row, with the cleared state, best completion and get_reward after this run (REPLACE list)."
+    }
+}
+
+json CampaignBattleEndResp {
+    doc "CampaignBattleEnd (pTNB6yw3) response — the header.  It used to share CampaignReceiptResp and carry that handler's serial-code stub (4MCxgS5p), which has nothing to do with a battle."
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "The header."
+    }
+}
+
+json CampaignReceiptPayload {
+    doc "Receipt stub payload under 4MCxgS5p — a single object {\"pCIRMw04\":\"\"}."
+
+    field marker type="str" {
+        key "pCIRMw04"
+        doc "Receipt marker; empty-string stub (the client applies the reward from its own state)."
+    }
+}
+
+json CampaignReceiptResp {
+    doc "CampaignReceipt (5Imq3wC0 — the Serial Code screen) response: refreshed HUD team info (fEi17cnx) plus the receipt stub (4MCxgS5p).  CampaignBattleEnd has its own CampaignBattleEndResp."
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Refreshed HUD team info (zel/karma/exp)."
+    }
+
+    field receipt type="CampaignReceiptPayload" {
+        key "4MCxgS5p"
+        doc "Receipt stub."
+    }
+}
+
+
+// @json
+json InitializeResp {
+    doc "Response of the initialize command"
+
+    // # cachable
+    field loginCampagin  type="[LoginCampaignMst]::size(1)" {
+        key Bd29Pqw0
+        doc "Configuration about the current login progression"
+    }
+
+    field loginCampaignReward type="[LoginCampaignReward]" {
+        key "bD18x9Ti"
+        doc "Configuration about each day of the login campaign"
+    }
+
+    field progression type="[UserLevelMst]" {
+        key "YDv9bJ3s"
+        doc "Configuration of the user stats progression"
+    }
+
+    field mst type="[VersionInfo]" {
+        key "KeC10fuL"
+        doc "Configuration of the versions of the MSTs"
+    }
+
+    field townFacility type="[TownFacilityMst]" {
+        key "Lh1I3dGo"
+        doc TODO
+    }
+
+    field townFacilityLv type="[TownFacilityLvMst]" {
+        key "d0EkJ4TB"
+        doc TODO
+    }
+
+    field townLocation type="[TownLocationMst]" {
+        key "1y2JDv79"
+        doc TODO
+    }
+
+    field townLocationLv type="[TownLocationLvMst]" {
+        key "9ekQ4tZq"
+        doc TODO
+    }
+
+    field dungeonKeys type="[DungeonKeyMst]" {
+        key "4NG79sX1"
+        doc "Configuration of the Vortex dungeon with keys"
+    }
+
+    field arenaRanks type="[ArenaRankMst]" {
+        key "6kWq78zx"
+        doc "PVP Arena rankings"
+    }
+
+    field gachaEffects type="[GachaEffectMst]" {
+        key "Pf97SzVw"
+        doc TODO
+    }
+
+    field gachas type="[GachaMst]" {
+        key "5Y4GJeo3"
+        doc "Configuration of current Gacha banners"
+    }
+
+    field defines type="DefineMst" {
+        key "VkoZ5t3K"
+        doc "Configuration of the server"
+    }
+
+    field npcs type="[NpcMst]" {
+        key "hV5vWu6C"
+        doc TODO
+    }
+
+    field bannerInfo type="[BannerInfoMst]" {
+        key "Pk5F1vhx"
+        doc TODO
+    }
+
+    field extraPassiveSkills type="[ExtraPassiveSkillMst]" {
+        key "z5U7utsm"
+        doc TODO
+    }
+
+    field noticeInfo type="NoticeInfo" {
+        key "Pj6zDW3m"
+        doc "Configuration of notices"
+    }
+
+    field expPattern type="[UnitExpPatternMst]" {
+        key "JYFGe9y6"
+        doc "TODO"
+    }
+
+    field receipe type="[ReceipeMst]" {
+        key "8f0bCciN"
+        doc "TODO"
+    }
+
+    field trophy type="[TrophyMst]" {
+        key "6CTU8m2v"
+        doc "TODO"
+    }
+
+    field trophy_group type="[TrophyGroupMst]" {
+        key "1NTG2oVZ"
+        doc "TODO"
+    }
+
+    field trophy_grade type="[TrophyGradeMst]" {
+        key "Ked15IpH"
+        doc "TODO"
+    }
+
+    field information type="[InformationMst]" {
+        key "5nBa3CAe"
+        doc "TODO"
+    }
+
+    field help type="[HelpMst]" {
+        key "9x4zZCeN"
+        doc "TODO"
+    }
+
+    field help_sub type="[HelpSubMst]" {
+        key "5C9LuNrk"
+        doc "TODO"
+    }
+
+    field url type="[UrlMst]" {
+        key "At7Gny2V"
+        doc "TODO"
+    }
+
+    field challenge type="[ChallengeMst]" {
+        key "mQC4s5ka"
+        doc "TODO"
+    }
+
+    field challenge_hr type="[ChallengeHrMst]" {
+        key "h09mEvDR"
+        doc "TODO"
+    }
+
+    field challenge_mis type="[ChallengeMisMst]" {
+        key "5M8jI4cP"
+        doc "TODO"
+    }
+
+    field challenge_grade type="[ChallengeGradeMst]" {
+        key "zW1i02aG"
+        doc "TODO"
+    }
+
+    field challenge_reward type="[ChallengeRewardMst]" {
+        key "4C1Wt8sS"
+        doc "TODO"
+    }
+
+    field challenge_item type="[ChallengeItemMst]" {
+        key "dn0NfRy1"
+        doc "TODO"
+    }
+
+    field challenge_mvp type="[ChallengeMvpMst]" {
+        key "nUmaEC41"
+        doc "TODO"
+    }
+
+    field challenge_rank_reward type="[ChallengeRankRewardMst]" {
+        key "P8V71kbw"
+        doc "TODO"
+    }
+
+    field interactive_banner type="[InteractiveBannerInfoMst]" {
+        key "B8lchAPr"
+        doc "TODO"
+    }
+
+    field sound type="[SoundMst]" {
+        key "36Sd0Aub"
+        doc "TODO"
+    }
+
+    // # user specific
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "TODO"
+    }
+
+    field settings type="[UserSettings]::size(1)" {
+        key "4ZfpSQv1"
+        doc "TODO"
+        // NOTE: not used in last version
+    }
+
+    field challengeArenaUserInfo type="[ChallengeArenaUserInfo]::size(1)" {
+        key "XGmGpmYW"
+        doc "User current progression in Challenge Arena"
+    }
+
+    field dailyTaskBonuses type="[DailyTaskBonusMst]::size(1)" {
+        key "p283g07d"
+        doc TODO
+    }
+
+    field dailyTaskPrizes type="[DailyTaskPrizeMst]" {
+        key "a739yK18"
+        doc TODO
+    }
+
+    field dailyTasks type="[DailyTaskMst]" {
+        key "k23D7d43"
+        doc TODO
+    }
+
+    field dailyLoginRewards type="DailyLoginRewardsUserInfo" {
+        key "Drudr2w5"
+        doc TODO
+    }
+
+    field guild type="GuildInfo" {
+        key "IkdSufj5"
+        doc "Guild information"
+    }
+
+    field videoAdSlots type="[VideoAdsSlotGameInfo]::size(1)" {
+        key "mebW7mKD"
+        doc TODO
+    }
+
+    field summonerJournal type="SummonerJournalUserInfo" {
+        key "M3dw18eB"
+        doc TODO
+    }
+
+    field loginInfo type="[LoginInfoResp]::size(1)" {
+        key "IKqx1Cn9"
+        doc "TODO"
+    }
+
+}
+
+json UnkUserInfoNetReq {
+    doc "TODO"
+
+    field unk type="i32::str" {
+        key "ad37Bdr1"
+        doc "TODO"
+    }
+}
+
+json UnkUserInfoNetResp {
+    doc "TODO"
+
+    field mock type="str" {
+        key "INVALID"
+        doc "TODO"
+    }
+}
+
+json UserInfoReq {
+    doc "TODO"
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc TODO
+    }
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "TODO"
+    }
+
+    field mstRequests type="[MstUrlList]" {
+        key "KeC10fuL"
+        doc "MST that should be sent"
+    }
+
+    field unk type="[UnkUserInfoNetReq]::size(1)" {
+        key "563Dtye3"
+        doc "TODO"
+    }
+}
+
+json GachaListReq {
+    doc "Requests the summon/gacha list shown by the summon screen."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login information identifying the current user."
+    }
+
+    field mstRequests type="[MstUrlList]" {
+        key "KeC10fuL"
+        doc "MST versions requested by the client."
+    }
+}
+
+json GachaActionReq {
+    doc "Requests a summon pull from the currently selected summon gate."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login information identifying the current user."
+    }
+
+    field gachaActionInfo type="[GachaActionInfo]::size(1)" {
+        key "1IR86sAv"
+        doc "Selected gate and summon-count information."
+    }
+
+    field mstRequests type="[MstUrlList]" {
+        key "KeC10fuL"
+        doc "MST versions requested by the client."
+    }
+}
+
+json GachaActionResp {
+    doc "Response payload sent after resolving a summon pull."
+
+    field signal_key type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key echoed back to the client."
+    }
+
+    field ope_user_unit type="[OpeUserUnitInfo]" {
+        key "Km35HAXv"
+        doc """
+        Summoned unit ids and animation metadata.
+
+        The client accepts multiple rows here for multi-summon result data.
+        However, only the last row controls which unit gets the gate-opening
+        animation.
+        """
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        doc """
+        Newly summoned owned-unit rows appended to the client unit list.
+        """
+    }
+
+    field unit_dictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        doc "The COMPLETE unit dictionary after the summon, never just the summoned species.  This response rebuilds the reference list the summon lineup reads; see UserUnitDictionary."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Updated user team state after spending summon currency."
+    }
+
+    field selector_ticket_info type="[UnitSelectorGachaUserInfo]" {
+        key "CGHaOZda"
+        doc "Sent only by UnitSelectorGachaTicket, which reuses this reply: the selector inventory after the spent ticket, every catalog ticket with its count (0 included), because the list is a full replace and nothing on the client decrements it.  See UnitSelectorGachaUserInfo."
+        optional #true
+    }
+
+    field summon_ticket_v2_user type="[SummonTicketV2UserInfo]" {
+        key "a3d5d12i"
+        doc "Sent when the pull was paid with V2 summon tickets: the ticket inventory after the spend.  SummonTicketV2UserInfoResponse::readParam @0x1C6EBB4 clears the list first, so this is a full replace and the spent type keeps reporting itself at 0; without it the gate goes on showing the pre-spend count until the next UserInfo."
+        optional #true
+    }
+}
+
+json CreateUserReq {
+    doc "Creates the game user after the tutorial name/starter prompt."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login information containing user, Gumi Live, device, and handle fields."
+    }
+
+    field selectedElement type="[TutorialSelectedElement]::size(1)" {
+        key "9u45RGcV"
+        doc "Starter element selected by the player."
+    }
+
+    field mstRequests type="[MstUrlList]" {
+        key "KeC10fuL"
+        doc "MST versions requested by the client."
+    }
+}
+
+json TutorialUpdateReq {
+    doc "Persists the current tutorial chapter posted by TutorialUpdateRequest."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login information containing the current tutorial chapter id."
+    }
+
+    field mstRequests type="[MstUrlList]" {
+        key "KeC10fuL"
+        doc "MST versions requested by the client."
+    }
+}
+
+json TutorialSkipResp {
+    doc "Simple acknowledgement after the player skips the tutorial."
+
+    field tutorialSkipInfo type="TutorialSkipInfo" {
+        key "2bD8ak3D"
+        doc "Tutorial skip response object parsed by the client."
+    }
+}
+
+json DeckEditReq {
+    doc "Persists the active party deck selected by DeckEditRequest."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login information identifying the current user."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field partyDeckInfo type="[UserPartyDeckInfo]" {
+        key "dX7S2Lc1"
+        doc "Party deck rows sent by the client."
+    }
+
+    field teamInfo type="[DeckEditTeamInfo]::size(1)" {
+        key "Ti62XfZK"
+        doc "Team information containing the active deck number."
+    }
+
+    field mstRequests type="[MstUrlList]" {
+        key "KeC10fuL"
+        doc "MST versions requested by the client."
+    }
+}
+
+json MissionStartReq {
+    doc "Request payload for starting a mission."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login information identifying the current user."
+    }
+
+    field signal_key type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field start_info type="[MissionStartInfo]::size(1)" {
+        key "9Q1Lq5FS"
+        doc "Mission-start info posted by the client."
+    }
+
+    field mstRequests type="[MstUrlList]" {
+        key "KeC10fuL"
+        doc "MST versions requested by the client."
+    }
+
+    field frontier_run type="[FrontierGateMissionRun]" {
+        key "Mg8K8Y1a"
+        doc "Frontier Gate battles only (MissionStartRequest::createBody @0x13AB230): the run this battle belongs to."
+        optional #true
+    }
+}
+
+json GetPlayerInfoReq {
+    doc """
+    GetPlayerInfo (vUQrAV65 / 7pW4xF9H) request.
+
+    GetPlayerInfoRequest::createBody @0x13A4E64 is 44 bytes and adds NOTHING
+    beyond the standard user-info / signal-key / version tags, so this carries
+    only the login block.  The whole contract is in the response.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Standard user-info tag; the only thing createBody emits."
+    }
+}
+
+json GetPlayerInfoResp {
+    doc """
+    What the Records / Archive screens need.
+
+    Sent by PlayerInfoBattleResultScene::initConnect, ArenaArchiveScene and
+    ColosseumArchiveScene -- the three scenes that call getActual @0x1791EEC,
+    the trophy-id chain that answers one trophy per UserTeamArchive counter.
+
+    getResponseObject is a global key -> class registry (handbook 7.12.4), so
+    these keys dispatch to their own response classes whichever handler carries
+    them.  Both archive blocks are singleton readParams with no list ops, so
+    re-sending on every visit is a clean overwrite.
+    """
+
+    field archive type="[UserTeamArchive]" {
+        key "zI2tJB7R"
+        doc "Lifetime trophy counters; 8 of 39 are fed from MissionEnd."
+    }
+
+    field trophy_grades type="[UserTrophyGradeInfo]" {
+        key "H18CjPKI"
+        doc "Which trophy grades those counters have reached.  The client cannot derive them (see UserTrophyGradeInfo), so without this every trophy on the screen reads grade 0."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "HUD refresh -- these scenes draw the header like any other."
+    }
+
+    field arena_archive type="[UserTeamArenaArchive]" {
+        key "PQ56vbkI"
+        doc "Sent as one all-zero row, never as [].  See UserInfoResp.arena_archive -- the class is a singleton readParam, so an empty array leaves it uninitialised and the Arena section renders garbage."
+    }
+
+    field arena_info type="[UserArenaInfo]" {
+        key "8jBJ7uKR"
+        doc "Also one all-zero row, never [] -- another singleton readParam.  This one supplies Total Entries / Total Wins / Offense Wins / Defense Wins on the Arena Record."
+    }
+}
+
+json UserInfoResp {
+    field entered_features type="[UserEnteredFeatureInfo]" {
+        key "2386Diw1"
+        doc "Full per-player visit snapshot: the reader clears its list before ingesting rows."
+    }
+
+
+    // AUDIT 2026-08-24: 33 blocks, all structurally verified (dispatch, response
+    // class, and replace-vs-merge).  NO BLOCK ACCUMULATES: every list either
+    // calls removeAllObjects, does a selective clear (the PermitPlace trio), or
+    // dedupes per row before insert.  That matters because the client refetches
+    // this on every return to Home -- GetUserInfoRequest is built from 10 sites
+    // incl. HomeScene2::updateEvent, ~15 times in a logged session.
+    //
+    // 4ceMWH6k and qC2tJs4E are the SAME class with opposite ctor flags:
+    // UserUnitInfoResponse(true) @0x1392674 is full-replace, (false) @0x139269C
+    // is insert-if-absent.  Full audit in tools/SERVER_COMPONENT_AUDIT.md.
+    doc "TODO"
+
+    field loginInfo type="[LoginInfoResp]::size(1)" {
+        key "IKqx1Cn9"
+        doc "TODO"
+    }
+
+    field teamInfo type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "TODO"
+    }
+
+	field unitInfo type="[UserUnitInfo]" {
+        key "4ceMWH6k"
+        doc "TODO"
+    }
+    field partyDeckInfo type="[UserPartyDeckInfo]" {
+        key "dX7S2Lc1"
+        doc "TODO"
+    }
+    field unitDictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        doc "TODO"
+    }
+    field favorite type="[UserFavorite]" {
+        key "3kcmQy7B"
+        doc "TODO"
+    }
+    field clearMissionInfo type="[UserClearMissionInfo]" {
+        key "UT1SVg59"
+        doc "TODO"
+    }
+    field warehouseInfo type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "TODO"
+    }
+    field itemFavorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc "TODO"
+    }
+    field itemDictionaryInfo type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "TODO"
+    }
+    field arenaInfo type="[UserArenaInfo]" {
+        key "8jBJ7uKR"
+        doc "TODO"
+    }
+    field archive type="[UserTeamArchive]" {
+        key "zI2tJB7R"
+        doc "TODO"
+    }
+    field arena_archive type="[UserTeamArenaArchive]" {
+        key "PQ56vbkI"
+        doc "⚠ MUST carry one row even when every counter is 0.  UserTeamArenaArchiveResponse::readParam @0x1402AC8 is a SINGLETON parser -- removeAllObjects/addObject fire per row, so a zero-row array never runs it and the client-side singleton is never written.  With \"PQ56vbkI\":[] the Battle Record drew uninitialised heap (9,765,061 arena entries, a defense streak of -1,191,182,337).  AN EMPTY LIST IS NOT A CLEAR for a singleton class."
+    }
+    field giftInfo type="[UserGiftInfo]" {
+        key "30uygM9m"
+        doc "TODO"
+    }
+    field campaignInfo type="[UserLoginCampaignInfo]::size(1)" {
+        key "3da6bd0a"
+        doc "TODO"
+    }
+    field summonerJournal type="SummonerJournalUserInfo" {
+        key "M3dw18eB"
+        doc "TODO"
+    }
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "TODO"
+    }
+    field permitPlace type="[PermitPlace]" {
+        key "yXNM8kL3"
+        doc "TODO"
+    }
+    field permitPlaceSP type="[PermitPlaceSP]" {
+        key "Y73tHKS8"
+        doc "TODO"
+    }
+    field permitPlaceML type="[PermitPlaceML]" {
+        key "Y73mHKS8"
+        doc "TODO"
+    }
+    field soundInfo type="[UserSoundInfo]" {
+        key "d98mjNDc"
+        doc "Every Music House track the player owns.  A LIST and a full replace (removeAllObjects at row 0), not the one-element wrapper this used to be -- the point of the block is to carry a collection.  Without it the jukebox forgets every purchase at relaunch."
+    }
+    field medalInfo type="[UserBraveMedalInfo]" {
+        key "6C0kzwM5"
+        doc "TODO"
+    }
+    field achievementInfo type="UserAchievementInfo" {
+        key "Bnc4LpM8"
+        doc "Always emitted (was optional and never set, so it never reached the wire).  UserAchievementInfoResponse::readParam lazily constructs the client-side singleton @0x13FBB90; without this block that pointer stays null, which is the suspected cause of the Randall Achievement crash."
+    }
+    field townFacilityInfo type="[UserTownFacilityInfo]" {
+        key "YRgx49WG"
+        doc "TODO"
+    }
+    field townLocationInfo type="[UserTownLocationInfo]" {
+        key "yj46Q2xw"
+        doc "TODO"
+    }
+    field townLocationDetail type="[UserTownLocationDetail]" {
+        key "s8TCo2MS"
+        doc "TODO"
+    }
+    field permitReceipes type="[PermitReceipe]" {
+        key "51yQrDBR"
+        doc "TODO"
+    }
+    field settings type="[UserSettings]::size(1)" {
+        key "4ZfpSQv1"
+        doc "FICTIONAL BLOCK KEY -- 4ZfpSQv1 is not dispatched by GameResponseParser::getResponseObject @0x1392568 and exists in NEITHER client binary (raw byte search over arm64 libgame.so and x86 BraveFrontier.Windows.exe).  The whole block is inert.  Inherited from upstream; left in place."
+        // NOTE: not used in last version
+    }
+    field dungeonKeyInfo type="[UserDungeonKeyInfo]" {
+        key "eFU7Qtb0"
+        doc "TODO"
+    }
+    field missionBreak type="[MissionBreakInfo]::size(1)" {
+        key "5PR2VmH1"
+        doc "TODO"
+    }
+    field raidUserInfo type="RaidUserInfo" {
+        doc "TODO"
+        key "1ry6BKoe"
+    }
+    field purchaseInfo type="UserPurchaseInfo" {
+        doc "TODO"
+        key "4W6EhXLS"
+    }
+    field releaseInfo type="[UserReleaseInfo]" {
+        doc "TODO"
+        key "Dp0MjKAf"
+    }
+    field equipInfo type="[UserEquipItemInfo]" {
+        doc "TODO"
+        key "71U5wzhI"
+    }
+    field equipBoostItemInfo type="[UserEquipBoostItemInfo]" {
+        doc "TODO"
+        key "nAligJSQ"
+    }
+    field summonTicketV2User type="[SummonTicketV2UserInfo]" {
+        doc "TODO"
+        key "a3d5d12i"
+    }
+    field selector_ticket_info type="[UnitSelectorGachaUserInfo]" {
+        key "CGHaOZda"
+        doc "Every Unit Selector ticket in the catalog with the count held (0 included) -- a full replace; see UnitSelectorGachaUserInfo.  Built by gme::loadSelectorTickets."
+    }
+    field npcMesssageOverwriteInfo type="[NpcMessageOverwriteInfo]" {
+        key "yNnvj59x"
+        doc "TODO"
+    }
+    field friendPointInfo type="[FriendPointInfo]" {
+        key "6e4b7sQt"
+        doc "What one borrowed Summoner Helper is worth in Honor -- see FriendPointInfo.  A SINGLETON: send its one full row, never an empty array, or the client keeps the ctor's \"0\"."
+    }
+    field summonerInfo type="[UserSummonerInfo]" {
+        key "n5mdIUqj"
+        doc "TODO"
+    }
+    field summonerArmInfo type="[UserSummonerArmsInfo]" {
+        key "dhMmbm5p"
+        doc "TODO"
+    }
+    field dbbInfo type="[UserUnitDbbInfo]" {
+        key "sxorQ3Mb"
+        doc "Dual Brave Burst bonds — see the struct.  A REPLACE list; login is where the client first learns them."
+    }
+
+    field dbbLevelInfo type="[UserUnitDbbLevelInfo]" {
+        key "tR4katob"
+        doc "The level of each bond."
+    }
+
+    field dbbMst type="[DbbMst]" {
+        key "fTV3A0By"
+        doc """
+        The Dual Brave Burst pair catalogue, 141 rows.
+
+        Nothing else sends it and the client has no copy of its own, so without
+        it DbbMstList is empty — and that list is what decides a unit HAS a DBB
+        at all: UnitDetailUserUnitScene offers the Bond button off
+        getDbbMstListByUnitId, DbbSelectBondScene fills its partner list from
+        the same call, and BattleUnit::initializeBaseStatus resolves the pair's
+        shared skill through getDbbMstByUnitIdsCombo.  A REPLACE list.
+        """
+        optional #true
+    }
+
+    field dbbBondRecipeMst type="[DbbBondRecipeMst]" {
+        key "keTrog0p"
+        doc "What raising a bond to rank 2..6 costs, 105 rows.  Sent beside the catalogue so the boost screen can price itself; a REPLACE list."
+        optional #true
+    }
+    field eventTokenInfo type="[EventTokenInfo]" {
+        key "l234vdKs"
+        doc "TODO"
+    }
+    field unkType type="[UnkUserInfoNetResp]" {
+        key "62Dz13dP"
+        doc "TODO"
+        // NOTE: not used in last binary
+    }
+
+    field featureGateInfo type="[FeatureGatingInfo]" {
+        doc "TODO"
+        key "2375D38i"
+    }
+
+    // Cachable!
+
+    field summonTicketV2 type="[SummonTicketV2Mst]" {
+        doc "TODO"
+        key "hE1d083b"
+    }
+    field unitSelectorGacha type="[UnitSelectorGachaMst]" {
+        key "JukkSeNA"
+        doc """
+        The Unit Selector catalogue (UnitSelectorGachaMstResponse).  Loaded at
+        boot and, until 2026-09-13, never sent -- which is the OTHER half of
+        "selector summons are not working".
+
+        SummonsDetailScene::initSummontickets @0x1D8E304 builds the scene's
+        selected-selector list by walking UnitSelectorGachaMstList for rows
+        whose gacha_gate_id is the open gate, and touchBegan @0x16A73FC sends
+        the player to the unit picker only when that list is NOT empty.  With
+        the catalogue absent the list can never fill, so SUMMON on a selector
+        gate fell through to the ordinary paid pull.  SummonsScrlItem::addObject
+        @0x16D9F70 reads the same list for the ticket count on the rail tile,
+        and UnitSelectorGachaUnitSelectScene::initialize @0x1D95CCC reads it for
+        the grid of units to choose from.
+
+        readParam @0x1CCAD3C merges rather than replaces (addObject with no
+        remove), and rows are keyed by ticket id, so re-sending is harmless.
+        """
+    }
+    field resummonGacha type="[ResummonGachaMst]" {
+        doc "TODO"
+        key "da3qD39b"
+    }
+    field firstDesc type="[FirstDescMst]" {
+        key "8UawtzHw"
+        doc "TODO"
+    }
+    field generalEvent type="[GeneralEventMst]" {
+        key "Md9gG3c0"
+        doc "TODO"
+    }
+    field gift type="[GiftItemMst]" {
+        key "Bm1WNDQ0"
+        doc "TODO"
+    }
+    field videoAdInfo type="[VideoAdInfo]" {
+        key "j129kD6r"
+        doc "TODO"
+    }
+    field videoAdRegion type="[VideoAdRegion]" {
+        key "bpD29eiQ"
+        doc "TODO"
+    }
+    field noticeInfo type="NoticeInfo" {
+        key "Pj6zDW3m"
+        doc "Configuration of notices"
+    }
+    field excludedDungeonMissions type="[ExcludedDungeonMissionMst]" {
+        key "3aDk1xk7"
+        doc "TODO"
+    }
+
+    field gachaInfo type="[GachaInfoMst]" {
+        key "1IR86sAv"
+        doc """
+        Available summon gates — the same rows GachaList sends.
+
+        Duplicated onto UserInfo because the summon screen paints BEFORE any
+        GachaList round trip when the tutorial drives it: tuto15.txt issues
+        `change_gacha_top_scene` directly, so SummonsCategorizationScene opens
+        with whatever the client already holds.  Sending it only on GachaList
+        left GachaInfoList empty and the scene crashed on entry.
+
+        Safe to send from here because GameResponseParser::getResponseObject
+        (0x1392568) dispatches this key globally — `1IR86sAv` constructs a
+        GachaInfoResponse no matter which handler's payload carries it.
+        GachaActionScene and SummonsDetailScene both resolve gates through
+        GachaInfoList::getObjectWithGachaID, which this populates.
+        """
+    }
+
+    field gachaCategories type="[GachaCategory]" {
+        key "IBs49NiH"
+        doc """
+        Summon-screen banner rail — the same rows GachaList sends.
+
+        Same reasoning as gachaInfo above: dispatched globally by
+        getResponseObject into a GachaCategoryMstResponse, so it populates
+        GachaCategoryMstList regardless of which response carries it, and the
+        banner rail is what the tutorial's forced scene change needs present.
+        """
+    }
+
+    field areaMst type="[AreaMst]" {
+        key "3SG2wX0R"
+        doc """
+        The whole world-area table, curated — this is what draws the Vortex
+        tile list.
+
+        ⚠ THIS KEY IS A FULL REPLACE, NOT AN ADDITION.
+        AreaMstResponse::readParam @0x13CBB48 opens with
+            if (field != 0) goto set_field;
+            if (row   != 0) goto new_row;
+            AreaMstList::shared(); AreaMstList::removeAllObjects();
+        so row 0 / field 0 wipes the client's entire AreaMstList before the
+        rows are rebuilt.  Whatever is sent here IS the client's area table:
+        every area omitted stops existing, Grand Gaia's included.  Send the
+        complete table or nothing at all.  (AreaMstList::addObject @0x13096B4
+        is a bare retain+push_back with no dedupe, so this clear is the only
+        thing keeping a second send from doubling every area.)
+
+        Why send it at all: the client otherwise uses the copy it downloaded
+        from our own CDN (deploy/game_content/mst/Ver669_vj6fEsg7.dat, which
+        decodes to the F_AREA_MST_Ver669 our deploy/mst/area_mst.json is
+        byte-identical to), and that copy carries 88 Vortex areas — 10 with no
+        dungeon behind them, 34 named in Japanese or mojibake, and 13 that are
+        another area's tile a second time.  Sending a curated table is what
+        removes those tiles; see ServerCache::clientAreaMst.
+
+        Order matters here too, and it is this field that decides it.
+        ⚠ THE VORTEX LIST IS DESCENDING — HIGHEST display_order IS THE TOP TILE.
+        AreaSPSelectScene::setDungeonList builds its own
+        pair<dispOrder, AreaMst*> vector and sorts it at 0x183F2D4 with
+        std::__sort<std::greater<...>>.  AreaMstList::getActiveList @0x1309EDC
+        sorts the same pair type with std::__less and is ASCENDING, but it is a
+        DIFFERENT consumer and citing it here is what put Parade Garden at the
+        bottom of the list on the first attempt.  Cite the scene, not the list.
+        """
+    }
+
+    field energy_recover type="DefineEnergyRecover" {
+        key "VkoZ5t3K"
+        doc "The header energy-refill threshold only (DefineEnergyRecover): the player's max energy, so tapping the Energy gauge says \"max\" exactly when it is."
+    }
+}
+
+// ReinforcementInfo is defined in net/reinforcement_info.kdl (xZH6EIQ7 â€” 47
+// fields; the local stub here was kept-as-placeholder until the schema was
+// decoded).
+//
+// FriendGetResp emits BOTH wire keys:
+//   - xZH6EIQ7 (ReinforcementInfoResponse) â€” populates ReinforcementInfoList,
+//     which a captured production response (server/deploy/log_res/2o4axPIC_*.json)
+//     confirms is the canonical key the BF server returns here even when empty
+//   - tojMy68W (FriendInfoResponse) â€” populates FriendInfoList; per the IDA
+//     dispatch table this is the "friend list" singleton used by other UIs
+//     (general friend roster, friend detail screen).  Cheap to populate both
+//     since we have the same source data.
+//
+// The Reinforcement picker UI almost certainly reads from one of these two
+// singletons; sending both removes the ambiguity until we identify which.
+// FriendInfo schema is in net/friends.kdl, ReinforcementInfo in
+// net/reinforcement_info.kdl.
+
+json FriendGetResp {
+    doc "FriendGet (2o4axPIC) response â€” the friend list that populates the Reinforcement / squad-select picker.  Emits both xZH6EIQ7 (ReinforcementInfoList) and tojMy68W (FriendInfoList) with the same source data."
+
+    field reinforce_info type="[ReinforcementInfo]" {
+        key "xZH6EIQ7"
+        doc "Friend list entries under the reinforce/helper picker key â€” matches the captured prod response shape."
+    }
+
+    field friend_info type="[FriendInfo]" {
+        key "tojMy68W"
+        doc "Same entries under the friend-info-list key â€” populates FriendInfoList for any UI that reads from there."
+    }
+
+    field friend_point_info type="[FriendPointInfo]" {
+        key "6e4b7sQt"
+        doc "The Honor a borrowed helper is worth -- see FriendPointInfo.  Sent here as well as on UserInfo because THIS is the reply that draws the picker: every card calls ReinforcementInfo::getFriendPoint, which reads this singleton.  One full row, never an empty array."
+    }
+}
+
+json FriendApplyResp {
+    doc """
+    FriendApply (WUNi08YL) response -- the roster as it stands AFTER the friend
+    was accepted.
+
+    THE REPLY HAS TO CARRY IT.  FriendInfoList is a client singleton filled at
+    login and refreshed only when a reply sends tojMy68W; nothing re-fetches it
+    when a friend request is accepted, so returning an empty body left the new
+    friend on the server and missing from the Friend List until the next
+    FriendGet.  Same discipline as the present box and the unit dictionary:
+    every handler refreshes the cache it just changed.
+
+    xZH6EIQ7 is deliberately NOT sent.  This reply lands while the mission
+    result screens are still up and still reading ReinforcementInfoList, and
+    that list is a full replace -- sending the roster alone would drop the
+    strangers out from under the scene.  FriendGet rebuilds it on the way into
+    the next picker anyway.
+    """
+
+    field friend_info type="[FriendInfo]" {
+        key "tojMy68W"
+        doc "The COMPLETE roster.  FriendInfoResponse::readParam @0x13D93C0 calls FriendInfoList::removeAllObjects on row 0 field 0, so this is a full replace and a partial send would erase the rest."
+    }
+
+    field friend_point_info type="[FriendPointInfo]" {
+        key "6e4b7sQt"
+        doc "Honor rates, resent so the refreshed cards keep their amounts -- the singleton's ctor defaults both to the literal 0."
+    }
+}
+
+json ChallengeArenaResetInfoResp {
+    doc "Challenge Arena cooling/reset timer snapshot"
+
+    field reset_info type="ChallengeArenaResetInfo" {
+        key "t6bRQfln"
+        doc "Timestamps for daily cooling and weekly reset"
+    }
+}
+
+json BadgeInfoReq {
+    doc "BadgeInfo (nJ3A7qFp) request — identity and the signal key only (captured 2026-09-11)."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json BadgeInfoResp {
+    doc "BadgeInfo (nJ3A7qFp) response — the badge singleton the client asks for at login.  See BadgeInfo in net/badge_info.kdl."
+
+    field badge_info type="BadgeInfo" {
+        key "h23iRjGN"
+        doc "The six badge counters; only dungeon_key_num has a reader and is filled (key types claimable today)."
+    }
+}
+
+json UnitFavoriteReq {
+    doc "Toggle the favorite/lock flag on one or more user_units.  Example captured wire body: {\"3kcmQy7B\":[{\"edy7fq3L\":\"12345\",\"5JbjC3Pp\":\"1\",\"2pAyFjmZ\":\"0\"}]}"
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field entries type="[UnitFavoriteEntry]" {
+        key "3kcmQy7B"
+        doc "List of entries the client is updating in this call"
+    }
+}
+
+json UnitFavoriteResp {
+    doc "Echoed favorite-flag entry.  The IDA-extracted UnitFavoriteResponse::SerializeFields (in exported_handlers/response/UnitFavoriteResponse.hpp) emits a single object value rather than an array under key 3kcmQy7B, so the wire shape is {\"3kcmQy7B\":{\"edy7fq3L\":\"...\",\"5JbjC3Pp\":\"...\",\"2pAyFjmZ\":\"...\"}}"
+
+    field entry type="UnitFavoriteEntry" {
+        key "3kcmQy7B"
+        doc "Echo of the first request entry"
+    }
+}
+
+json UnitEvoReq {
+    doc "Evolve a base unit by consuming evo materials.  Wire root keys (UnitEvoRequest::createBody): login IKqx1Cn9, base unit(s) Km35HAXv, evolution target I82p0wCL, zel cost mCE3rUu5, element/material units 8Z2NQrx1."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field units type="[UnitEvoUnitEntry]" {
+        key "Km35HAXv"
+        doc "Base unit(s) being evolved (role \"1\" = base)."
+    }
+
+    field target type="[UnitEvoTargetEntry]" {
+        key "I82p0wCL"
+        doc "Evolution target — the unit_mst id the base evolves into."
+    }
+
+    field zel_cost_list type="[UnitEvoZelEntry]" {
+        key "mCE3rUu5"
+        doc "Zel cost line items for the evolution."
+    }
+
+    field elem_units type="[UnitEvoElemEntry]" {
+        key "8Z2NQrx1"
+        doc "Evolution material (element) units consumed."
+    }
+}
+
+json UnitEvoResp {
+    doc "UnitEvo response (response_class=UnitOpeEvoResponse).  Carries the evolution result (I82p0wCL), a full unit-cache rebuild (4ceMWH6k) and the updated team info (fEi17cnx).  xZH6EIQ7 is the HELPER PICKER list and is never sent from here (see the reinforce field)."
+
+    field evo_result type="[EvoResultEntry]" {
+        key "I82p0wCL"
+        doc "Which MST id the base evolved into (and the evolved unit's DB id)."
+    }
+
+    field unit_refresh type="[UserUnitInfo]" {
+        key "4ceMWH6k"
+        doc """
+        FULL-REPLACE unit cache rebuild — the ONLY key that can change a unit
+        the client already owns, because its ctor flag makes readParam call
+        removeAllObjects() before re-adding.  Send the COMPLETE roster here or
+        the client loses every unit omitted.
+
+        Evolution needs this for the same reason fusion does: the client has no
+        local apply path.  It never rewrites the evolved unit and never drops
+        the consumed materials, and it issues no request afterwards, so without
+        this the unit list keeps showing the pre-evolution form until Home.
+
+        The historical note here said DO NOT USE 4ceMWH6k because it soft-locked
+        the result screen.  That test is superseded — the same key is confirmed
+        working on UnitMix (2026-08-10) now that lvup_status is a valid table;
+        the earlier build sent "1", which crashes the result scene by itself.
+        The removeAllObjects release() hazard is still the thing to suspect if a
+        result screen ever does hang on this.
+
+        OPTIONAL ON PURPOSE: a plain vector serialises as "4ceMWH6k": [] when
+        unset, and an empty full-replace list is the one payload that could
+        clear the roster outright.
+        """
+        optional #true
+    }
+
+    field ope_result type="[UnitOpeResult]" {
+        key "1ZbHB6Im"
+        doc """
+        DO NOT POPULATE THIS FOR EVOLUTION — the evolution result screen never
+        reads it.  UnitOpeResult::shared() has exactly one scene consumer,
+        UnitMixPlayScene::parseMixResult (the other two callers are the response
+        ctor and its readParam), and UnitOpeResult is a SINGLETON, so writing it
+        from an evolution reply mutates state a fusion scene may later read.
+        Evolution reports through its own class instead: I82p0wCL ->
+        UnitOpeEvoResponse -> UnitEvoInfo (see EvoResultEntry).
+        Retained only because the field is shared with UnitMixResp.
+        """
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Updated team info (zel) after the evolution."
+    }
+
+    field reinforce type="[UnitReinforceEntry]" {
+        key "xZH6EIQ7"
+        doc """
+        NEVER SET -- same hazard as UnitMixResp.reinforce.  xZH6EIQ7 is the
+        HELPER PICKER list, not an evolution animation payload.  Omitted.
+        """
+        optional #true
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc """
+        Complete positive inventory, sent only when an evolution material had
+        spheres equipped and gme::returnEquippedSpheres put them back.  No
+        evolution scene calls a client warehouse mutator (incWarehouseItem,
+        setItemNum, UserWarehouseInfoList::addObject) and HomeInfo carries no
+        warehouse, so those spheres stayed invisible until relaunch.
+        readParam @0x14060E0 clears first: whole warehouse only.
+        """
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "Every item species ever stacked, sent with warehouse_info (merge with dedupe; see PresentReceiptResp)."
+        optional #true
+    }
+}
+
+json UnitMixReq {
+    doc "Fuse (mix) material units into a base unit for XP.  Wire root keys: login IKqx1Cn9, units Km35HAXv (role \"1\" = base receiving XP, \"2\" = material consumed), zel cost mCE3rUu5."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field units type="[UnitMixUnitEntry]" {
+        key "Km35HAXv"
+        doc "Base + material units (role \"1\" = base, \"2\" = material)."
+    }
+
+    field zel_cost_list type="[UnitMixZelEntry]" {
+        key "mCE3rUu5"
+        doc "Zel cost line items for the fusion."
+    }
+}
+
+json UnitMixResp {
+    doc "UnitMix (Power Fusion) response.  Carries the result record (1ZbHB6Im), a full unit-cache rebuild (4ceMWH6k) and the updated team info (fEi17cnx).  xZH6EIQ7 is the HELPER PICKER list and is never sent from here (see the reinforce field)."
+
+    field reinforce type="[UnitReinforceEntry]" {
+        key "xZH6EIQ7"
+        doc """
+        NEVER SET.  xZH6EIQ7 is the HELPER PICKER list, not a fusion
+        animation payload: it dispatches to ReinforcementInfoResponse, whose
+        readParam @0x13EB29C calls ReinforcementInfoList::removeAllObjects on
+        row 0 and, on each row's last field, ADDS the row only when its user id
+        (h7eY3sAK) is non-empty -- otherwise the row is autoreleased.
+
+        Until 2026-10-02 fusion and evolution sent one "DecompDev" row with no
+        user id here.  The client parsed it, emptied the helper list, then
+        threw the row away, so the next quest's picker said NO_REINFORCEMENT
+        ("Reinforcements could not be found") until a FriendGet (a battle
+        result or a relaunch) refilled it.  Player report 2026-10-02: "every
+        once in a while" -- i.e. after a fusion or evolution.
+
+        Nothing reads it for fusion either: the result screen draws from
+        UnitOpeResult (1ZbHB6Im) and the unit cards from the 4ceMWH6k roster.
+        The row could never reach a list, so it never drove anything.
+        Optional so the key is omitted; a zero-row array would also be inert,
+        but an absent key cannot be misread.
+        """
+        optional #true
+    }
+
+    field unit_update type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        doc """
+        INERT for fusion — kept only so the shape stays documented.  This key
+        is INSERT-IF-ABSENT, not an update: UserUnitInfoResponse::readParam
+        ends with
+
+            v187 = UserUnitInfoList::exist(list, userUnitId);
+            if ( (v187 & 1) == 0 ) { ...; addObject(...); return 1; }
+            return 1LL;              // already owned -> entry DISCARDED
+
+        and a fusion base unit is always already owned, so whatever we put
+        here is parsed and then dropped.  It is the right key for genuinely
+        NEW units (drops, gacha).  Use unit_refresh below to actually change
+        an owned unit.
+        """
+    }
+
+    field unit_refresh type="[UserUnitInfo]" {
+        key "4ceMWH6k"
+        doc """
+        FULL-REPLACE unit cache rebuild — the ONLY key that can change a unit
+        the client already owns, because its ctor flag makes readParam call
+        removeAllObjects() before re-adding.  Send the COMPLETE roster here or
+        the client loses every unit omitted.
+
+        CONFIRMED WORKING on the fusion reply, 2026-08-10: the fusion menu shows
+        the new level and the fodder are gone with no trip to Home.
+        The one caveat to remember is that removeAllObjects() release()s every
+        CCObject in both containers, so any scene still holding a raw
+        UserUnitInfo* dangles.  This key soft-locked the result screen once
+        (2026-08-09), but that build also sent lvup_status "1", which crashes
+        parseMixResult by itself.  If a result screen ever hangs on this again,
+        the release() is the mechanism to suspect.
+
+        Why it is here at all: the client has NO local apply path.  It never
+        updates the fused unit and never removes the fodder — removeObject is
+        called by the sale scenes (UnitSellTopScene2::sellUnit @0x1C35DFC) and
+        the FrontierGate/FGPlus friend lists, never by a fusion scene, and
+        removeObjectWithUserUnitID has none.  It also requests nothing after a
+        fusion.  So without this key the fusion menu stays stale until Home.
+
+        OPTIONAL ON PURPOSE, and it must stay that way.  A plain vector
+        serialises as "4ceMWH6k": [] when unset — qC2tJs4E demonstrably does
+        exactly that today — and an empty full-replace list is the one payload
+        that could clear the client's roster outright.  As std::optional the
+        key is absent entirely unless we mean it.
+        """
+        optional #true
+    }
+
+    field ope_result type="[UnitOpeResult]" {
+        key "1ZbHB6Im"
+        doc "The result-screen payload — before/after levels and exp for the level-up animation.  See UnitOpeResult in net/unit.kdl."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Updated team info (zel) after the fusion."
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc """
+        Complete positive inventory, sent only when fusion fodder had spheres
+        equipped and gme::returnEquippedSpheres put them back.  No fusion
+        scene calls a client warehouse mutator (incWarehouseItem, setItemNum,
+        UserWarehouseInfoList::addObject) and HomeInfo carries no warehouse,
+        so those spheres stayed invisible until relaunch.  readParam
+        @0x14060E0 clears first: whole warehouse only.
+        """
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "Every item species ever stacked, sent with warehouse_info (merge with dedupe; see PresentReceiptResp)."
+        optional #true
+    }
+    field dbb_info type="[UserUnitDbbInfo]" {
+        key "sxorQ3Mb"
+        doc """
+        The DBB list, re-sent because THIS handler can change it.
+
+        Fusing an Elemental Golem opens a unit's DBB slot, and the client learns
+        a slot is open only by finding the unit in this list -- setDbbFusedIcon
+        @0x1EC4CF8 does `objectForKey(<user_unit_id>)` on it.  Writing
+        `dbb_unlocked` and not re-sending this left the fusion looking like it
+        had done nothing: handbook §6, "a successful SQL update is not a UI
+        refresh".  A REPLACE list, so it is always the complete set.
+        """
+        optional #true
+    }
+
+    field dbb_level_info type="[UserUnitDbbLevelInfo]" {
+        key "tR4katob"
+        doc "Bond levels, sent alongside dbb_info so the two never disagree."
+        optional #true
+    }
+
+}
+
+json UnitSellReq {
+    doc "Sell one or more user_units for zel.  Wire root keys: login IKqx1Cn9, units Km35HAXv."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field units type="[UnitSellEntry]" {
+        key "Km35HAXv"
+        doc "Units to sell."
+    }
+}
+
+json UnitSellResp {
+    doc """
+    UnitSell response.  The client applies the unit removal from its own state
+    (UnitSellTopScene2::sellUnit removes the sold units itself), so no roster
+    block is needed.  It does NOT apply returned spheres: nothing on the sale
+    path calls a client warehouse mutator.
+    """
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Updated team info (zel) after the sell."
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "Complete positive inventory, sent only when a sold unit had spheres equipped and gme::returnEquippedSpheres put them back.  readParam @0x14060E0 clears first: whole warehouse only."
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "Every item species ever stacked, sent with warehouse_info (merge with dedupe; see PresentReceiptResp)."
+        optional #true
+    }
+}
+
+json GachaListResp {
+    doc "Gacha list data returned when opening the summon screen."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key response block."
+    }
+
+    field gachaInfo type="[GachaInfoMst]" {
+        key "1IR86sAv"
+        doc "Current gacha info rows."
+    }
+
+    field gachaCategories type="[GachaCategory]" {
+        key "IBs49NiH"
+        doc "Current summon screen category rows."
+    }
+
+    field unitSelectorGacha type="[UnitSelectorGachaMst]" {
+        key "JukkSeNA"
+        doc """
+        The Unit Selector catalogue (UnitSelectorGachaMstResponse).  Loaded at
+        boot and, until 2026-09-13, never sent -- which is the OTHER half of
+        "selector summons are not working".
+
+        SummonsDetailScene::initSummontickets @0x1D8E304 builds the scene's
+        selected-selector list by walking UnitSelectorGachaMstList for rows
+        whose gacha_gate_id is the open gate, and touchBegan @0x16A73FC sends
+        the player to the unit picker only when that list is NOT empty.  With
+        the catalogue absent the list can never fill, so SUMMON on a selector
+        gate fell through to the ordinary paid pull.  SummonsScrlItem::addObject
+        @0x16D9F70 reads the same list for the ticket count on the rail tile,
+        and UnitSelectorGachaUnitSelectScene::initialize @0x1D95CCC reads it for
+        the grid of units to choose from.
+
+        readParam @0x1CCAD3C merges rather than replaces (addObject with no
+        remove), and rows are keyed by ticket id, so re-sending is harmless.
+        """
+    }
+}
+
+json MissionStartResp {
+    doc "Response payload for starting a mission."
+
+    field signal_key type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key response included in captured mission-start payloads."
+    }
+
+    field battle_groups type="[BattleGroupMst]" {
+        key "pj41dy9g"
+        doc "Battle group rows for each stage."
+    }
+
+    field battle_monster_groups type="[BattleMonsterGroupMst]" {
+        key "75t0sx9z"
+        doc "Monster placement rows for each battle group."
+    }
+
+    field monsters type="[MonsterMst]" {
+        key "U0v5IeJo"
+        doc "Mission-local monster MST rows."
+    }
+
+    field monster_cgs type="[MonsterCgsMst]" {
+        key "8hoyIF9Q"
+        doc """
+        Per-animation-state sprite sheets for monsters with NO backing unit —
+        i.e. non-obtainable bosses.  See MonsterCgsMst in net/mission.kdl.
+
+        OPTIONAL ON PURPOSE.  MonsterCgsMstResponse::readParam @0x13E4E20 opens
+        with MonsterCgsMstList::removeAllObjects, so emitting this block always
+        would clear the client's cached list on every mission start — including
+        for the ordinary missions that have nothing to put back.  Leaving it
+        nullopt makes Glaze drop the key entirely (the same omission behaviour
+        verified for the GachaInfoMst extras in handbook 7.11.6), so a mission
+        with no special monsters sends exactly what the live captures show.
+        """
+        optional #true
+    }
+
+    field battle_skills type="[SkillMst]" {
+        key "8aiBoHg5"
+        doc """
+        F_SKILL_MST rows for the monsters' BATTLE-ONLY skills, re-registered for
+        this battle.
+
+        A skill row whose ToZj4zyn is "0" (21,174 of the 33,381) is not kept:
+        UnitSkillMstResponse::readParam @0x13F9E04 files it with
+        UnitSkillMstList::addObjectTemporary, and GameUtils::
+        battleTemporaryMstRemove @0x1176238 empties that list on every Home
+        (GameScene::initAllContensFlg) and after every mission result.  So
+        by the time a battle loads, every monster-only skill is gone, and
+        GameScene::requestMonsterSummonFiles @0x16433CC dereferences
+        UnitSkillMstList::getObject(id) unchecked: SIGSEGV at 0x48 the moment a
+        boss with such a skill (Trial No. 001's Karl, 6140-6143) is loaded.
+
+        In a response this key builds UnitSkillMstResponse(true)
+        (GameResponseParser::getResponseObject @0x13928B8), which APPENDS: no
+        removeAllObjects, and ToZj4zyn "0" rows go back into the temporary list,
+        to be dropped again at the result scene.  (The full-replace variant is
+        5hafnym7, never sent.)  UnitSkillMstList::getObject @0x135B398 searches
+        the permanent list, then the temporary one.
+
+        Only temporary rows are sent; a permanent row is still in the client's
+        list.  Level rows (F_SKILL_LEVEL_MST) default to permanent and carry no
+        ToZj4zyn, so they need no re-sending.  Optional: absent when the mission
+        has no such skill.
+        """
+        optional #true
+    }
+
+    field ais type="[AIMst]" {
+        key "89ausgc4"
+        doc "Mission-local AI rows."
+    }
+
+    field mission_num type="[MissionNumInfo]::size(1)" {
+        key "Kz7qfSs5"
+        doc "Mission serial state required by MissionStartScene."
+    }
+
+    field start_info type="[MissionStartInfo]::size(1)" {
+        key "9Q1Lq5FS"
+        doc "Mission-start info consumed by the battle scene."
+    }
+
+    field frontier_battle type="[FrontierBattleInfo]" {
+        key "eIQ79KO2"
+        doc "Frontier Gate battles only: the floors and score the run has reached, which the battle starts from.  FrontierBattleInfoResponse is the only setter of that state, so a first battle gets zeros and every later one the last MissionEnd's values (see FrontierBattleInfo)."
+        optional #true
+    }
+}
+
+json MissionEndReq {
+    // AUDIT 2026-08-24: createBody @0x13A78F8 is 5596 bytes over 64 keys; this
+    // models 56 of them.  The 8 undeclared ones cost nothing today (our handler
+    // reads only zel, karma, unit_rewards and item_rewards) but are recorded in
+    // tools/SERVER_COMPONENT_AUDIT.md because a future achievements or Frontier
+    // Hunter scoring feature needs exactly them:
+    //
+    //   ZYSWU9V1  group, emitted only when BattleState::isEp3TrialMode @0x13A82C4
+    //             or isPlayNormalChallengeMission @0x13A82D0
+    //   57YByKEt  group, only when isPlaySPChallengeMission @0x13A8860
+    //             both carry TPR79fyI getNote, 7cev0fzQ getTotalScore,
+    //             pG2n1A28 getClearBattleOrder, gUvjqu39 SaveData::getItemSetID
+    //   pJqG1B7b  BattleLog string @0x13A7C98
+    //   pgY9m2ne  BattleLog::getUnitUBBKoMonsterCntCsv @0x13A8138
+    //   0w47scoa  BattleLog::getUBBDefeatMonsterElemCsv @0x13A81D8
+    //
+    // pG2n1A28 means clearBattleOrder HERE.  It is the Summoner's Journal
+    // TARGET on its own class -- same hash, unrelated meanings (Rule Zero).
+    //
+    // 8 keys in battle_result are byte-identical with UserTeamArchive's trophy
+    // counters (hoG2ieT5 6PLsn8xo 5NRJQ1LU XP06YWdT U8uZLA34 rZQJF5G9 TW1Mrtp5
+    // e6BKoYy9).  The client reports them every mission; we discard them, which
+    // is why those trophies read 0.
+    doc "Request payload sent after a mission battle ends."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login/user identity included with mission-end requests."
+    }
+
+    field signal_key type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key sent by the client."
+    }
+
+    field mission_num type="[MissionNumInfo]::size(1)" {
+        key "Kz7qfSs5"
+        doc "Mission serial state being completed."
+    }
+
+    field battle_result type="[MissionBattleResultInfo]::size(1)" {
+        key "rXvA1E5y"
+        doc "Client-reported mission reward/result values."
+    }
+
+    field party_deck_info type="[UserPartyDeckInfo]" {
+        key "0xgIw1Ns"
+        doc "Party deck state after the mission."
+    }
+
+    field frontier_gate type="[FrontierGateMissionRef]" {
+        key "dPM7oJDl"
+        doc "Frontier Gate battles only (createBody @0x13A8B98): the gate."
+        optional #true
+    }
+
+    field frontier_battle type="[FrontierBattleInfo]" {
+        key "eIQ79KO2"
+        doc "Frontier Gate battles only (createBodyFrontierGateBattle @0x13A8ED4): the run's floors and score after this battle."
+        optional #true
+    }
+}
+
+json MissionEndResp {
+    doc "Response payload sent after a mission battle ends."
+
+    field loginInfo type="[LoginInfoResp]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Updated login/tutorial state after mission end."
+    }
+
+    field reward_info type="[MissionRewardInfo]::size(1)" {
+        key "F5Vs19mb"
+        doc "Mission reward values consumed by the result scenes."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Updated user team state after applying mission rewards."
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        doc "Newly awarded units from this mission."
+    }
+
+    field unit_dictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        doc "The COMPLETE unit dictionary, sent when this mission awarded units (an empty list otherwise, which readParam never sees).  Never only the new species: this response rebuilds the reference list the summon lineup reads; see UserUnitDictionary."
+    }
+
+    field clear_mission_info type="[UserClearMissionInfo]" {
+        key "UT1SVg59"
+        doc """
+        The caller's cleared missions, refreshed after this clear.
+
+        Sent so the map marks the mission cleared IMMEDIATELY.  Without it the
+        client only learns on the next UserInfo, so a freshly beaten mission
+        kept its uncleared marker. Actual unlocks require the separate full
+        PermitPlace replacement emitted alongside this list.
+
+        SAFE as a partial list: UserClearMissionInfoResponse::readParam
+        @0x13FD758 does getMissionID + addObject with NO removeAllObjects, so
+        entries MERGE into the client's list rather than replacing it (§6.20).
+        """
+    }
+
+    field permitPlace type="[PermitPlace]" {
+        key "yXNM8kL3"
+        doc "Full normal PermitPlace replacement after the clear. Filled by the shared current-state builder; see PermitPlace for the discriminated-row contract."
+    }
+
+    field permitPlaceSP type="[PermitPlaceSP]" {
+        key "Y73tHKS8"
+        doc "The SPECIAL half of the same snapshot.  PermitPlaceSpResponse::readParam clears removeSpecialObjects at row 0, and yXNM8kL3's removeNormalObjects deliberately SKIPS special rows -- so anything whose area is AreaMst type 1 or 3 has to come back on this key or it can never be withdrawn.  Same discriminated row shape; built by the shared snapshot builder."
+    }
+
+    field permitPlaceML type="[PermitPlaceML]" {
+        key "Y73mHKS8"
+        doc "The ML half, cleared by removeMLObjects.  AreaMst type 10.  Same contract as permitPlaceSP."
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "Complete positive inventory after crediting drops. APK readParam @0x14060E0 clears before adding; never send only earned stacks."
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "Every item species in persisted inventory, including zero-count historical stacks, matching UserInfo."
+    }
+    field permit_receipes type="[PermitReceipe]" {
+        key "51yQrDBR"
+        doc "Complete recipe permissions after the clear. APK readParam @0x13E9B70 clears the recipe list; derive from all current facilities and cleared missions."
+    }
+    field town_location_detail type="[UserTownLocationDetail]" {
+        key "s8TCo2MS"
+        doc """
+        Every town tile's harvest state, re-read after the clear (Town::
+        locationState, against the same cleared set as permit_receipes).
+
+        WHY MissionEnd: missions 11 and 12 unlock the Farm and the Mountain
+        (TownLocationMst need_mission_id), and the client checks that gate
+        itself against UT1SVg59 -- which this reply already updates.  But a
+        locked tile is sent with no taps and no loot, and nothing but UserInfo
+        ever re-sent this list, so a Farm unlocked mid-session passed its gate
+        and still sat there with tap_cnt 0: no sparkle, and collectItem
+        @0x18F24A8 returns silently on a tap (reported 2026-10-02 as "Farm says
+        unlocked but is not").  Rolling here gives the newly opened tile its
+        first period at the moment it opens, and lets the 3-hour refresh reach
+        a long session at its next clear instead of its next login.
+
+        Race-free: the client batches every tile tap into one TownUpdate it
+        flushes on leaving town (captured "2:9,4:10" with the Home BadgeInfo),
+        long before a battle ends.  UserTownLocationDetailResponse::readParam
+        @0x1404090 clears the list at row 0, so this is always the full set.
+        Omitted on a result that settles nothing.
+        """
+        optional #true
+    }
+    field energy_recover type="DefineEnergyRecover" {
+        key "VkoZ5t3K"
+        doc "The header energy-refill threshold, re-sent because a level-up raises max energy."
+    }
+
+    field frontier_battle type="[FrontierBattleInfo]" {
+        key "eIQ79KO2"
+        doc "Frontier Gate battles only: the run's state after this battle, echoed as the client reported it (see FrontierBattleInfo)."
+        optional #true
+    }
+
+    field frontier_end type="[FrontierEndInfo]" {
+        key "mu0kXAlV"
+        doc "Frontier Gate battles only, and only when the battle was LOST: the run is over, and this block is what moves FrontierGateBattleEndScene on to the result scene (see FrontierEndInfo).  One row."
+        optional #true
+    }
+
+    field frontier_rewards type="[FrontierResRewardInfo]" {
+        key "QXFCkE67"
+        doc "Sent with frontier_end: the rewards the ended run earned."
+        optional #true
+    }
+
+    field event_token_info type="[EventTokenInfo]" {
+        key "l234vdKs"
+        doc "Sent when this battle's Frontier Gate rewards credited an event token (the Rift Token is the gate's own currency): the balances after the payout.  A full replace -- see EventTokenInfo."
+        optional #true
+    }
+
+    field summon_ticket_v2_user type="[SummonTicketV2UserInfo]" {
+        key "a3d5d12i"
+        doc "Sent when this battle's Frontier Gate rewards credited a V2 summon ticket: the inventory after the payout.  A full replace -- see SummonTicketV2UserInfo."
+        optional #true
+    }
+    field equip_info type="[UserEquipItemInfo]" {
+        key "71U5wzhI"
+        doc "The battle-item bar (user_equip_items, every slot, zero counts kept) after this battle's uses were spent.  UserEquipItemInfoResponse::readParam @0x13FE2E0 clears UserEquipItemInfoList at row 0 before adding, so this replaces the client's bar.  Without it the bar kept the used items until a restart, and the client let them be used again for free (ticket #9)."
+        optional #true
+    }
+    field badge type="BadgeAchievementCount" {
+        key "h23iRjGN"
+        doc "The achievement badges after this battle, the complete set (parseBadgeData replaces it).  A battle can finish a daily Challenge (the Missions > Challenges count, category 2) or a trophy-backed achievement, and the client asks for BadgeInfo only at login and on Home/Randall town entry, so without this the count stayed dark for the rest of the session.  Set on every MissionEnd reply; optional only so that a reply built without it leaves the client's badges alone instead of clearing them."
+        optional #true
+    }
+
+}
+
+
+// Frontier Gate — request/response wrappers.  The FrontierGateInfo entry type
+// and the full decode evidence live in net/frontier_gate.kdl; the IDA audit is
+// tools/ida/audits/dPM7oJDl_audit.txt.
+//
+// Registration: REGISTER("M17pPotk", FrontierGateInfo, "sochkegz").  Note the
+// request GroupId (M17pPotk) is NOT the response key (dPM7oJDl) — handbook 6.1.
+
+json FrontierGateInfoReq {
+    doc "FrontierGateInfo (M17pPotk) request.  createBody @0x13BB8C8 emits only the three BaseRequest tags (userInfo/signalKey/version) and ZERO addParam/addGroup/addNode calls, so this carries loginInfo only and the server derives the gate list from the resolved user.  The two trailing setFrogateID(\"\") calls in createBody are client-side resets of the suspended-info singletons, not wire fields."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json FrontierGateInfoResp {
+    doc "FrontierGateInfo (M17pPotk) response — the player's per-gate progress list, keyed dPM7oJDl.  is_array=True per readparam_analysis.json, and readParam calls FrontierGateInfoList::addObject once per node, so this is a list even when it holds a single gate.  The legacy handler returned this empty ({\"dPM7oJDl\": []}), which is the safe idle shape."
+
+    field gates type="[FrontierGateInfo]" {
+        key "dPM7oJDl"
+        doc "One entry per Frontier Gate the player has progress on."
+    }
+}
+
+// Frontier Gate tier 2 — FrontierGateStart.  Entry types and the decode
+// evidence are in net/frontier_gate.kdl.
+//
+// Registration: REGISTER("l3lkDBSc", FrontierGateStart, "vYPCD34q").
+
+json FrontierGateStartReq {
+    doc "FrontierGateStart (l3lkDBSc) request.  createBody @0x13BC3C0 branches on the isFGPlus flag: the normal Frontier Gate path emits group Mg8K8Y1a (gate id + support id) plus the deck/unit snapshot groups MxmCpDRC/52xDBRGr; the FGPlus path emits Che7rAre/cexa3Uwr/cr6qeFUP instead.  Only the normal path is modelled — handbook §11.2 says do not mix FGPlus into this subsystem.  The deck/unit snapshot groups are deliberately NOT declared yet; they belong to tier 3 (see tools/FRONTIER_GATE_STATE_MODEL.md) and the lenient read drops them harmlessly until then."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field frogate type="[FrontierGateStartEntry]::size(1)" {
+        key "Mg8K8Y1a"
+        doc "addGroup(\"Mg8K8Y1a\") + a single addNode — the gate being entered and the support picked."
+    }
+
+    field party_deck type="[FrontierGatePartyDeckInfo]" {
+        key "MxmCpDRC"
+        doc "The party the client is entering with, from FrontierGateBaseRequest::createBodySaveDataDeck.  Parsed so it can be echoed back — the client rebuilds its FG party list from the response."
+    }
+
+    field units type="[FrontierGateUserUnitInfo]" {
+        key "52xDBRGr"
+        doc "The unit snapshot, from FrontierGateBaseRequest::createBodySaveDataUnit.  MissionStartScene::downloadFiles reads FrontierGateUserUnitInfoList to decide which unit assets to fetch, so this MUST come back or the battle loads with no unit files."
+    }
+}
+
+json FrontierGateStartResp {
+    doc "FrontierGateStart (l3lkDBSc) response — the freshly opened run, keyed Mg8K8Y1a.  A single OBJECT, not an array: FrontierGateNumResponse::readParam writes the FrontierGateNum shared singleton rather than appending to a list (is_array=false in readparam_analysis.json).  Note the request wraps this same key in an array while the response does not."
+
+    field num type="FrontierGateNum" {
+        key "Mg8K8Y1a"
+        doc "The active run: its handle, gate, support and stat multipliers."
+    }
+
+    field party_deck type="[FrontierGatePartyDeckInfo]" {
+        key "MxmCpDRC"
+        doc "The run's party, echoed back so the client's FG deck list is populated."
+    }
+
+    field units type="[FrontierGateUserUnitInfo]" {
+        key "52xDBRGr"
+        doc "The run's units, echoed back.  Without this FrontierGateUserUnitInfoList is empty and MissionStartScene::downloadFiles fetches no unit assets — the mission then crashes mid-load."
+    }
+}
+
+json DungeonEventUpdateReq {
+    doc "DungeonEventUpdate (BjAt1D6b) request — identity only as far as the server is concerned, but its login envelope carries the 9yVsu21R scene-intro list the client has played, which is the reason this struct exists rather than the handler ignoring the body."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user; also carries special_scenario_info (9yVsu21R)."
+    }
+}
+
+// Generic shop spend.  CAPTURED FROM: a live Recover tap on the Frontier Gate
+// "no Hunter Orbs" prompt, 2026-08-07 —
+//   "32ibWjFG":[{"60IsqxDt":"5","03UGMHxF":"1","5gXxT7LZ":"0","rA9jDCP5":"0"}]
+json ShopUseEntry {
+    doc "One shop action — request group 32ibWjFG, a single node."
+
+    field shop_use_type type="i32::str" {
+        key "60IsqxDt"
+        doc """
+        ShopUseType — WHICH action this is.  Every setShopUseType call site:
+          1   = fully restore Energy — the shop (ShopHelActionScene::touchBegan)
+                and every "not enough Energy" prompt (MissionSelectShortage-
+                StaminaScene, GameScene::confirmAnswerYesEnergy, the campaign,
+                trial, raid and guild party screens); DefineMst
+                action_point_heal_count gems, ext_cnt 0
+          2   = expand the unit box   (ShopUnitBoxExtScene::confirmAnswerYes,
+                                       setShopUseType(2) @0x1AD9984)
+          3   = expand the item box   (ShopItemBoxExtScene::confirmAnswerYes,
+                                       setShopUseType(3) @0x1AD0528)
+          4   = fully restore Arena Orbs (ShopHelFightScene, ArenaTopScene);
+                fight_point_heal_count gems
+          5   = fully restore Hunter Orbs (Frontier Gate / Frontier Hunter)
+          6   = buy a stamp set (ShopBuyStampScene; rA9jDCP5 = the set id)
+          7   = +5 friend capacity (ShopFriendExtScene); friend_ext_count gems,
+                ext_cnt 5
+          8   = ColosseumTopScene::shopScene
+          9   = UnitDetailVirtuallyInfoScene::resetConnect (edy7fq3L = unit)
+          10  = Quest Repeat's Auto Energy Recovery (MissionResultRepeatCheck-
+                Scene::recoverStamina); priced and handled like 1
+          11  = ShopSummonerItemBuyDetailScene (T1IxCpTF = shop item id)
+          12  = SummonerUnitMakeScene (9i2xhMaJ = next summoner sex)
+          103 = VortexArenaTopScene (adds group d2b8d79J, n37dK9Xi)
+        Types 2 and 3 are also what the Expand button on the Over Unit / Item
+        Capacity warning reaches.  The client changes no counter itself after
+        any of these (ShopUseConnectScene only checks the reply), so the
+        team_info reply is the purchase.  The handler implements 1-5, 7, 9 and
+        10 and ignores the rest rather than guess what they spend.
+        """
+    }
+
+    field cost type="i32::str" {
+        key "03UGMHxF"
+        doc """
+        Gem cost of the action, AS THE CLIENT PRICED IT; 1 for the orb restore.
+        For 2/3 it is slots / 5 x DefineMst unit/item_box_ext_count — captured
+        1 / 19 / 20 gems for 5 / 95 / 100 slots.  A client-supplied price is a
+        claim: ShopUse recomputes it.  Same hash as team_info brave_coin and
+        GachaInfoMst need_gems — see handbook §10.3 for the collision.
+        """
+    }
+
+    field ext_cnt type="i32::str" {
+        key "5gXxT7LZ"
+        doc """
+        Slots to add for types 2/3 (captured 5, 95, 100) and 7 (always 5); 0 on
+        the energy and orb restores.
+        Always a multiple of 5: both box scenes' ctors load 5.0f as the divisor
+        SetNeedDiaNum uses (unit box @0x1AD6ACC -> +0x360, item box @0x1ACD870
+        -> +0x338).  Named ExtCnt via UserUnitInfoResponse, which uses the same
+        hash.
+        """
+    }
+
+    field unk_ra9j type="i32::str" {
+        key "rA9jDCP5"
+        doc "The stamp set bought by type 6: createBody writes ShopUseRequest +0x20, which only setStampSetId @0x13ACBAC sets (its one caller is ShopBuyStampScene::confirmAnswerYes).  0 for every other type."
+    }
+
+    field user_unit_id type="str" {
+        key "edy7fq3L"
+        doc "The owned unit a type-9 use acts on.  ShopUseRequest::createBody @0x13AC8C8 adds it only when set, and its one setter caller is UnitDetailVirtuallyInfoScene::resetConnect @0x1BDEBDC (the Enhancements screen's Reset, priced at DefineMst reset_fe_skill_dia_count).  The client sends it only when the reset can do something: resetBtnSet @0x1BE2C88 disables the button while getFeUsedBP() is 0, and resetDialog @0x1BDF278 shows the shortage dialog instead when its gem count is below the price.  The body says nothing about the unit's state and carries no nonce, so a retry and a later genuine reset look the same.  Empty for every other type."
+    }
+}
+
+json ShopUseReq {
+    doc "ShopUse (xe8tiSf4) request.  createBody also emits conditional params edy7fq3L / T1IxCpTF / 9i2xhMaJ and a second group d2b8d79J for unit-targeted and Vortex-Arena uses; those are not modelled because no capture exercises them and the lenient read drops them harmlessly."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field shop_use type="[ShopUseEntry]::size(1)" {
+        key "32ibWjFG"
+        doc "The shop action being performed."
+    }
+}
+
+json ShopUseResp {
+    doc "ShopUse (xe8tiSf4) response.  The binary defines no ShopUseResponse class, so this returns the refreshed team_info the way every other currency-spending handler does (UnitSell/UnitMix) — that is what makes the client's gem and orb counters update without a full UserInfo round trip."
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Refreshed team info: gems after the spend, and the energy, orbs, box or friend capacity the purchase changed.  Sent on a refusal too, so the client falls back to the server's numbers."
+    }
+
+    field user_team type="HunterOrbRefresh" {
+        key "kN2i7qds"
+        doc "HUNTER ORBS AFTER THE PURCHASE.  ShopUse type 5 refills them, and they are NOT in team_info -- they live in the client's ChallengeHeaderInfo, whose only writer is this key.  Without it the player paid the Gem and the counter on screen stayed where it was, so the \"restore orbs\" prompt simply came back.  Sent only for the orb purchase. Uses the partial count/timer shape so buying orbs cannot overwrite HR or Frontier Gate score."
+        optional #true
+    }
+
+    field unit_refresh type="[UserUnitInfo]" {
+        key "4ceMWH6k"
+        doc "Type 9 (reset a unit's SP enhancements) only: the COMPLETE roster, full-replace.  The client never clears fe_skill_info or moves SP back itself -- setFeBP / setFeUsedBP / setFeSkillInfo are written only by UserUnitInfoResponse::readParam -- and qC2tJs4E cannot update an owned unit, so this is the one way the reset shows.  Safe here: UnitDetailVirtuallyInfoScene re-resolves its unit by id in every function that reads it.  Optional so every other type omits it (an empty full-replace list would clear the roster)."
+        optional #true
+    }
+}
+
+json FeSkillGetEntry {
+    doc """
+    The one node of request group bx56032l.  FeSkillGetRequest::createBody
+    @0x13CA7F4, filled by FeSkillGetRequest::setParam from
+    UnitDetailVirtuallyInfoScene::feSkillGetConnect @0x1BDF7AC — ONE skill per
+    request: the player taps a node (touchSkill stores that FESkillMst's id in
+    the scene at +0x3C0) and confirms.
+    """
+
+    field unit_id type="str" {
+        key "pn16CNah"
+        doc "The unit's MST id, as the unit's own getter returns it."
+    }
+
+    field user_unit_id type="str" {
+        key "edy7fq3L"
+        doc "The owned unit being enhanced."
+    }
+
+    field fe_skill_id type="str" {
+        key "ri6D9yBi"
+        doc "The FeSkillMst id to acquire — a node of UnitFeSkillMst for this unit."
+    }
+}
+
+json FeSkillGetReq {
+    doc "FeSkillGet (nSQxNOeL / nZ2bVoWu) request: spend SP on one Omni enhancement. Registered by FeSkillGet.cpp on 2026-10-01. Reverified against createBody @0x13CA7F4 and setParam @0x13CA750; see docs/FE_SKILL_PURCHASE_2026-10-01.md in the parent repository."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field fe_skill_get type="[FeSkillGetEntry]::size(1)" {
+        key "bx56032l"
+        doc "The skill being acquired."
+    }
+}
+
+json FeSkillGetResp {
+    doc """
+    FeSkillGet response.  The binary has no FeSkillGetResponse class and the
+    scene applies nothing itself: checkConnectResult only runs
+    checkResponseMessage, and the unit's SP and skill list have no writer but
+    UserUnitInfoResponse::readParam.  So the reply IS the purchase: the whole
+    roster under 4ceMWH6k, which the Enhancements screen then redraws from
+    (it looks its unit up by id every time, so the full replace leaves it
+    nothing stale to hold).
+    """
+
+    field signal_key type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key echoed back."
+    }
+
+    field unit_refresh type="[UserUnitInfo]" {
+        key "4ceMWH6k"
+        doc "The COMPLETE roster, full-replace, carrying the unit's new fe_skill_info (Fnxab5CN), fe_bp and fe_used_bp.  Optional so a refusal never serialises an empty list."
+        optional #true
+    }
+}
+
+// Frontier Hunter hub.  "Challenge" is this binary's internal name for Frontier
+// Hunter — c5yZnpB4 resolves to setFrohunID (ChallengeMvpResponse,
+// ChallengeRankRewardResponse), and the Survey Office's HR / Hunter Orbs header
+// is Frontier Hunter chrome that Frontier Gate sits behind.
+json ChallengeInfo {
+    doc "The currently running Frontier Hunter event — response key cvg8hzp9 (ChallengeInfoResponse), a single field.  The client needs a live event id before the Survey Office will show event state."
+
+    field frohun_id type="i32::str" {
+        key "c5yZnpB4"
+        doc "setFrohunID — the active F_FROHUN_MST (challenge_mst.json) row id.  CONFIRMED by cross-class reuse: named setFrohunID in ChallengeMvpResponse (nUmaEC41) and ChallengeRankRewardResponse (p73SJiWv)."
+    }
+}
+
+json ChallengeBaseResp {
+    doc "ChallengeBase (nUAW2B0a) response.  The binary defines no ChallengeBaseResponse class, so this emits the response keys the Survey Office needs: cvg8hzp9 (the active event id) and kN2i7qds (the header state carrying Hunter Orbs).  The HR ladder already reaches the client as an MST (challenge_hr_mst.json ships under h09mEvDR via Initialize), so it does not need repeating here.  s7A3bGLe belongs to ChallengeUserInfo (jF3AS4cp), which has its own handler — the hub does not send it."
+
+    field challenge_info type="ChallengeInfo" {
+        key "cvg8hzp9"
+        doc "The running Frontier Hunter event."
+    }
+
+    field user_team type="ChallengeUserTeam" {
+        key "kN2i7qds"
+        doc "Frontier Hunter header state — this is what feeds ChallengeHeaderInfo, where the Hunter Orb (Aube) counter actually lives."
+    }
+}
+
+// ChallengeUserInfo (jF3AS4cp / Nst6MK5m) — the per-event state the Frontier
+// Hunter lobby runs on.
+//
+// THIS WAS AN UNREGISTERED GROUPID, and an unregistered GroupId is answered
+// "Unsupported request" with a Close command, which ends the session and looks
+// exactly like a crash.  It is not hypothetical: deploy/log has the client
+// firing it at 2026-09-13 07:28:53 — straight after a DungeonEventUpdate whose
+// 9yVsu21R marker list ends in "challenge," (the Frontier Hunter intro) — and
+// relaunching thirty seconds later.
+//
+// ChallengeUserInfoRequest::createBody @0x13A25D4 posts group a7HQ9sEB with the
+// event id and the mission being inspected.
+
+json ChallengeUserInfoReq {
+    doc "ChallengeUserInfo (jF3AS4cp) request — the event and mission the lobby is asking about."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field challenge type="[ChallengeUserInfoReqEntry]::size(1)" {
+        key "a7HQ9sEB"
+        doc "The one node createBody adds."
+    }
+}
+
+json ChallengeUserInfoReqEntry {
+    doc "Inner node of the ChallengeUserInfo request group a7HQ9sEB."
+
+    field frohun_id type="str" {
+        key "c5yZnpB4"
+        doc "setFrohunID — the Frontier Hunter event being opened.  `str` because createBody passes it through the std::string addParam overload."
+    }
+
+    field mission_id type="str" {
+        key "j28VNcUW"
+        doc "setMissionID — the challenge mission the lobby is showing.  Same std::string overload."
+    }
+}
+
+// ChallengeUserInfoResponse::readParam @0x13D3BEC — eight setters across TWO
+// singletons, no list operations on either, so this is a single full row like
+// n5mdIUqj rather than a list.
+json ChallengeUserInfo {
+    doc "Per-event Frontier Hunter state — response key s7A3bGLe.  Six fields land on ChallengeInfo::shared() and two on ChallengeHeaderInfo::shared()."
+
+    field search type="i64::str" {
+        key "TPR79fyI"
+        doc "ChallengeHeaderInfo::setSearc @0x1258184 (read back as getSearch) — the player's survey SCORE for this event, parsed with StrToLongLong, so 64-bit.  ChallengeResultScene::initialize and updateStateCountUp are the only other writers, which is what a score looks like.  Same hash the Frontier Gate result uses for its score."
+    }
+
+    field frohun_flg type="i32::str" {
+        key "QG5kcBz6"
+        doc "ChallengeInfo::setFrohunFlg.  // UNVERIFIED — no reader found in this build."
+    }
+
+    field frohun_id type="str" {
+        key "c5yZnpB4"
+        doc "ChallengeInfo::setFrohunID — echoes the requested event.  Read by ChallengeBase::getFroMst, the lobby, the ranking/result/reward scenes and MissionStartScene::initConnect, so it has to name a real challenge_mst row."
+    }
+
+    field frohun_stat type="i32::str" {
+        key "j0Uszek2"
+        doc """
+        ChallengeInfo::setFrohunStat — THE LOBBY GATE.
+
+        ChallengeLobbyScene::startCheck @0x155CDB8 and
+        ChallengeConditionScene::startCheck only proceed when this is exactly
+        1; anything else draws CHALLENG_CHECK_TIME ("event not running") and
+        refuses.  btnSetSt @0x155B904 pins a second value: 3 draws the blue
+        "collect your reward" button, so 3 is the ended-and-payable phase and
+        everything else falls through to the red entry button.  strPeriod and
+        missionScene branch on it too.
+
+        This server sends 0 on purpose.  A 1 lights the Start button, and the
+        request behind it — ChallengeStart, sQfU18kH / m4sdYv9e — is not
+        registered, so it would only move the session kill one tap further in.
+        Register ChallengeStart before ever raising this.
+        """
+    }
+
+    field frohun_term type="str" {
+        key "s2gM3deu"
+        doc "ChallengeInfo::setFrohunTerm — the event PERIOD text, rendered by ChallengeLobbyScene::strPeriod alongside frohun_stat."
+    }
+
+    field frohun_try type="i32::str" {
+        key "2Cn0bWt9"
+        doc "ChallengeInfo::setFrohunTry.  // UNVERIFIED — the getter has no callers in this build, so nothing reads it back."
+    }
+
+    field order type="i32::str" {
+        key "vV4P53m7"
+        doc "ChallengeHeaderInfo::setOrder @0x1258208 — the player's RANK on the event ladder.  Drawn by GameScene::updateHeader and setHeaderControl, and by ChallengeNewRankingScene::strNaveMsg."
+    }
+
+    field comment type="str" {
+        key "WDUyI85C"
+        doc "ChallengeInfo::setComment — the navigator's message on the lobby screen (ChallengeLobbyScene::strNaveMsg @0x155BF20)."
+    }
+}
+
+json ChallengeUserInfoResp {
+    doc "ChallengeUserInfo (jF3AS4cp) response.  Carries the event state the lobby gates on plus the header block, because the same screen reads Hunter Orbs out of ChallengeHeaderInfo in the same breath (ChallengeLobbyScene::startCheck reads getAube and getFrohunStat one after the other)."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key echoed back."
+    }
+
+    field challenge_user type="ChallengeUserInfo" {
+        key "s7A3bGLe"
+        doc "The event state — see ChallengeUserInfo.  A SINGLETON pair of writes, so send the full row."
+    }
+
+    field user_team type="ChallengeUserTeam" {
+        key "kN2i7qds"
+        doc "HR and Hunter Orbs — the same header block ChallengeBase sends, repeated here so the lobby's orb read is current."
+    }
+}
+
+// Frontier Hunter ranking board.  Every field below is a REAL named setter from
+// readparam_analysis.json — this struct contains no guessed names.
+json ChallengeRankingEntry {
+    doc "One row of the Frontier Hunter ranking board — response key Hmiwj75u (ChallengeRankingResponse), an array.  Fields 14-17 are the Summoner avatar, so each row renders the player's character."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "setUserID."
+    }
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "setHandleName — the displayed player name."
+    }
+
+    field team_lv type="i32::str" {
+        key "2Fh3J7ng"
+        doc "setTeamLv — the player's account level."
+    }
+
+    field unit_id type="str" {
+        key "pn16CNah"
+        doc "setUnitID — the player's showcased unit (unit_mst id)."
+    }
+
+    field unit_lv type="i32::str" {
+        key "4A6LzBxr"
+        doc "setUnitLv — that unit's level."
+    }
+
+    field point1 type="str" {
+        key "U4pMNjy0"
+        doc "setPoint1.  std::string on this class while Point2/Point3 are ints — the client keeps this one unconverted."
+    }
+
+    field point2 type="i32::str" {
+        key "pG2n1A28"
+        doc "setPoint2.  Same hash the Frontier Gate info response uses for Progress/PlayProgress."
+    }
+
+    field point3 type="i32::str" {
+        key "2Cn0bWt9"
+        doc "setPoint3."
+    }
+
+    field rank_order type="i32::str" {
+        key "vV4P53m7"
+        doc "setRankOrder — position within the board.  Also used by FrontierGateRankingResponse and SPChallengeRankingResponse."
+    }
+
+    field info_type type="i32::str" {
+        key "NH65Wj0f"
+        doc "setInfoType.  // UNVERIFIED: the enum is not decoded; likely distinguishes the viewer's own row from other players' rows."
+    }
+
+    field rank type="i32::str" {
+        key "9w5e3ZJB"
+        doc "setRank — the displayed rank number."
+    }
+
+    field mission_id type="str" {
+        key "j28VNcUW"
+        doc "setMissionID — which mission the score was set on."
+    }
+
+    field unit_img_type type="i32::str" {
+        key "2pAyFjmZ"
+        doc "setUnitImgType — which artwork variant to draw for the unit."
+    }
+
+    field ep3_flg type="i32::str" {
+        key "jkldTrhL"
+        doc "setEp3Flg — Episode 3 marker."
+    }
+
+    field sex type="i32::str" {
+        key "9i2xhMaJ"
+        doc "setSex — Summoner avatar gender."
+    }
+
+    field element type="i32::str" {
+        key "iNy0ZU5M"
+        doc "setElement — Summoner avatar element."
+    }
+
+    field hair_id type="str" {
+        key "btZizNep"
+        doc "setHairID — Summoner avatar hair.  Named via UserGiftInfoResponse / SummonerFriendInfoResponse."
+    }
+
+    field arm_id type="str" {
+        key "RVVgyuor"
+        doc "setArmID — Summoner avatar weapon.  Named via SummonerFriendInfoResponse / RaidRoomPartyInfoResponse."
+    }
+}
+
+json ChallengeRankingReq {
+    doc "ChallengeRanking (2Kxi7rIB) request.  createBody emits group cvg8hzp9 carrying c5yZnpB4 — the Frontier Hunter event whose board is being viewed, i.e. exactly the id ChallengeBase hands out."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field challenge type="[ChallengeInfo]::size(1)" {
+        key "cvg8hzp9"
+        doc "The event being ranked — reuses ChallengeInfo, the same one-field shape ChallengeBase returns."
+    }
+}
+
+json ChallengeRankingResp {
+    doc "ChallengeRanking (2Kxi7rIB) response — the board, keyed Hmiwj75u.  is_array=true in readparam_analysis.json."
+
+    field ranking type="[ChallengeRankingEntry]" {
+        key "Hmiwj75u"
+        doc "Board rows, best rank first."
+    }
+}
+
+// Frontier Hunter header state — response key kN2i7qds
+// (ChallengeUserTeamResponse, a single object, is_array=false).
+//
+// THIS IS WHERE HUNTER ORBS LIVE.  Found 2026-08-07 by binary xref: orbs are
+// internally called "Aube", and the counter is ChallengeHeaderInfo::getAube —
+// NOT UserTeamInfo::fight_point, which is what the server had been setting.
+//
+//   ChallengeHeaderInfo::getAubeMax() { return DefineMst::getMaxfrohunP(); }
+//   MissionStartScene::initConnect()  spends one on Frontier Gate entry:
+//       Aube = getAube(); setAube(max(Aube,1) - 1)
+//   FrontierGateConditionScene::textWindowAube()  is the "no Hunter Orbs" popup
+//
+// RESOLVED 2026-09-13 by disassembling ChallengeUserTeamResponse::readParam
+// @0x13D3F94 directly, which made the planned probe unnecessary — the five
+// setter calls are in the open there, PLT-resolved, in wire order:
+//
+//   Sv80kL5r -> ChallengeHeaderInfo::setHR            @0x1258174  (+0x30)
+//   38sHatGk -> ChallengeHeaderInfo::setAube          @0x1258194  (+0x40)
+//   6mh0jiKJ -> ChallengeHeaderInfo::setAubeTimer     @0x12581B8  (+0x44)
+//   RHKA30s5 -> ChallengeHeaderInfo::setAubeRestTimer @0x12581C8  (+0x48)
+//   vvXp7Uek -> ChallengeHeaderInfo::setFrogateScore  @0x12581F8
+//               and FrontierGateComInfo::setDrawFrontierGatePoint
+//
+// The probe was inconclusive because every value it sent sat above the cap; the
+// binary does not have that problem.
+json ChallengeUserTeam {
+    doc "Frontier Hunter header state — HR, Hunter Orbs (Aube) and the Frontier Gate score that the Survey Office chrome renders."
+
+    field hr_id type="i32::str" {
+        key "Sv80kL5r"
+        doc "setHR — Hunter Rank, the \"HR n\" in the Survey Office header.  CONFIRMED by cross-class reuse: setHRID in ChallengeHrResponse (h09mEvDR) and ChallengeRankRewardResponse (p73SJiWv)."
+    }
+
+    field aube type="i32::str" {
+        key "38sHatGk"
+        doc """
+        setAube @0x1258194 — THE HUNTER ORB COUNT, and the only field on this
+        response that gates anything.
+
+        Every entry check reads it through ChallengeHeaderInfo::getAube:
+        FrontierGateConditionScene::startCheck @0x15DE978 calls entryCheck only
+        when it is > 0 and otherwise opens the "restore orbs" prompt,
+        ChallengeLobbyScene and ChallengeConditionScene do the same for Frontier
+        Hunter, and FGPlusConditionScene, MissionGameOverScene::froGateAubeCheck
+        and GameScene::challengeLight all read it.  Never sending this response
+        left it at 0 permanently, so Frontier Gate entry always took the
+        no-orbs branch.
+
+        The client SPENDS it itself: MissionStartScene::initConnect @0x1823358
+        does `setAube(max(getAube(),1) - 1)`, but only when
+        FrontierGateUtils::nowFrontierGate is false — a Frontier Gate entry is
+        not debited there, so the server owns that charge.
+
+        Capped by DefineMst max_frohun_p (3).
+        """
+    }
+
+    field aube_timer type="i32::str" {
+        key "6mh0jiKJ"
+        doc "setAubeTimer @0x12581B8 — stores to +0x44, which only getAubeTimer @0x12581B0 reads, and that getter has NO CALLERS in this build.  Write-only here, so it goes out as 0 rather than carrying an invented countdown; send a real value only once a reader turns up."
+    }
+
+    field aube_rest_timer type="i32::str" {
+        key "RHKA30s5"
+        doc """
+        setAubeRestTimer @0x12581C8 — SECONDS UNTIL THE NEXT ORB.  The setter
+        stores the value at +0x48 and stamps CommonUtils::getNowUnitxTime at
+        +0x58, and from there the client runs the regeneration itself:
+        decFightRestTimer @0x1258270 ticks it down one per second and, each time
+        the remainder divides evenly by DefineMst recover_time_frohun, adds an
+        orb and reloads the timer — stopping once the count reaches
+        max_frohun_p.  getFightRecoveryTime @0x1258210 renders it as
+        minutes-remaining (ceil, minimum 1), and 0 means "nothing pending".
+
+        So the server sends a starting state, not a running clock: the orb count
+        plus the seconds left on the one being refilled.
+        """
+    }
+
+    field frogate_score type="i32::str" {
+        key "vvXp7Uek"
+        doc "setFrogateScore — CONFIRMED named setter (readparam_analysis.json).  The player's Frontier Gate score, carried on a Challenge response because the two subsystems share header state."
+    }
+}
+
+// Frontier Gate run control — the "Continue / Pause / Retire" prompt between
+// floors.  All three post to their own GroupId and all three address the run by
+// its server-issued handle.
+//
+// The j3g5P4cq (MissionStatus) enum is DECODED from the createBody constants:
+// End sends 3, Save sends 4.  Continue sends neither, so "keep fighting" is
+// implied by the endpoint rather than by a status value.
+
+json FrontierGateRunRef {
+    doc "Addresses a run by its handle — request group Mg8K8Y1a for Continue."
+
+    field frogate_num type="i32::str" {
+        key "2FQdEbG3"
+        doc "The run handle the server issued at Start; the client round-trips it opaquely."
+    }
+}
+
+json FrontierGateContinueReq {
+    doc "FrontierGateContinue (uiFIMUH6) request — the Continue button.  createBody emits only the run handle; no party snapshot, so the server must already know the run."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field run type="[FrontierGateRunRef]::size(1)" {
+        key "Mg8K8Y1a"
+        doc "The run being continued."
+    }
+}
+
+json FrontierGateContinueResp {
+    doc "FrontierGateContinue (uiFIMUH6) response.  No dedicated response class exists in the binary, so this returns the run under Mg8K8Y1a the way Start does — the client reads FrontierGateNum back before requesting the next floor."
+
+    field num type="FrontierGateNum" {
+        key "Mg8K8Y1a"
+        doc "The run, with its status advanced."
+    }
+}
+
+json FrontierGateEndEntry {
+    doc "Addresses the run being ended — request group Mg8K8Y1a for End."
+
+    field frogate_num type="i32::str" {
+        key "2FQdEbG3"
+        doc "Run handle."
+    }
+
+    field mission_status type="i32::str" {
+        key "j3g5P4cq"
+        doc "Literal 3 for End — createBody hardcodes it (addParam(v4, \"j3g5P4cq\", 3)).  This is what decodes the MissionStatus enum: 3 = retired/ended."
+    }
+}
+
+json FrontierGateEndReq {
+    doc "FrontierGateEnd (cAJp7U4l) request — the Retire button."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field run type="[FrontierGateEndEntry]::size(1)" {
+        key "Mg8K8Y1a"
+        doc "The run being retired, with status 3."
+    }
+}
+
+json FrontierGateEndResp {
+    doc """
+    FrontierGateEnd (cAJp7U4l) response — the Retire button's result.  The
+    interval scene changes to the result scene (0x66A) when this arrives
+    (FrontierGateIntervalScene::updateEvent state 4 @0x15E3FA8), and that scene
+    reads the result and the reward list the blocks below fill.
+    """
+
+    field frontier_end type="[FrontierEndInfo]" {
+        key "mu0kXAlV"
+        doc "The run's result (grade, merit points...).  One row."
+    }
+
+    field frontier_rewards type="[FrontierResRewardInfo]" {
+        key "QXFCkE67"
+        doc "The rewards the run earned, empty when it earned none."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Currency and the present badge after the rewards were paid."
+    }
+
+    field event_token_info type="[EventTokenInfo]" {
+        key "l234vdKs"
+        doc "The event-token balances when the retired run credited one (the Rift Token is this mode's currency).  A full replace -- see EventTokenInfo."
+        optional #true
+    }
+
+    field summon_ticket_v2_user type="[SummonTicketV2UserInfo]" {
+        key "a3d5d12i"
+        doc "The V2 summon-ticket inventory when the retired run credited one.  A full replace -- see SummonTicketV2UserInfo."
+        optional #true
+    }
+
+    field achievement_info type="UserAchievementInfo" {
+        key "Bnc4LpM8"
+        doc """
+        Merit Points AFTER the run's payout.  Retiring credits score/100 to
+        user_info.achieve_point, but the balance the client prints lives in its
+        own singleton (UserAchievementInfo +0x18 = idfCDG70), which nothing but
+        this block writes -- so without it the result screen shows the points
+        earned while the running total stays at whatever the last UserInfo said.
+        Reported from the client 2026-09-12: "I see the merit points being
+        credited but I don't see the number at the top right increasing".
+        """
+    }
+}
+
+json FrontierGateSaveEntry {
+    doc "Addresses the run being suspended — request group Mg8K8Y1a for Save."
+
+    field frogate_id type="i32::str" {
+        key "hBNPQAU0"
+        doc "Gate id.  Note Save identifies the run by GATE, not by run handle, unlike Continue and End."
+    }
+
+    field mission_status type="i32::str" {
+        key "j3g5P4cq"
+        doc "Literal 4 for Save — createBody hardcodes it.  MissionStatus 4 = suspended/paused."
+    }
+}
+
+json FrontierGateSaveReq {
+    doc "FrontierGateSave (Ng73nFHJ) request — the Pause button.  Unlike Continue and End this re-uploads the full party (MxmCpDRC + 52xDBRGr) via createBodySaveDataDeck/Unit, because a suspended run has to be restorable later."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field run type="[FrontierGateSaveEntry]::size(1)" {
+        key "Mg8K8Y1a"
+        doc "The run being suspended, with status 4."
+    }
+
+    field party_deck type="[FrontierGatePartyDeckInfo]" {
+        key "MxmCpDRC"
+        doc "Party snapshot at the point of suspension."
+    }
+
+    field units type="[FrontierGateUserUnitInfo]" {
+        key "52xDBRGr"
+        doc "Unit snapshot at the point of suspension."
+    }
+}
+
+json FrontierGateRetryEntry {
+    doc "Addresses the run being retried — request group Mg8K8Y1a for Retry."
+
+    field frogate_num type="i32::str" {
+        key "2FQdEbG3"
+        doc "Run handle."
+    }
+
+    field mission_status type="i32::str" {
+        key "j3g5P4cq"
+        doc "Literal 3, same constant End uses — createBody hardcodes it.  Retry is therefore 'end this attempt and start it again', not a distinct status."
+    }
+}
+
+json FrontierGateRetryReq {
+    doc "FrontierGateRetry (9pzHMBzq) request — the 'continue at the cost of a Hunter Orb' prompt after a loss.  Re-uploads the DECK only (createBodySaveDataDeck); unlike Save it does not resend the unit snapshot, so the server must already hold one."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field run type="[FrontierGateRetryEntry]::size(1)" {
+        key "Mg8K8Y1a"
+        doc "The run being retried."
+    }
+
+    field party_deck type="[FrontierGatePartyDeckInfo]" {
+        key "MxmCpDRC"
+        doc "Party at the point of retry — HP and gauges reset by the client."
+    }
+}
+
+json FrontierGateRunStateResp {
+    doc "Shared response for the run-control verbs that must hand the party back: Continue and Retry.  Returns the run plus the stored party so the client can rebuild FrontierGateUserUnitInfoList before the next floor — without it MissionStartScene::downloadFiles fetches no unit assets and the party comes up empty."
+
+    field num type="FrontierGateNum" {
+        key "Mg8K8Y1a"
+        doc "The run."
+    }
+
+    field party_deck type="[FrontierGatePartyDeckInfo]" {
+        key "MxmCpDRC"
+        doc "The run's party deck, restored from the stored snapshot."
+    }
+
+    field units type="[FrontierGateUserUnitInfo]" {
+        key "52xDBRGr"
+        doc "The run's units, restored from the stored snapshot."
+    }
+}
+
+json FrontierGateRestartEntry {
+    doc "Addresses a gate to restart from the beginning — request group Mg8K8Y1a."
+
+    field frogate_id type="i32::str" {
+        key "hBNPQAU0"
+        doc "Gate id.  Restart identifies by GATE, like Save, because the old run is being discarded."
+    }
+}
+
+json FrontierGateRestartReq {
+    doc "FrontierGateRestart (v0m1FU0g) request — abandon the current run and begin the gate again."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field run type="[FrontierGateRestartEntry]::size(1)" {
+        key "Mg8K8Y1a"
+        doc "The gate being restarted."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dungeon keys (Vortex parades).  Entry types are in net/dungeon_key.kdl; the
+// per-user row is UserDungeonKeyInfo in net/user.kdl, decoded in
+// tools/ida/audits/eFU7Qtb0_audit.txt.
+//
+// Registration:
+//   REGISTER("1mr9UsYz", GetDistributeDungeonKeyInfo, "r0ZA3pn5")
+//   REGISTER("WCJE0xe2", DungeonKeyReceipt,           "V4pfQo5C")
+//   REGISTER("aGT5S6qZ", DungeonKeyUse,               "3rPx6tTw")
+// GroupIds and AES keys from the legacy handler registry
+// (server/gimuserver/gme/handlers/*RequestHandler.hpp), where all three were
+// 7-line empty-OK stubs — there was no behaviour to port.
+// ---------------------------------------------------------------------------
+
+json GetDistributeDungeonKeyInfoReq {
+    doc """
+    GetDistributeDungeonKeyInfo (1mr9UsYz) request.  createBody @0x13A4D14
+    emits ONLY the three BaseRequest tags (userInfo/signalKey/version) and zero
+    addParam/addGroup calls, so this carries loginInfo alone and the server
+    derives everything from the resolved user plus the current date.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json DungeonKeyReceiptReq {
+    doc """
+    DungeonKeyReceipt (WCJE0xe2) request — claim today's key at the Akras
+    Summoners' Hall Administration Office.  createBody @0x13A34E4 emits
+    addGroup("9S5M2yI3") + one addNode.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field receipt type="[DungeonKeyReceiptEntry]::size(1)" {
+        key "9S5M2yI3"
+        doc "The key being claimed."
+    }
+}
+
+json DungeonKeyUseReq {
+    doc """
+    DungeonKeyUse (aGT5S6qZ) request — spend keys to open a parade tier.
+    createBody @0x13A366C emits addGroup("xki65BPq") + one addNode.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field use type="[DungeonKeyUseEntry]::size(1)" {
+        key "xki65BPq"
+        doc "The key being spent and how many."
+    }
+}
+
+json DungeonKeyInfoResp {
+    doc """
+    Shared response for all three dungeon-key handlers — the player's current
+    key inventory, keyed eFU7Qtb0 (UserDungeonKeyInfoResponse, is_array=true).
+
+    There is no dedicated Receipt or Use response class in the binary: eFU7Qtb0
+    is the ONLY dungeon-key response it defines, so every handler answers with
+    the post-mutation inventory and the client re-reads its list from that.
+    The legacy stubs returned {} instead, which left the client's key count
+    stale until the next UserInfo.
+    """
+
+    field keys type="[UserDungeonKeyInfo]" {
+        key "eFU7Qtb0"
+        doc "One entry per DungeonKeyMst row (Metal / Jewel / Imp)."
+    }
+
+    field badge type="BadgeKeyCount" {
+        key "h23iRjGN"
+        doc "The key-ready badge, re-sent with every key reply.  BadgeInfo::setDungeonKeyNum is written only by BadgeInfoResponse (no local clear), so without this a claimed key kept its Home / Keys / Summoners' Hall badge until the next login.  Only this one field, so the other badge counters are untouched."
+    }
+}
+
+json DungeonKeyUseResp {
+    doc "Key purchase reply combines existing response classes through the global registry (APK getResponseObject @0x1392568); there is no new client response class."
+    field keys type="[UserDungeonKeyInfo]" {
+        key "eFU7Qtb0"
+        doc "Current key inventory after the purchase."
+    }
+    field permitPlace type="[PermitPlace]" {
+        key "yXNM8kL3"
+        doc "Full current-state replacement, including all active parade tiers."
+    }
+
+    field permitPlaceSP type="[PermitPlaceSP]" {
+        key "Y73tHKS8"
+        doc "The SPECIAL half of the same snapshot.  PermitPlaceSpResponse::readParam clears removeSpecialObjects at row 0, and yXNM8kL3's removeNormalObjects deliberately SKIPS special rows -- so anything whose area is AreaMst type 1 or 3 has to come back on this key or it can never be withdrawn.  Same discriminated row shape; built by the shared snapshot builder."
+    }
+
+    field permitPlaceML type="[PermitPlaceML]" {
+        key "Y73mHKS8"
+        doc "The ML half, cleared by removeMLObjects.  AreaMst type 10.  Same contract as permitPlaceSP."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UpdateInfoLight (ynB7X5P9 / 7kH9NXwC) — the client's "anything new for me?"
+// poll.  See handbook §8.41.
+//
+// The client fires this roughly every time it returns to Home (~143 times in a
+// single logged session) and its createBody @0x13AF9F4 emits ONLY the userInfo
+// and signalKey tags — the request carries no fields whatsoever.  Both this
+// server and the legacy fork answered it with a bare {}, i.e. "nothing has
+// changed", every single time.
+//
+// Nothing constrains a GME response to a fixed class: GameResponseParser
+// dispatches each top-level key independently through getResponseObject (504
+// keys, see tools/ida/audits/getResponseObject_FULL.txt), so a response is a
+// BAG OF KEYS and this poll can carry whatever actually changed.
+//
+// Uses 4ceMWH6k for units, not qC2tJs4E.  Per §8.32 the same class is
+// registered twice with different flags — 4ceMWH6k -> UserUnitInfoResponse(v3, 1)
+// clears the list before appending (full replace) and qC2tJs4E ->
+// UserUnitInfoResponse(v3, 0) appends (incremental, which is what unit DROPS
+// use).  A refresh poll wants the authoritative current list, so: full replace.
+// ---------------------------------------------------------------------------
+
+json UpdateInfoLightReq {
+    doc "UpdateInfoLight (ynB7X5P9) request — loginInfo only; createBody emits no addParam/addGroup calls at all."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json UpdateInfoLightResp {
+    field entered_features type="[UserEnteredFeatureInfo]" {
+        key "2386Diw1"
+        doc "Full per-player visit snapshot: the reader clears its list before ingesting rows."
+    }
+
+
+    doc """
+    UpdateInfoLight (ynB7X5P9) response — the mutable per-user state, resent so
+    the client can refresh without a relaunch.
+
+    Deliberately NOT the whole UserInfo payload: this fires on every return to
+    Home, so it carries only what actually changes during play.  The MST tables,
+    PermitPlace, gacha catalog and so on are login-time data and stay out.
+    """
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Energy, zel, karma, level, exp — the header the player is looking at."
+    }
+
+    // NO unit list here.  4ceMWH6k was tried and removed on 2026-08-09.
+    //
+    // Its readParam opens with UserUnitInfoList::removeAllObjects(), which
+    // RELEASES every CCObject in the list.  This poll fires on every return to
+    // Home — ~143 times a session — and Home displays the party units, so we
+    // would be freeing objects a live scene holds pointers to, over and over.
+    // The same call soft-locked the fusion result screen when the clearing key
+    // was tried there, which is what exposed the hazard.
+    //
+    // It also bought nothing: sending the full list here did NOT make
+    // evolutions or level-ups appear without a relaunch, so there is no
+    // benefit to weigh against the risk.  If unit refresh is revisited, it
+    // needs a mechanism that does not clear a list other scenes are holding.
+
+    field clear_mission_info type="[UserClearMissionInfo]" {
+        key "UT1SVg59"
+        doc "Cleared-mission history — the progression driver the client evaluates unlocks against."
+    }
+    field hunter_orbs type="HunterOrbRefresh" {
+        key "kN2i7qds"
+        doc "Read-only derived orb count/timer; partial singleton update preserves existing rank and score."
+    }
+
+}
+
+// ---------------------------------------------------------------------------
+// UpdateInfo (RUV94Dqz / hy0P9xjsGJ6MAgb2) — Home's THIRTY-MINUTE refresh.
+//
+// HomeScene2::updateEvent (and AnotherHomeScene's, the Vortex home) sends it
+// when UpdateInfo::isNeedUpdate @0x1285E9C — now minus the time the
+// UpdateInfo singleton was created or last reset > 0x708 (1800 s).  Unhandled,
+// the server's "Unsupported request" closed the session the first time the
+// player reached a Home screen half an hour after launch — which looked like a
+// crash on entering Vortex, and a relaunch reset the timer.  createBody
+// @0x13AFA94 sends the userInfo and signalKey tags only.
+json UpdateInfoReq {
+    doc "UpdateInfo (RUV94Dqz) request — loginInfo only."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json UpdateServerTime {
+    doc "UpdateInfoResponse (response key AhSmZF07), a singleton.  Its readParam @0x13FAA18 reads one key; setUpdateServerTime @0x1285E24 stores it and restarts the 30-minute timer."
+
+    field server_time type="i32::str" {
+        key "QxWZoA04"
+        doc "Server time, Unix seconds."
+    }
+}
+
+json UpdateInfoResp {
+    field entered_features type="[UserEnteredFeatureInfo]" {
+        key "2386Diw1"
+        doc "Full per-player visit snapshot: the reader clears its list before ingesting rows."
+    }
+
+
+    doc "UpdateInfo (RUV94Dqz) response — what UpdateInfoLight sends (and for the same reason no unit list), plus the server time that restarts the client's timer."
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "The header."
+    }
+
+    field clear_mission_info type="[UserClearMissionInfo]" {
+        key "UT1SVg59"
+        doc "Cleared-mission history."
+    }
+
+    field update_info type="UpdateServerTime" {
+        key "AhSmZF07"
+        doc "Server time."
+    }
+    field hunter_orbs type="HunterOrbRefresh" {
+        key "kN2i7qds"
+        doc "Read-only derived orb count/timer; partial singleton update preserves existing rank and score."
+    }
+
+}
+
+// NoticeUpdate (68pTQAJv / WHfcd53M) — refreshes the notice list.  Sent by
+// Home and the Vortex home alongside UpdateInfo when their notice flag is set,
+// and by NoticeListScene::initConnect @0x176D904 on opening the Notices
+// screen.  Its constructor clears NoticeMstList and marks it loading; only a
+// NoticeMstResponse (keys oOmzJJSd / bcdqwXES, NOTICE_DATA 0 / 1) marks it
+// done again, in its destructor @0x13E6EB8, and NoticeListScene::updateEvent
+// @0x176DC10 waits on that before drawing the list.  So the reply names both
+// keys, empty: "no notices", and the screen stops waiting.
+json NoticeUpdateEntry {
+    doc "Request group 1eun7Ly7, one node."
+
+    field notice_kind type="i32::str" {
+        key "wDgU3rAh"
+        doc "The NoticeMst::NOTICE_KIND the request was constructed with (NoticeUpdateRequest +0x20)."
+    }
+}
+
+json NoticeUpdateReq {
+    doc "NoticeUpdate (68pTQAJv) request.  An async request (isAsync @0x13ABB2C returns 1)."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field notice type="[NoticeUpdateEntry]" {
+        key "1eun7Ly7"
+        doc "Which notice kind to refresh."
+    }
+}
+
+json NoticeMstRow {
+    doc "One NoticeMst row.  Only the id is modelled: the server has no notices, and NoticeMstResponse::readParam @0x13E6F10 reads ~20 more keys (Hl7S4ldK, aigSzwVh, dTd8sy7S, ...) that would need decoding before any row is sent."
+
+    field notice_id type="i32::str" {
+        key "xJNom6i0"
+        doc "Notice id."
+    }
+}
+
+json NoticeUpdateResp {
+    doc "NoticeUpdate (68pTQAJv) response: both notice lists, empty."
+
+    field notices type="[NoticeMstRow]" {
+        key "oOmzJJSd"
+        doc "NOTICE_DATA 0 list — sent empty so the NoticeMstResponse it creates marks the list done."
+    }
+
+    field informations type="[NoticeMstRow]" {
+        key "bcdqwXES"
+        doc "NOTICE_DATA 1 list — likewise empty."
+    }
+}
+
+// UserLoginCampaignInfo (5fc8bf2c / 4eb7ce1b) — Home asks again twelve hours
+// after launch (LoginCampaignRewardObjectManager::is12HoursSinceLastRequest,
+// interval 43200 s), then carries on without waiting for the answer.  There is
+// no login campaign offline, so the reply is empty; unhandled, it closed the
+// session like UpdateInfo did.
+json UserLoginCampaignInfoReq {
+    doc "UserLoginCampaignInfo (5fc8bf2c) request — createBody @0x1C70CF0 sends the userInfo and signalKey tags only."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json UserLoginCampaignInfoResp {
+    doc """
+    UserLoginCampaignInfo (5fc8bf2c) response -- which calendar cell the player
+    is on.
+
+    Home asks again twelve hours after launch
+    (LoginCampaignRewardObjectManager::is12HoursSinceLastRequest, interval
+    43200 s) and carries on without waiting, so this is the request that rolls
+    the calendar over for someone who leaves the game running across midnight.
+
+    It used to reply {} on the grounds that no campaign runs offline.  That was
+    the visible half of why the advent calendar paid nothing: with neither this
+    nor InitializeResp's 3da6bd0a populated, UserLoginCampaignInfo::shared()
+    kept its constructed defaults and the grid believed the player was on day 0.
+    """
+
+    field campaign_info type="[UserLoginCampaignInfo]::size(1)" {
+        key "3da6bd0a"
+        doc "The cell to light and whether to play the claim flourish.  A singleton -- readParam @0x1C70D74 writes into UserLoginCampaignInfo::shared() with no row-0 clear, so one full row goes out or none at all."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HomeInfo (NiYWKdzs / f6uOewOD) — requested by the client as it ENTERS the
+// Home scene.  createBody @0x1C69270 emits only the three BaseRequest tags, so
+// it carries no fields of its own.
+//
+// This is the unit cache's rebuild point.  See §8.41: the client has NO
+// in-session path to correct a cached unit — UnitMixMainScene holds a POINTER
+// to the UserUnitInfo it rendered at initialize() and never re-reads, and the
+// incremental key (qC2tJs4E) can only APPEND, which getNotParty would render
+// as a duplicate because it does not de-duplicate.  The only thing that
+// rebuilds the cache is 4ceMWH6k, whose readParam calls removeAllObjects().
+//
+// That call RELEASES every CCObject in the list, so it is only safe where no
+// scene is holding unit pointers — which is exactly a scene boundary.  Login
+// is the proven-safe case (UserInfo lands, then scenes build), and HomeInfo
+// has the same ordering: the client asks for it while entering Home, before
+// HomeScene binds its party sprites.  Trying the same key mid-fusion
+// soft-locked the ritual screen, which is what established the rule.
+// ---------------------------------------------------------------------------
+
+json MysteryBoxListReq {
+    doc """
+    MysteryBoxList (pAJ2Xesw) request - opening the Mystery Chest screen.
+
+    loginInfo only: MysteryBoxListRequest::createBody @0x1C6B094 emits
+    createUserInfoTag + createSignalKeyTag and nothing else, not even a version
+    tag.  Fired from MysteryChestScene::initConnect @0x1E7A800, immediately
+    after MysteryBoxList::removeAllObjects().
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json MysteryBoxListResp {
+    doc """
+    MysteryBoxList (pAJ2Xesw) response - the player's chests.
+
+    A full replace with no operation code, so the complete set goes every time
+    and an empty list is a truthful "no chests".
+    """
+
+    field boxes type="[MysteryBoxInfo]" {
+        key "d0ajLeRi"
+        doc "Every chest the player currently holds: unclaimed and unexpired."
+    }
+}
+
+json MysteryBoxClaimEntry {
+    doc "The chest being claimed."
+
+    field box_id type=str {
+        key "rEFRefr8"
+        doc "Id of the chest to open, echoed from the list response."
+    }
+}
+
+json MysteryBoxClaimReq {
+    doc """
+    MysteryBoxClaim (2paswUpR) request - opening one chest.
+
+    From MysteryBoxClaimRequest::createBody @0x1C6AFB4: identity, version tag,
+    then "d0ajLeRi":[{ "rEFRefr8": "<box id>" }].  rEFRefr8 uses the STRING
+    overload of addParam, and the group key is the same one the list response
+    dispatches on.  Fired from MysteryRewardScene::initConnect @0x1D3CA6C.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field entries type="[MysteryBoxClaimEntry]" {
+        key "d0ajLeRi"
+        doc "The chest to open.  The client sends exactly one."
+    }
+}
+
+json MysteryBoxClaimResp {
+    doc """
+    MysteryBoxClaim (2paswUpR) response - what the chest paid.
+
+    Carries the reward list plus the refreshed chest list, so the claimed chest
+    disappears from the screen without a second round trip, and team_info so any
+    currency the chest granted shows immediately.
+    """
+
+    field rewards type="[MysteryBoxRewardInfo]" {
+        key "CoAp2aph"
+        doc "The prizes this chest paid."
+    }
+
+    field boxes type="[MysteryBoxInfo]" {
+        key "d0ajLeRi"
+        doc "The player's remaining chests, minus the one just opened."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Refreshed header so gem/zel/karma rewards land on screen at once."
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        doc "Units the chest created, read back in the shape login sends.  No Mystery Chest scene adds to the client roster, so without this they stayed off the unit list until HomeInfo's roster rebuild."
+        optional #true
+    }
+
+    field unit_dictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        doc "The COMPLETE unit dictionary whenever the chest paid a unit (see UserUnitDictionary)."
+        optional #true
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "Complete positive inventory whenever the chest paid an item, material or sphere.  No Mystery Chest scene calls a client warehouse mutator and HomeInfo carries no warehouse; readParam @0x14060E0 clears first, so whole warehouse only."
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "Every item species ever stacked, sent with warehouse_info (merge with dedupe; see PresentReceiptResp)."
+        optional #true
+    }
+}
+
+json SlotgameResultInfo {
+    doc """
+    One Brave Slots pull result, keyed s8r5M6wI (SlotgameResultInfoResponse).
+
+    Field map decoded 2026-08-21 from readParam @0x1448E58.  Every setter on
+    this class is BOTH inlined and dispatched through the vtable, so these were
+    resolved by slot and then cross-checked: VideoAdsSlotgameResultInfoResponse
+    shares all nine keys and puts its two extra fields on slots 24 and 26,
+    exactly where the 10th and 11th declared members sit.  All nine take
+    std::string.
+
+    Full replace with no operation code - removeAllObjects() then addObject().
+    """
+
+    field prize_type type=str {
+        key "yT3NBME0"
+        doc "setPrizeType (vtable slot 6)."
+    }
+
+    field prize_data type=str {
+        key "CW1bko4F"
+        doc """
+        setPrizeData (slot 8).  TWO fields, '@'-separated: "<targetId>@<count>".
+
+        NOT a description, and NOT a bare id.  createPrizeDrawInfo @0x1A75674
+        splits this on RandallSlotScene::SLOT_PRIZE_DATA_DELIMITER (= "@"),
+        resolves element [0] via UnitMstList/ItemMstList::getObject(STRING),
+        and builds the popup label as getItemName() + "x" + element [1].
+
+        ⚠ Element [1] is read at [vector + 0x18] with NO bounds check
+        (@0x1A75CE0).  A single-field value therefore constructs a std::string
+        from whatever heap follows the vector and memcpy's from a wild pointer
+        - memory CORRUPTION, not a clean crash, so the same payload can render
+        fine one run and take the client down the next.
+
+        Only elements [0] and [1] are ever read; two fields is exactly right.
+        Same shape as b5yeVr61 ("<medalId>@<cost>").
+        """
+    }
+
+    field prize_rank type=str {
+        key "3WZ7KTp8"
+        doc "setPrizeRank (slot 10).  Drives how loud the win presentation is."
+    }
+
+    field picture_pattern type=str {
+        key "D20kuSLy"
+        doc "setPicturePattern (slot 12)."
+    }
+
+    field effect_sam type=str {
+        key "HgI9wEJ0"
+        doc "setEffectSam (slot 14).  Names a .sam effect bundle - the scene loads SlotFrameLightHighSpeedAdd.sam and SlotReelSideLightAdd.sam."
+    }
+
+    field effect_type type=str {
+        key "3Vcj8eUn"
+        doc "setEffectType (slot 16)."
+    }
+
+    field effect_param type=str {
+        key "NLbQm24T"
+        doc "setEffectParam (slot 18)."
+    }
+
+    field reel_stop_num type=str {
+        key "h6smq0WE"
+        doc """
+        setReelStopNum (slot 20) - WHERE THE THREE REELS STOP.
+
+        The server decides the outcome and the client animates to it, so this is
+        the field that makes the machine land somewhere meaningful.  It is a
+        string carrying several numbers, which handbook 3.4 says to read as a
+        delimited list; the exact encoding is UNVERIFIED, so if the reels stop
+        somewhere other than the symbols the prize names, start here.
+        """
+    }
+
+    field medal_num type=str {
+        key "A0P7psui"
+        doc "setMedalNum (slot 22).  The medal balance AFTER the pull."
+    }
+}
+
+json SlotActionEntry {
+    doc "The pull being requested."
+
+    field slot_id type="i32::str" {
+        key "zS45RFGb"
+        doc """
+        Which machine.  1 is Brave Slots, matching brave_slots.json.
+
+        QUOTED on the wire.  createBody uses JsonNode::addParam(const char*,
+        int), and an earlier revision typed this i32::int on the strength of
+        that - but the overload only says what the C++ SOURCE type is, not how
+        the value is encoded.  The captured request is
+        "kLz5ujP2":[{"zS45RFGb":"1","d04gRmkE":"1"}], and i32::int made the
+        whole request fail to parse with parse_number_failure (handbook 3.4:
+        int setter + quoted wire value -> i32::str).
+        """
+    }
+
+    field draw_cnt type="i32::str" {
+        key "d04gRmkE"
+        doc "How many pulls.  The client sends 1.  QUOTED, same as slot_id."
+    }
+}
+
+json SlotActionReq {
+    doc """
+    SlotAction (vChFp73J) request - pulling the lever.
+
+    From SlotActionRequest::createBody @0x13C95C8: identity, signal key, version
+    tag, then "kLz5ujP2":[{ zS45RFGb, d04gRmkE }].  BOTH params use the INT
+    overload of JsonNode::addParam, not the string one.
+
+    Fired from RandallSlotActionScene::touchBegan @0x1A70DCC - the lever pull,
+    NOT opening the screen.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field entries type="[SlotActionEntry]" {
+        key "kLz5ujP2"
+        doc "The pull.  The client sends exactly one."
+    }
+}
+
+json SlotActionResp {
+    doc """
+    SlotAction (vChFp73J) response.
+
+    Carries the result the reels stop on, the refreshed medal balance so the
+    counter is right without a relaunch, and team_info so any currency the pull
+    paid lands on screen at once.
+    """
+
+    field results type="[SlotgameResultInfo]" {
+        key "s8r5M6wI"
+        doc "The pull outcome.  One entry."
+    }
+
+    field medal_info type="[UserBraveMedalInfo]" {
+        key "6C0kzwM5"
+        doc "Medal balances after the pull."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Refreshed header for gem/zel prizes."
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        doc "Units the pulls created, read back in the shape login sends.  No slot scene adds to the client roster, so without this they stayed off the unit list until HomeInfo's roster rebuild."
+        optional #true
+    }
+
+    field unit_dictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        doc "The COMPLETE unit dictionary whenever a pull paid a unit (see UserUnitDictionary)."
+        optional #true
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "Complete positive inventory whenever a pull paid an item, material or sphere.  No slot scene calls a client warehouse mutator and HomeInfo carries no warehouse; readParam @0x14060E0 clears first, so whole warehouse only."
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "Every item species ever stacked, sent with warehouse_info (merge with dedupe; see PresentReceiptResp)."
+        optional #true
+    }
+}
+
+json DailyLoginReq {
+    doc """
+    DailyLogin (4aClzokO) request - the Daily Spin's SPIN action.
+
+    loginInfo only: DailyLoginRequest::createBody @0x1CC9880 emits just
+    createUserInfoTag + createSignalKeyTag, with no addGroup or addParam.
+
+    Note this is NOT sent when the screen opens - DailyLoginScene::initConnect
+    is 16 bytes, i.e. empty.  It is fired from updateEvent state 2 @0xE53058,
+    immediately before the wheel animates.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json DailyLoginResp {
+    doc """
+    DailyLogin (4aClzokO) response.
+
+    Carries the same DailyLoginRewardsUserInfo the Initialize reply seeds, so
+    the client's singleton is replaced with the post-spin state: one more spin
+    used, and XIvaD6Jp set to the reward the spin landed on.
+
+    Drudr2w5 IS dispatched by GameResponseParser::getResponseObject @0x1396CD4,
+    so it lands on DailyLoginRewardsUserInfo whichever handler sends it.
+    """
+
+    field dailyLoginRewards type="DailyLoginRewardsUserInfo" {
+        key "Drudr2w5"
+        doc "Post-spin state: spins used, the day, and the reward landed on."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc """
+        Refreshed header after the spin.  The wheel pays gems, zel, karma and
+        summon tickets (UserTeamInfo::summon_ticket).  No DailyLoginScene
+        function calls UserTeamInfo's zel/karma mutators (incZel, setZel,
+        incKarma, setKarma), and fEi17cnx is what every other reward reply
+        refreshes the header with; before this a currency prize never reached
+        the header until some later reply carried it.
+        """
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        doc "Units the spin created, read back in the shape login sends.  No Daily Spin scene adds to the client roster, so without this they stayed off the unit list until HomeInfo's roster rebuild."
+        optional #true
+    }
+
+    field unit_dictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        doc "The COMPLETE unit dictionary whenever the spin paid a unit (see UserUnitDictionary)."
+        optional #true
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "Complete positive inventory whenever the spin paid an item.  No Daily Spin scene calls a client warehouse mutator and HomeInfo carries no warehouse; readParam @0x14060E0 clears first, so whole warehouse only."
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "Every item species ever stacked, sent with warehouse_info (merge with dedupe; see PresentReceiptResp)."
+        optional #true
+    }
+}
+
+json HomeInfoReq {
+    doc "HomeInfo (NiYWKdzs) request — loginInfo only; createBody emits no addParam/addGroup calls."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json HomeInfoResp {
+    doc """
+    HomeInfo (NiYWKdzs) response — the unit-cache rebuild.
+
+    Deliberately minimal: the team header and the authoritative unit list.
+    Everything else the Home scene needs it already has from login.
+    """
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Energy, zel, karma, level — the header the player sees on Home."
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "4ceMWH6k"
+        doc """
+        The full owned-unit list, FULL-REPLACE variant.
+
+        This is what makes a fusion or evolution visible without relaunching:
+        4ceMWH6k's readParam clears both of UserUnitInfoList's containers (the
+        dictionary at +44 and the array at +45) before repopulating, so the
+        stale entry is actually gone rather than shadowed.
+        // Safe HERE and only here-like places — see the block comment above.
+        // Do NOT copy this key onto a mutation reply such as UnitMix/UnitEvo.
+        """
+    }
+
+    field energy_recover type="DefineEnergyRecover" {
+        key "VkoZ5t3K"
+        doc "The header energy-refill threshold (DefineEnergyRecover), kept equal to the player's max energy."
+    }
+}
+
+json SummonerJournalInfoReq {
+    doc """
+    SummonerJournalInfo (32Gwida0) request.
+
+    Captured from a real client 2026-08-22 and it carries NO journal
+    parameters - identity, the signal key, and the 168-entry MST version
+    manifest, exactly as createBody @0xE3794C predicted.  Only the identity is
+    modelled; the handler reads with error_on_unknown_keys off, so the rest
+    passes through without needing to be described.
+    """
+
+    field login_info type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json SummonerJournalTaskRewardsNode {
+    doc "One mission being claimed."
+
+    field task_id type="str" {
+        key "23DaiBpe"
+        doc """
+        Which mission.  Added via the std::string overload of
+        JsonNode::addParam (@0xE37898), not the int one, so §3.4's
+        quoted-int ambiguity does not apply - this really is a string.
+        """
+    }
+}
+
+json SummonerJournalTaskRewardsReq {
+    doc """
+    SummonerJournalTaskRewards (2y48D13d) - claiming one mission's reward.
+
+    Shape from createBody @0xE377A8: identity, signal key, version tag, then
+    a `da38tRai` group carrying `23DaiBpe`.
+
+    ⚠ da38tRai is ALSO the dispatch key of SummonerJournalUserTaskInfo, so the
+    request posts the same group shape it will be answered in.
+    """
+
+    field login_info type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field entries type="[SummonerJournalTaskRewardsNode]" {
+        key "da38tRai"
+        doc "The mission(s) being claimed."
+    }
+}
+
+json UpdatePermitPlaceInfoReq {
+    doc "APK createBody @0x13AFB58 sends login and signal tags only."
+    field login_info type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Resolved user identity for the refresh."
+    }
+}
+json UpdatePermitPlaceInfoResp {
+    doc "Full normal permission snapshot through the global response registry."
+    field permitPlace type="[PermitPlace]" {
+        key "yXNM8kL3"
+        doc "Rebuilt from current progression, weekday and every parade window."
+    }
+
+    field permitPlaceSP type="[PermitPlaceSP]" {
+        key "Y73tHKS8"
+        doc "The SPECIAL half of the same snapshot.  PermitPlaceSpResponse::readParam clears removeSpecialObjects at row 0, and yXNM8kL3's removeNormalObjects deliberately SKIPS special rows -- so anything whose area is AreaMst type 1 or 3 has to come back on this key or it can never be withdrawn.  Same discriminated row shape; built by the shared snapshot builder."
+    }
+
+    field permitPlaceML type="[PermitPlaceML]" {
+        key "Y73mHKS8"
+        doc "The ML half, cleared by removeMLObjects.  AreaMst type 10.  Same contract as permitPlaceSP."
+    }
+}
+
+json HunterOrbRefresh {
+    doc "Partial ChallengeHeaderInfo update. APK ChallengeUserTeamResponse::readParam @0x13D3F94 only sets named fields, with no reset. Omitting HR and score preserves both ChallengeHeaderInfo and FrontierGateComInfo score."
+    field aube type="i32::str" {
+        key "38sHatGk"
+        doc "Current Hunter Orb count, setter @0x13D4008; derived from persisted count/deadline."
+    }
+    field aube_rest_timer type="i32::str" {
+        key "RHKA30s5"
+        doc "Seconds to next orb, setter @0x13D4068; zero at cap. Does not alter rank or Frontier Gate score."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FixGiftInfo (gLRIn74v) -- the gift screen's one write.
+//
+// Modelled 2026-09-15 from FixGiftInfoRequest::createBody @0x13A37E4.  It does
+// THREE things in one request, which is why the handler cannot be a stub:
+//   * updates the player's wanted gift (from UserTeamInfo::getWantGift)
+//   * CLAIMS the received gifts it names by gift_identify_id
+//   * sends gifts to friends
+// ---------------------------------------------------------------------------
+
+json FixGiftInfoNode {
+    doc "One FixGiftInfo write: the wanted-gift preference, the gifts being claimed, and the gifts being sent."
+
+    field want_gift type="str" {
+        key "s2WnRw9N"
+        doc "The gift the player has asked friends for -- UserTeamInfo::getWantGift @0x13A3844, stored on user_info.want_gift.  The wiki calls this the request list; this build carries one id."
+    }
+
+    field receive_ids type="str" {
+        key "23Xi0jom"
+        doc "COMMA-SEPARATED gift_identify_ids being claimed, joined from UserState::getUserGiftInfoListRecieve.  Each names a row of the player's own inbox; granting must be idempotent because the client resends the whole selection."
+    }
+
+    field send_pairs type="str" {
+        key "qD74LPXb"
+        doc "Gifts being SENT, as `user_id_to:gift_id` pairs joined with commas (getUserIDTo and getGiftID, separators at 0x13A3A18/0x13A3A20).  Unused here until real friends exist."
+    }
+}
+
+json FixGiftInfoReq {
+    doc "Request for FixGiftInfo (gLRIn74v) -- fired by the gift screen's Receive button and after MissionEnd."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[FixGiftInfoNode]" {
+        key "Gg5c3eM6"
+        doc "The write itself."
+    }
+}
+
+json GetGiftInfoReq {
+    doc "Request for GetGiftInfo (ifYoPJ46) -- fired by GiftRecieveConnectScene::initConnect simply to open the gift screen."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json GetGiftInfoResp {
+    doc """
+    The gift inbox.
+
+    MUST NOT BE EMPTY.  GiftRecieveListScene2 renders straight from
+    UserGiftInfoList and setGiftList @0x166D330 null-derefs on an empty list --
+    a deterministic client crash reproduced in two identical minidumps
+    (+0x84F533, read 0x14).  An empty inbox is not a safe state here, which is
+    why the simulated friend sends a gift a day.
+    """
+
+    field giftInfo type="[UserGiftInfo]" {
+        key "30uygM9m"
+        doc "The player's unclaimed gifts, same shape as UserInfoResp.giftInfo."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FriendDelete (SfMN9w4p) -- unfriend.  Shape from FriendDeleteRequest::
+// createBody @0x13A3EC0.  FriendApply (WUNi08YL) and FriendAgree (NYKBH4V6)
+// send the IDENTICAL body, so this struct will serve all three.
+// ---------------------------------------------------------------------------
+
+json FriendDeleteNode {
+    doc "One friend named by the request."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "The friend's user id -- the same key the roster is emitted under in xZH6EIQ7 and tojMy68W."
+    }
+}
+
+json FriendDeleteReq {
+    doc "Request for FriendDelete (SfMN9w4p)."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[FriendDeleteNode]" {
+        key "BPz1e5tU"
+        doc "The friend(s) to drop."
+    }
+}
+
+json FriendApplyNode {
+    doc "One Summoner named by a friend request."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "The Summoner to add -- for the developer easter egg, the encounter id FriendGet offered in the picker."
+    }
+}
+
+json FriendApplyReq {
+    doc "Request for FriendApply (WUNi08YL).  Body shape identical to FriendDelete's, from FriendApplyRequest::createBody @0x13A3DA0."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[FriendApplyNode]" {
+        key "BPz1e5tU"
+        doc "The Summoner(s) being added."
+    }
+}
+
+// Android arm64: createBody 0x1C706F0, readParam 0x1C7041C.
+// The reader resets the list on its first field, then appends triples.
+json UserEnteredFeatureInfo {
+    doc "One feature/dungeon visit; zero new_flg means entered."
+    field feature_id type="i32::str" {
+        key "e63D1BV0"
+        doc "Feature ID. Zero can accompany a dungeon-specific visit."
+    }
+    field dungeon_id type="i32::str" {
+        key "MHx05sXt"
+        doc "Dungeon ID, or zero for a feature-wide visit."
+    }
+    field new_flg type="i32::str" {
+        key "Diwl3b56"
+        doc "Zero means entered: confirmed by enteredCheckByFeatureID 0x1CBBE68 and getIfUserEnteredParadeFeature 0x1CBBD20. All traced request call sites send zero."
+    }
+}
+
+json UserEnteredFeatureReq {
+    doc "One client-reported visit, GroupId 983D5Dii."
+    field login_info type="[LoginInfoReq]::size(1)" { key "IKqx1Cn9"; doc "Current player login."; }
+    field entered_features type="[UserEnteredFeatureInfo]" { key "2386Diw1"; doc "Feature visit rows."; }
+}
+
+json UserEnteredFeatureResp {
+    doc "Complete persistent visit history for the current player."
+    field entered_features type="[UserEnteredFeatureInfo]" { key "2386Diw1"; doc "Feature visit rows."; }
+}

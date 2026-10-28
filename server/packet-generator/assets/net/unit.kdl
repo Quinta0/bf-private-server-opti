@@ -1,0 +1,566 @@
+// GME unit-related SHARED types (reusable across multiple handlers).
+//
+// Request/response wrappers live in handlers.kdl per the project convention —
+// unit.kdl only carries struct types that more than one handler references
+// (e.g. UnitFavoriteEntry is used by both UnitFavoriteReq and UnitFavoriteResp).
+
+json UnitFavoriteEntry {
+    doc "Single user_unit favorite/lock entry — used by both UnitFavoriteReq (under `3kcmQy7B`) and UnitFavoriteResp (under `3kcmQy7B`).  Example wire JSON captured from a live UnitFavorite request: {\"edy7fq3L\":\"12345\",\"5JbjC3Pp\":\"1\",\"2pAyFjmZ\":\"0\"}"
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "Target user_unit instance id (matches user_units.id).  Quoted decimal integer on the wire."
+    }
+
+    field favorite type="i32::str" {
+        key "5JbjC3Pp"
+        doc "Boolean-as-quoted-integer flag: \"1\" = favorited (locked from sell/fusion), \"0\" = unlocked.  Semantically a boolean, but neither `bool::int` (would emit unquoted `1`/`0`) nor `bool::str` (would emit `\"true\"`/`\"false\"`) matches the actual wire format the client/server exchange — the value travels as a quoted decimal integer string.  Verified against UnitFavoriteResponse readparam (response_mappings.json: response_class=UnitFavoriteResponse, params include `5JbjC3Pp`)."
+    }
+
+    field unit_img_type type="i32::str" {
+        key "2pAyFjmZ"
+        doc "Cosmetic unit-image frame id; echoed back unchanged by the server.  Quoted decimal integer on the wire."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unit operation request entries (UnitMix / UnitEvo / UnitSell).
+// These were previously hand-written glz structs inside the handler .cpp
+// files; hoisted here so the handlers consume generated types (matches the
+// UnitFavoriteEntry pattern above).
+// ---------------------------------------------------------------------------
+
+json UnitMixUnitEntry {
+    doc "One unit in a UnitMix (fusion) request: the base unit receiving XP or a material consumed for it.  Wire: {\"edy7fq3L\":\"<user_unit_id>\",\"mnZ5K4Ii\":\"<role>\"}."
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "user_units instance id.  Quoted decimal integer on the wire."
+    }
+
+    field role type="str" {
+        key "mnZ5K4Ii"
+        doc "\"1\" = base unit receiving XP, \"2\" = material unit consumed."
+    }
+}
+
+json UnitMixZelEntry {
+    doc "One zel cost line item for a UnitMix (fusion) operation."
+
+    field cost type="i32::str" {
+        key "Rs7bCE3t"
+        doc "Zel cost for this line.  Quoted decimal integer on the wire."
+    }
+}
+
+json UnitEvoUnitEntry {
+    doc "The base unit being evolved in a UnitEvo request (role \"1\" = base)."
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "user_units instance id of the base unit.  Quoted decimal integer on the wire."
+    }
+
+    field role type="str" {
+        key "mnZ5K4Ii"
+        doc "Unit role; \"1\" = base unit being evolved."
+    }
+}
+
+json UnitEvoTargetEntry {
+    doc "The evolution target: the unit_mst id the base evolves into."
+
+    field target_mst_id type="i32::str" {
+        key "pn16CNah"
+        doc "unit_mst id of the evolved form.  Quoted decimal integer on the wire."
+    }
+}
+
+json UnitEvoZelEntry {
+    doc "One zel cost line item for a UnitEvo (evolution) operation."
+
+    field cost type="i32::str" {
+        key "Rs7bCE3t"
+        doc "Zel cost for this line.  Quoted decimal integer on the wire."
+    }
+}
+
+json UnitEvoElemEntry {
+    doc "One node of UnitEvoRequest::createBody @0x13AE818's 8Z2NQrx1 group: the base unit, then every material unit, then every material ITEM.  Note the id here rides key inU8Q4gL, not edy7fq3L."
+
+    field user_unit_id type="i32::str" {
+        key "inU8Q4gL"
+        doc "For a unit node (material_kind 1) the user_units instance id.  For an ITEM node (material_kind 2) it is UserWarehouseInfo::getItemIndex @0x13AEB1C -- a client-side display index, NOT a unit id: never feed it to a user_units lookup.  Quoted decimal integer on the wire."
+    }
+
+    field role type="str" {
+        key "mnZ5K4Ii"
+        doc "1 = the base being evolved, 2 = a material (constants at @0x13AE908 / @0x13AE9B8 / @0x13AEAF8)."
+    }
+
+    field material_kind type="i32::str" {
+        key "29MgiJIQ"
+        doc "1 = a unit (the base and each material unit), 2 = an item from the warehouse (createBody @0x13AE91C / @0x13AE9C8 / @0x13AEB08).  The same 1/2 code UnitEvoMst's per-slot flags carry for its nine material slots (verified on all 1342 rows: every item-id slot is 2, every unit-id slot 1)."
+        optional #true
+    }
+}
+
+json UnitSellEntry {
+    doc """
+    One user_unit being sold for zel in a UnitSell request.
+
+    AUDIT 2026-08-24 -- UnitSellRequest::createBody @0x13AF5B4 sends TWO fields
+    per entry, not one.  mnZ5K4Ii precedes edy7fq3L and goes through the INT
+    overload with a constant (mov w2,#2 @0x13AF6CC), so it is a per-entry
+    discriminator, not an id.  Left undeclared: our handler does not read it and
+    Glaze tolerates it.  Its vocabulary is unknown -- as a request field the only
+    consumer is a server we wrote, so the meaning has to come from a capture
+    comparison or the legacy server, not from the client binary.
+
+    createBody also sends two groups this schema does not model at all:
+    60subGk3 (operation header, n7Pmh6ex = 1) and mCE3rUu5 -> Rs7bCE3t, the SELL
+    GOLD from GameUtils::getSellGold @0x13AF640.
+
+    Rs7bCE3t is CLIENT-COMPUTED and UnitSell.cpp deliberately ignores it,
+    summing UnitMst.sell_price server-side instead.  Do NOT wire the handler to
+    it -- it is player-controllable input.
+
+    Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    """
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "user_units instance id to sell.  Quoted decimal integer on the wire."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unit operation response entries (UnitMix / UnitEvo).
+// ---------------------------------------------------------------------------
+
+json UnitReinforceEntry {
+    doc """
+    AUDIT 2026-08-24: xZH6EIQ7 dispatches to ReinforcementInfoResponse (readParam
+    @0x13EB29C, REPLACE via removeAllObjects), which reads 48 KEYS -- 45 through
+    inlined setters, so a setter-call scan sees only three (setTeamLv @0x13EB77C,
+    setGuildID @0x13EB9AC, setFriendPoint @0x13EBB40).
+
+    2026-09-15: that blind spot is closed, and it had cost us a real field.
+    `tools/readparam_map.py` resolves all 46 keys of this readParam -- following
+    the control flow instead of reading forward, resolving virtual calls through
+    the vtable, and naming inlined writes by their member offset.  It is what
+    proved Ge8Yo32T is setEquipItemID (the sphere) and not setMissionID.  Re-run
+    it before trusting any hand-written note in this file.
+
+    The 20 fields below are ALL among those 48: a correct SUBSET, not a mismatch.
+    The other 28 are friend and guild fields (bM7RLu5K, 98WfKiyA, J3stQ7jd,
+    sD73jd20, zsiAn9P1, ...) that this server has no system for.
+
+    Note the class the client builds is the reinforcement HELPER record, shared
+    with the friend-slot path (handbook 8.33).  The name below describes how
+    UnitMix and UnitEvo used it, not what the class is.
+
+    2026-10-02: RETIRED.  Neither handler sends it any more.  A row without a
+    user id (h7eY3sAK) is discarded by readParam AFTER row 0 has already
+    cleared the helper list, so this entry only ever wiped the friend picker
+    (UnitMixResp.reinforce in net/handlers.kdl has the decode).  Kept so the
+    shape stays documented.
+
+    Original note: Reinforcement/level-up animation + stat payload under response key xZH6EIQ7.  Shared by UnitMix and UnitEvo — the client's animation and stat-display code expects this same shape after either operation (the two handlers previously carried byte-identical MixReinforceEntry/EvoReinforceEntry structs).
+    """
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "Display handle/name of the reinforced unit."
+    }
+
+    field target_lv type="i32::str" {
+        key "4A6LzBxr"
+        doc "Level the unit reached after the operation.  Quoted decimal integer on the wire."
+    }
+
+    field unit_mst_id type="str" {
+        key "pn16CNah"
+        doc "Plain MST id of the reinforced unit (no _100 suffix)."
+    }
+
+    field base_hp type="i32::str" {
+        key "e7DK0FQT"
+        doc "Base HP.  Quoted decimal integer on the wire."
+    }
+
+    field base_atk type="i32::str" {
+        key "67CApcti"
+        doc "Base ATK.  Quoted decimal integer on the wire."
+    }
+
+    field base_def type="i32::str" {
+        key "q08xLEsy"
+        doc "Base DEF.  Quoted decimal integer on the wire."
+    }
+
+    field base_heal type="i32::str" {
+        key "PWXu25cg"
+        doc "Base REC/heal.  Quoted decimal integer on the wire."
+    }
+
+    field add_hp type="i32::str" {
+        key "cuIWp89g"
+        doc "Added HP (from fusion/evo).  Quoted decimal integer on the wire."
+    }
+
+    field add_atk type="i32::str" {
+        key "RT4CtH5d"
+        doc "Added ATK.  Quoted decimal integer on the wire."
+    }
+
+    field add_def type="i32::str" {
+        key "GcMD0hy6"
+        doc "Added DEF.  Quoted decimal integer on the wire."
+    }
+
+    field add_heal type="i32::str" {
+        key "C1HZr3pb"
+        doc "Added REC/heal.  Quoted decimal integer on the wire."
+    }
+
+    field ext_hp type="i32::str" {
+        key "TokWs1B3"
+        doc "Extra/imp HP.  Quoted decimal integer on the wire."
+    }
+
+    field ext_atk type="i32::str" {
+        key "t4m1RH6Y"
+        doc "Extra/imp ATK.  Quoted decimal integer on the wire."
+    }
+
+    field ext_def type="i32::str" {
+        key "e6mY8Z0k"
+        doc "Extra/imp DEF.  Quoted decimal integer on the wire."
+    }
+
+    field skill_id type="str" {
+        key "nj9Lw7mV"
+        doc "Brave-burst / skill id."
+    }
+
+    field skill_lv type="i32::str" {
+        key "3NbeC8AB"
+        doc "Skill level.  Quoted decimal integer on the wire."
+    }
+
+    field extra_skill_id type="str" {
+        key "iEFZ6H19"
+        doc "Extra-skill (SBB/UBB) id."
+    }
+
+    field extra_skill_lv type="i32::str" {
+        key "RQ5GnFE2"
+        doc "Extra-skill level.  Quoted decimal integer on the wire."
+    }
+
+    field unit_type_id type="i32::str" {
+        key "nBTx56W9"
+        doc "Unit type/element id.  Quoted decimal integer on the wire."
+    }
+
+    field equipitem_id type="i32::str" {
+        key "Ge8Yo32T"
+        doc """
+        The unit's equipped SPHERE, slot 1 -- not a mission id.
+
+        CORRECTED 2026-09-15 along with ReinforcementInfo.equipitem_id, which
+        carries the same key into the same readParam (xZH6EIQ7 dispatches to
+        ReinforcementInfoResponse, so both structs land on
+        UserUnitInfoBase::setEquipItemID at vtable +0x1e8).
+
+        This one mattered because xZH6EIQ7 is a REPLACE: sending an empty value
+        here blanked the sphere on the record the result screen then draws.
+        Fill from `user_units.eqip_item_id` -- both UnitEvo and UnitMix already
+        select it.
+        """
+    }
+}
+
+json EvoResultEntry {
+    doc "UnitEvo result payload under response key I82p0wCL — tells the client which MST id the base evolved into."
+
+    field evolved_unit_id type="i32::str" {
+        key "pn16CNah"
+        doc "Target MST id the unit evolved into.  Quoted decimal integer on the wire."
+    }
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "DB instance id of the evolved unit.  Quoted decimal integer on the wire."
+    }
+
+    field orig_mst_id type="i32::str" {
+        key "t9FEW2KC"
+        doc "Original (\"before\") MST id, used by the evo animation.  Quoted decimal integer on the wire."
+    }
+
+    field user_unit_id_before type="i32::str" {
+        key "u1ECvfg8"
+        doc """
+        UnitEvoInfo::setUserUnitIDBefore — the instance id the unit had BEFORE
+        the evolution.  This server evolves in place (an UPDATE on the same
+        user_units row), so it is the same value as edy7fq3L; it is a distinct
+        field because a server that minted a new row would differ here.
+        Quoted decimal integer on the wire.
+        """
+    }
+
+    field evolution_type type="i32::str" {
+        key "dV3qji4I"
+        doc """
+        UnitEvoInfo::setEvolutionType (StrToInt).  The DOMAIN IS UNDECODED —
+        the request carries no type and no consumer of
+        UnitEvoInfo::getEvolutionType has been read, so 0 is a placeholder, not
+        a known value.  Normal vs omni is the obvious guess given
+        unit_evo_omni_type_mst exists, but nothing here confirms it.
+        Safe to leave: this key is the last in UnitOpeEvoResponse::readParam's
+        chain, but the commit is gated on the last-field flag (a6), not on this
+        key, so UnitEvoInfoList::addObject still fires without it.
+        Quoted decimal integer on the wire.
+        """
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UnitOpeResult — the unit-operation RESULT payload, response key 1ZbHB6Im
+// (UnitOpeResultResponse, func_addr 0x13F88DC).
+//
+// "UnitOpe" = unit operation: fusion, evolution and the other unit ops all
+// report their outcome through this one shape.  It is what drives the RESULT
+// SCREEN — the xp bar sweep and the level-up flourish — and this server had
+// never sent it, which is why the fusion screen rendered the unit but the bar
+// never moved and no level-up was processed.
+//
+// The give-away is the field set: it is entirely BEFORE/AFTER pairs.  A bar
+// cannot animate from a single end point, and handbook §3.4 already recorded
+// the same mechanism on the mission result screen (F5Vs19mb), where a
+// before_lv the server did not know existed caused a bogus level cascade.
+// Same trap, different screen: there it was populated wrongly, here not at all.
+//
+// All 27 fields decoded from the readParam strcmp chain — see
+// tools/ida/audits/1ZbHB6Im_audit.txt.  Types are taken from the pseudocode
+// (StrToInt -> i32::str, byref std::string -> str), NOT from
+// readparam_analysis.json, which has no entry for this class at all.
+// ---------------------------------------------------------------------------
+
+json UnitOpeResult {
+    doc "Result of a unit operation (fusion / evolution) — drives the result screen's level-up animation.  Response key 1ZbHB6Im."
+
+    field unit_id type="str" {
+        key "pn16CNah"
+        doc "setUnitID — the unit's MST id."
+    }
+
+    field user_unit_id type="str" {
+        key "edy7fq3L"
+        doc "setUserUnitID — which owned unit this result is about."
+    }
+
+    field zel type="i32::str" {
+        key "Najhr8m6"
+        doc "setZel — zel spent on the operation."
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "setExp — exp gained by the operation."
+    }
+
+    field success_type type="i32::str" {
+        key "6hMI5xeF"
+        doc """
+        setSuccessType — the fusion result tier.
+
+        // CONFIRMED 2026-09-07 from the client, values and all.
+        // UnitMixPlayScene::ConvSuccessSet @0x1C200A4 branches straight off
+        // UnitOpeResult::getSuccessType and picks the animation:
+        //
+        //     ldr  w8, [x0, #0x400]
+        //     cmp  w8, #2  -> "ConvSuccessSuper.sam"   Super Success
+        //     cmp  w8, #1  -> "ConvSuccessBig.sam"     Great Success
+        //     cbnz w8      -> "ConvSuccess.sam"        normal
+        //
+        // All three .sam files ship in game_content, and
+        // SummonerWeaponMixPlayScene::ConvSuccessSet reads the same three values,
+        // so the vocabulary is shared with summoner-arm fusion.
+        //
+        //   0 = normal, 1 = Great Success, 2 = Super Success
+        //
+        // // SUPERSEDES "UNVERIFIED: the value set ... 0 is sent for a normal
+        // // result until a capture shows the other values."  The server pinned
+        // // this to 0, so no player could ever see a Great or Super Success no
+        // // matter what rate the fusion screen advertised.
+        //
+        // The EXP MULTIPLIERS are MST data, not a server invention:
+        // DefineMst.unit_mix_great_exp_rate (2inP0tCg) = 1.5 and
+        // unit_mix_super_exp_rate (zn65EXYF) = 2.0.  UnitMix applies whichever
+        // matches the rolled tier.
+        //
+        // // STILL UNVERIFIED: the CHANCE.  defines_mst carries the two
+        // multipliers and no probability, and no other MST names one, so the
+        // original server owned the roll.  Ours is 10% great / 2% super,
+        // doubled when every material matches the base unit's element — the one
+        // condition the game itself states improves a fusion.  Tunable in
+        // UnitMix.cpp; no capture backs the figures.
+        """
+    }
+
+    field before_lv type="i32::str" {
+        key "81CsGAR9"
+        doc "setBeforeLv — level BEFORE the operation.  The bar animates from here."
+    }
+
+    field after_lv type="i32::str" {
+        key "MD8r7Wa0"
+        doc "setAfterLv — level after."
+    }
+
+    field before_exp type="i32::str" {
+        key "rQ9JVD0w"
+        doc "setBeforeExp — exp within the level before the operation."
+    }
+
+    field after_exp type="i32::str" {
+        key "K3iqB72Q"
+        doc "setAfterExp — exp within the level after."
+    }
+
+    field before_skill_lv type="i32::str" {
+        key "vZH12LoA"
+        doc "setBeforeSkillLv — BB level before."
+    }
+
+    field after_skill_lv type="i32::str" {
+        key "8hVR4Fjr"
+        doc "setAfterSkillLv — BB level after."
+    }
+
+    field before_extra_skill_lv type="i32::str" {
+        key "g9DXe3HZ"
+        doc "setBeforeExtraSkillLv — SBB level before."
+    }
+
+    field after_extra_skill_lv type="i32::str" {
+        key "0xgWq5bD"
+        doc "setAfterExtraSkillLv — SBB level after."
+    }
+
+    field lvup_status type="str" {
+        key "5Hi7MVQe"
+        doc """
+        setLvupStatus — NOT a flag.  A COLON-SEPARATED STAT SNAPSHOT,
+        "lv:hp:atk:def:heal".
+
+        // CONFIRMED from UnitMixPlayScene::parseMixResult @0x1C17C10
+        (tools/ida/audits/ParseMixResult_audit.txt).  The scene reads it and
+        branches on LENGTH:
+            getLvupStatus(&s);
+            if (len(s)) goto LABEL_47;          // use the server's value
+            // otherwise build it locally:
+            IntToString(level); LongLongToString(getHp()); ...atk, def, rec...
+            joined with ':'
+        So an EMPTY string is a supported path — the client reconstructs the
+        snapshot from the UserUnitInfo it is already displaying.
+
+        // ⚠ SEND IT EMPTY unless you have all five values.  Anything
+        non-empty is parsed as a five-field colon list and indexed at
+        +24/+48/+72/+96; sending "1" or "0" as a boolean flag reads off the end
+        of a one-element list and CRASHES the client on the ritual animation.
+        That cost three crash cycles.  The level-up flourish does NOT come from
+        here — it is driven by the before_lv/after_lv pair, which parseMixResult
+        loops over separately (`while (lv < afterLv) getLevelUpEvent(...)`).
+        """
+    }
+
+    field param_up_state type="str" {
+        key "Xoq6z0VI"
+        doc """
+        setParamUpState — the same "lv:hp:atk:def:heal" colon list as
+        lvup_status, used for the stat-gain flourish.
+
+        // CONFIRMED from parseMixResult: guarded by `if (len)`, then
+        CommonUtils::parseList with separator descriptor 0x3A02 (0x3A = ':'),
+        then StrToInt at +0/+24/+48/+72/+96 — five fields.
+        // Empty is SAFE here: the length guard skips the whole block.  But
+        note the block contains a null-deref if it ever does run with a level
+        that matches no MixResultStatus entry (`v119 = 0` then
+        `MixResultStatus::getHp(v119)`), so do not populate it speculatively.
+        """
+        optional #true
+    }
+
+    field before_eqp_frame_id type="i32::str" {
+        key "WT2X78J1"
+        doc "setBeforeEqpFrameID — sphere frame in slot 1 before."
+    }
+
+    field after_eqp_frame_id type="i32::str" {
+        key "N2Iiemv4"
+        doc "setAfterEqpFrameID — sphere frame in slot 1 after."
+    }
+
+    field before_eqp_frame_id2 type="i32::str" {
+        key "1wme6kJz"
+        doc """
+        setBeforeEqpFrameID2 — sphere frame in slot 2 before.
+
+        NOT INERT, unlike the slot-1 pair: -1 here means the unit had no second
+        slot at all, and a Sphere Frog in this fusion moves it to 0.  That
+        transition is the frog's entire visible effect, so before and after must
+        carry the real values (see UserUnitInfo.equipitem_frame_id2).
+        """
+    }
+
+    field after_eqp_frame_id2 type="i32::str" {
+        key "m0fq76GY"
+        doc "setAfterEqpFrameID2 — sphere frame in slot 2 after.  0 once a Sphere Frog has opened the slot; see before_eqp_frame_id2."
+    }
+
+    field before_fe_bp type="i32::str" {
+        key "0xhLsnDv"
+        doc "setBeforeFeBP — Frontier Enhancement BP before."
+    }
+
+    field after_fe_bp type="i32::str" {
+        key "3YVEeL2a"
+        doc "setAfterFeBP — Frontier Enhancement BP after."
+    }
+
+    field before_fe_info type="str" {
+        key "TLbr6q4U"
+        doc "setBeforeFeInfo — FE allocation before.  String setter."
+        optional #true
+    }
+
+    field after_fe_info type="str" {
+        key "Wyn8wrxw"
+        doc "setAfterFeInfo — FE allocation after.  String setter."
+        optional #true
+    }
+
+    field before_max_fe_bp type="i32::str" {
+        key "kuHWF7yc"
+        doc "setBeforeMaxFeBP — FE BP cap before."
+    }
+
+    field after_max_fe_bp type="i32::str" {
+        key "ksED59z9"
+        doc "setAfterMaxFeBP — FE BP cap after."
+    }
+
+    field before_dbb_skill_level type="i32::str" {
+        key "KLpo4OX6"
+        doc "setBeforeDbbSkillLevel — Dual Brave Burst skill level before."
+    }
+
+    field after_dbb_skill_level type="i32::str" {
+        key "lo7ebFla"
+        doc "setAfterDbbSkillLevel — Dual Brave Burst skill level after."
+    }
+}

@@ -1,0 +1,654 @@
+// Frontier Gate — the per-user progress payload (net side).  The gate/floor
+// catalog and support-effect tables are the MST side and live in
+// mst/frontier_gate.kdl; F_FROGATE_REWARD_MST and F_FRONTIER_GATE_AREA_MST are
+// client-loaded, so the server never sends reward or area data.  The server's
+// job here is per-user progress only: which gate, what state/progress, score,
+// and the support slot.
+//
+// Decoded 2026-08-07 — full audit in tools/ida/audits/dPM7oJDl_audit.txt.
+//
+// Every setter in FrontierGateInfoResponse::readParam (@0x142ECBC) is INLINED,
+// so no field name comes out of the pseudocode directly.  Two levers resolved
+// them: cross-class hash reuse (the same key named by a real call in another
+// response class) and the vtable slot map — the inlined calls are virtual
+// dispatches at fixed offsets +48..+208, a clean 16-byte stride with no gaps,
+// giving 11 slots for 11 wire keys.  That is the COMPLETE field layout.
+//
+// // REVERTED FROM the legacy stub: bfdata/responses/Frontier/
+// FrontierGateInfoResponse.hpp declares only 7 fields, omits NungTq5g /
+// JQ23rIvk / SzV0Nps7 / 2wHGmJqm entirely, and orders the rest wrongly.  Do not
+// build from it.  readparam_analysis.json has the same 7-field gap and types
+// every one of them uint32_t; where it disagrees with the pseudocode (start_date
+// / end_date are std::string there, not uint32_t) THE PSEUDOCODE WINS — the
+// analysis entry appears to be what the legacy stub was generated from.
+//
+// Field order below follows response_mappings.json's params list (which matches
+// the readParam strcmp chain).  Note that is NOT the vtable order: the chain
+// tests j28VNcUW before 69bpUIXR while the vtable declares them the other way.
+// Each doc records its vtable slot, since slot adjacency is the evidence behind
+// the two UNVERIFIED names.
+
+json FrontierGateInfo {
+    doc "Frontier Gate per-user progress entry — one per gate, under response_key dPM7oJDl (array).  Populates the FrontierGateInfoList singleton the FG top/select screens read from."
+
+    field frogate_id type="i32::str" {
+        key "hBNPQAU0"
+        doc "setFrogateID.  vtable slot 0 (+48).  = FrontierGateMst.id (1..3, then 200001..200015).  The binary StrToInt's the wire value then IntToString's it back before storing, so it is provably an integer even though the setter takes std::string (FrontierGateInfoList::getObjectWithFrogateID also keys on the string form)."
+    }
+
+    field score type="i32::str" {
+        key "TPR79fyI"
+        doc "setScore.  vtable slot 1 (+64).  CommonUtils::StrToInt — a plain int."
+    }
+
+    field support_id_list type="[i32::str]::sep(comma)" {
+        key "NungTq5g"
+        doc "setSupportIDList.  vtable slot 2 (+80).  CommonUtils::parseList with separator constant 11266 = 0x2C02 (an SSO std::string holding ','), so comma-separated.  Elements = FrontierGateSupportMst.id, which are plain ints (100..123 and 2xxxxx across all 61 rows), hence [i32::str].  Same hash/name as mst/frontier_gate.kdl's support id."
+    }
+
+    field state type="i32::str" {
+        key "j0Uszek2"
+        doc "setState.  vtable slot 3 (+96).  StrToInt.  // UNVERIFIED: the state enum's values are not decoded — no capture exists (deploy/log has no http_log_M17pPotk_*)."
+    }
+
+    field reward_info_list type="[str]::sep(comma)" {
+        key "JQ23rIvk"
+        doc "setRewardInfoList.  vtable slot 4 (+112).  parseList, same comma separator as NungTq5g.  Elements stay `str`: the sibling use of this hash in mst/raid.kdl (F_RAID_RC_MST reward_info, CONFIRMED setRewardInfo) holds colon-packed tuples like \"6:20302:1:1:1\", so they are not plain ints.  Also carried by CampaignMissionInfoResponse (2I9V0o6J) and ColosseumUserInfoResponse (FfBebG0R)."
+    }
+
+    field progress type="i32::str" {
+        key "pG2n1A28"
+        doc "setProgress.  vtable slot 5 (+128).  StrToInt.  readParam ALSO mirrors this value to FrontierGateComInfo::setPlayProgress on the shared singleton — the two names (Progress / PlayProgress) are the same number."
+    }
+
+    field mission_id type="str" {
+        key "j28VNcUW"
+        doc "setMissionID.  vtable slot 6 in wire order (+160 in the vtable).  Kept `str`, not i32::str: the binary stores this one WITHOUT any StrToInt, unlike frogate_id/score/state/progress which are all converted.  That asymmetry is the evidence — the client treats it as an opaque string.  Narrow it only against a real capture."
+    }
+
+    field progress_max type="i32::str" {
+        key "69bpUIXR"
+        doc "// UNVERIFIED (named from vtable slot position + arg type): ProgressMax.  vtable slot 6 (+144), StrToInt.  This key is FG-EXCLUSIVE — it appears in no other class in readparam_analysis.json or response_mappings.json and has no named setter anywhere in the corpus, so cross-class reuse cannot resolve it.  Structural argument: of the five FrontierGateInfo getters left unclaimed (getProgressMax, getRanking, getMissionStartDate, getMissionEndDate, getTimeString) only ProgressMax and Ranking are int-shaped, and this slot sits immediately after slot 5 = Progress.  RISK: could be swapped with `ranking` below — both are ints, so a swap is wire-compatible and would surface only as a wrong number on screen.  Disambiguate by sending distinguishable sentinels (7 here, 99 there) and reading which the UI prints as progress vs as a rank."
+    }
+
+    field start_date type="str" {
+        key "qA7M9EjP"
+        doc "setStartDate.  vtable slot 8 (+176).  CONFIRMED by cross-class reuse: named setStartDate by GachaInfoResponse (1IR86sAv), FeatureGatingInfoResponse (2375D38i), BundlePacksInfoResponse (K72eC4nz) and UserTownLocationDetailResponse (s8TCo2MS).  `str` on THIS path — the setter takes a std::string with no numeric conversion, matching the string-typed siblings and mst/guild.kdl's datetime strings.  Do NOT reuse mst/frontier_gate.kdl's i64::str raw-unix-seconds type here without a capture; readparam_analysis.json claims uint32_t but the pseudocode builds a std::string."
+    }
+
+    field end_date type="str" {
+        key "SzV0Nps7"
+        doc "setEndDate.  vtable slot 9 (+192).  CONFIRMED by cross-class reuse: named setEndDate by UserItemTimeLimitInfoResponse (YmaEqtA8), and pairs with qA7M9EjP as start/end in GachaInfo, BundlePacks, BundlePacksCategory, FeatureGating and InteractiveBanner.  Same `str` reasoning as start_date."
+    }
+
+    field ranking type="i32::str" {
+        key "2wHGmJqm"
+        doc "// UNVERIFIED (named from vtable slot position + arg type): Ranking.  vtable slot 10 (+208), StrToInt.  Thinner evidence than progress_max: this key is absent from readparam_analysis.json entirely (hand-coded getValue path) and appears in response_mappings.json only for dPM7oJDl.  Structural argument: it is the LAST declared field, fitting a later-revision append, and Ranking is a feature the client gates behind FrontierGateMst::getRankingDispFlg while the full board lives in its own classes (FrontierGateRankingInfo / FrontierGateRankingResponse) — a single per-gate \"my rank\" int here is consistent.  See the swap RISK noted on progress_max."
+    }
+}
+
+// NOT wire fields — FrontierGateInfo also exposes getMissionStartDate,
+// getMissionEndDate and getTimeString, and none of the three has a vtable slot
+// in this response.  They are derived client-side, most likely from
+// FrontierGateMst (which carries its own start/end dates and entry term) via
+// mission_id.  Do not invent keys for them.
+
+// ---------------------------------------------------------------------------
+// Tier 2 — the active run.  FrontierGateStart (l3lkDBSc) opens one and the
+// server answers with FrontierGateNum under key Mg8K8Y1a.
+// ---------------------------------------------------------------------------
+
+// Request side.  FrontierGateStartRequest::createBody @0x13BC3C0 BRANCHES on
+// the isFGPlus byte at this+32: true takes createBodyFGPlusNum (group
+// "Che7rAre") + the FGPlus deck/unit serializers, false takes
+// createBodyFrogateNum (group "Mg8K8Y1a") + the normal ones.  Only ONE group is
+// emitted per request — they are alternatives, not siblings.  Per handbook
+// §11.2 the server handles the normal Frontier Gate path (Mg8K8Y1a) and leaves
+// FGPlus alone.
+json FrontierGateStartEntry {
+    doc "The gate the player is entering and the support they picked — request group Mg8K8Y1a, one node (createBodyFrogateNum @0x13BC4F0)."
+
+    field frogate_id type="i32::str" {
+        key "hBNPQAU0"
+        doc "FrontierGateComInfo::getFrogateGateID — the gate being entered, = FrontierGateMst.id.  Passed to addParam as a std::string, so quoted on the wire."
+    }
+
+    field support_id type="i32::str" {
+        key "NungTq5g"
+        doc "FrontierGateComInfo::getSupportID — the chosen support effect, = FrontierGateSupportMst.id.  SINGULAR here, unlike the same hash in dPM7oJDl where it is a comma LIST (SupportIDList).  Cardinality is per-context; do not share a type between the two."
+    }
+}
+
+// Response side.  FrontierGateNumResponse::readParam @0x142FF48 — every one of
+// the 7 setters is a REAL named call (no inlining), so unlike dPM7oJDl there is
+// no guesswork in this struct.
+//
+// is_array = FALSE: readParam writes the FrontierGateNum SHARED SINGLETON and
+// never calls addObject on a list, unlike FrontierGateInfoResponse which drives
+// FrontierGateInfoList.  So Mg8K8Y1a is a single embedded OBJECT on the
+// response, even though the request wraps the same key in an array via
+// addGroup/addNode.  Same key, different cardinality per direction.
+json FrontierGateNum {
+    doc "The player's active Frontier Gate run — response key Mg8K8Y1a (FrontierGateNumResponse), a single object.  Its presence is also what FrontierGateSuspendedInfoResponse (gmeGFd2s, 1 field) projects."
+
+    field frogate_num type="i32::str" {
+        key "2FQdEbG3"
+        doc "setFrogateNum.  StrToInt.  The RUN handle: FrontierGateEnd/Continue/Retry read it straight back out of the shared singleton (FrontierGateNum::getFrogateNum) and echo it as their own 2FQdEbG3, so the client never authors this value — the SERVER owns it and the client round-trips it opaquely."
+    }
+
+    field mission_status type="i32::str" {
+        key "j3g5P4cq"
+        doc "setMissionStatus.  StrToInt.  Named by RaidRoomUserInfoResponse (uwH62EZy), which uses the same hash.  // UNVERIFIED: the status enum's values are not decoded — no capture exists.  NOTE readparam_analysis.json omits this field for Mg8K8Y1a entirely (it lists 6 of 7); the pseudocode and response_mappings both have it."
+    }
+
+    field frogate_id type="i32::str" {
+        key "hBNPQAU0"
+        doc "setFrogateID.  StrToInt.  Which gate this run is in, = FrontierGateMst.id."
+    }
+
+    field sel_support_id type="i32::str" {
+        key "NungTq5g"
+        doc "setSelSupportID.  StrToInt — a SINGLE int here, not the comma list this hash carries in dPM7oJDl."
+    }
+
+    field power_up_rate_hp type="f32::str" {
+        key "9iE6ouVv"
+        doc "setPowerUpRateHp.  CommonUtils::StrToFloat, then the client DIVIDES BY 100 before storing — the wire carries a percentage and the client wants a multiplier.  So 100 = x1.0 = no bonus, and 0 would multiply the party's HP by ZERO.  100 is the neutral value; never send 0.  (readparam_analysis.json types this std::string, which is true of the raw wire but hides the float parse — the pseudocode is the authority.)"
+    }
+
+    field power_up_rate_atk type="f32::str" {
+        key "llTJ33yj"
+        doc "setPowerUpRateAtk.  StrToFloat then / 100.0 — see power_up_rate_hp.  Neutral = 100."
+    }
+
+    field power_up_rate_def type="f32::str" {
+        key "fPxrnRT4"
+        doc "setPowerUpRateDef.  StrToFloat then / 100.0 — see power_up_rate_hp.  Neutral = 100."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tier 3 — the run's party.  DECODED 2026-08-07 from the battle-path dump.
+//
+// MissionStartScene::downloadFiles branches on GameUtils::isFrontierGate and,
+// in Frontier Gate mode, builds its asset download set from
+// FrontierGateUserUnitInfoList — i.e. from 52xDBRGr — NOT from the player's
+// normal unit list:
+//
+//     if (GameUtils::isFrontierGate(missionId)) {
+//         list = FrontierGateUserUnitInfoList::shared();
+//         if (!list.empty()) { requestSummonerUnitFiles(); requestUnitFiles(); }
+//     }
+//
+// The server never sent 52xDBRGr, so that list was empty, no unit assets were
+// requested, and the battle then ran with units whose files had never been
+// fetched — the mission downloaded its 12 shared assets and crashed.
+//
+// isFrontierGate itself resolves mission -> dungeon -> DungeonMst.dungeon_type
+// == 5 (dungeon 9000002 carries 3hPeI1RV=5), so the client is correctly in FG
+// mode; it simply has no party to load.
+//
+// The client SENDS both groups on FrontierGateStart, so echoing them back is
+// both the fix and the resume mechanism.
+// ---------------------------------------------------------------------------
+
+json FrontierGatePartyDeckInfo {
+    doc "One party-deck member for a Frontier Gate run — response key MxmCpDRC (FrontierGatePartyDeckInfoResponse).  A strict subset of CampaignMissionPartyDeckInfoResponse (w5vHLT0q), which adds 1e6jxQzf and yu18xScw; authored separately rather than shared so we do not emit two keys the FG client never reads."
+
+    field deck_num type="i32::str" {
+        key "zsiAn9P1"
+        doc "Deck slot number."
+    }
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "user_units instance id of this member."
+    }
+
+    field friend_id type="str" {
+        key "98WfKiyA"
+        doc "setFriendID — set on the borrowed friend slot, empty otherwise."
+    }
+
+    field member_type type="i32::str" {
+        key "gr48vsdJ"
+        doc "Member role/type."
+    }
+
+    field disporder type="i32::str" {
+        key "XuJL4pc5"
+        doc "Display order within the deck."
+    }
+
+    field now_hp type="i32::str" {
+        key "a3qJ6QhX"
+        doc "Current HP — volatile per-run state."
+    }
+
+    field max_hp type="i32::str" {
+        key "3WMz78t6"
+        doc "Max HP."
+    }
+
+    field bb_gauge type="i32::str" {
+        key "gU2xtQ0V"
+        doc "Brave-burst gauge."
+    }
+
+    field sb_gauge type="i32::str" {
+        key "nIGZ1X9C"
+        doc "Super-burst gauge."
+    }
+
+}
+
+json FrontierGateUserUnitInfo {
+    doc "One unit in a Frontier Gate run — response key 52xDBRGr (FrontierGateUserUnitInfoResponse).  44 fields: 35 shared with UserUnitInfo (qC2tJs4E) plus a Summoner-avatar block, because a Frontier Gate party carries the summoner alongside the units.  MissionStartScene::downloadFiles reads this list to decide which unit assets to fetch, so an empty one means the battle loads with no unit files."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field user_unit_id type="u32::str" {
+        key "edy7fq3L"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field friend_id type="str" {
+        key "98WfKiyA"
+        doc "setFriendID — the borrowed friend/reinforcement slot."
+    }
+
+    field unit_id type="u32::str" {
+        key "pn16CNah"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field unit_type_id type="u32::str" {
+        key "nBTx56W9"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field unit_lvl type="u32::str" {
+        key "D9wXQI2V"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field total_exp type="i32::str" {
+        key "gQInj3H6"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field base_hp type="u32::str" {
+        key "e7DK0FQT"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field add_hp type="i32::str" {
+        key "cuIWp89g"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field ext_hp type="u32::str" {
+        key "TokWs1B3"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field base_atk type="u32::str" {
+        key "67CApcti"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field add_atk type="i32::str" {
+        key "RT4CtH5d"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field ext_atk type="u32::str" {
+        key "t4m1RH6Y"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field base_def type="u32::str" {
+        key "q08xLEsy"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field add_def type="i32::str" {
+        key "GcMD0hy6"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field ext_def type="u32::str" {
+        key "e6mY8Z0k"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field base_rec type="u32::str" {
+        key "PWXu25cg"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field add_rec type="i32::str" {
+        key "C1HZr3pb"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field ext_rec type="u32::str" {
+        key "X6jf8DUw"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field leader_skill_id type="i32::str" {
+        key "oS3kTZ2W"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field bb_id type="str" {
+        key "nj9Lw7mV"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field bb_lvl type="u32::str" {
+        key "3NbeC8AB"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field sbb_id type="str" {
+        key "iEFZ6H19"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field sbb_lvl type="u32::str" {
+        key "RQ5GnFE2"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field equipitem_id type="i32::str" {
+        key "Ge8Yo32T"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field equipitem_frame_id type="i32::str" {
+        key "0R3qTPK9"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field equipitem_id2 type="i32::str" {
+        key "mZA7fH2v"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field equipitem_frame_id2 type="i32::str" {
+        key "RXfC31FA"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field extra_passive_skill_id type="i32::str" {
+        key "cP83zNsv"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field extra_passive_skill_id2 type="i32::str" {
+        key "LjY4DfRg"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field add_extra_passive_skill_id type="i32::str" {
+        key "T4rewHa9"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field unit_img_type type="i32::int" {
+        key "2pAyFjmZ"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field omni_level type="i32::int" {
+        key "49sa3sld"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field fe_skill_info type="str" {
+        key "Fnxab5CN"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field ep3_flg type="i32::str" {
+        key "jkldTrhL"
+        doc "setEp3Flg — Episode 3 marker."
+    }
+
+    field sex type="i32::str" {
+        key "9i2xhMaJ"
+        doc "setSex — Summoner avatar gender."
+    }
+
+    field element type="str" {
+        key "iNy0ZU5M"
+        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+    }
+
+    field hair_id type="str" {
+        key "btZizNep"
+        doc "setHairID — Summoner avatar hair."
+    }
+
+    field arm_id type="str" {
+        key "RVVgyuor"
+        doc "setArmID — Summoner avatar weapon."
+    }
+
+    field arm_lv type="i32::str" {
+        key "U8FCB2Wj"
+        doc "setArmLv — Summoner arm level (RaidRoomPartyInfo / SummonerFriendInfo)."
+    }
+
+    field arm_exp type="i32::str" {
+        key "NqVAPbLC"
+        doc "setArmExp — Summoner arm exp (SummonerReinforcementInfo / RaidRoomPartyInfo)."
+    }
+
+    field ability_info type="str" {
+        key "mgNdrCEe"
+        doc "setAbilityInfo — Summoner ability payload (SummonerFriendInfo / RaidRoomPartyInfo)."
+    }
+
+    field unk_summoner type="str" {
+        key "utP1c0CD"
+        doc "// UNVERIFIED: no named setter anywhere in the corpus; sits in the Summoner avatar block."
+    }
+
+}
+
+// ---------------------------------------------------------------------------
+// The run's battle state and its end — decoded 2026-09-11.
+//
+// A Frontier Gate run is a string of battles.  After each one the client sends
+// MissionEnd with the FG groups below (MissionEndRequest::createBody @0x13A8B8C
+// -> createBodyFrontierGateBattle @0x13A8ED4), and the only way its running
+// floor count and score survive into the next battle is the server handing
+// them back as eIQ79KO2: FrontierBattleInfoResponse::readParam @0x142E25C is
+// the ONLY caller of FrontierBattleInfo::setProgress / setNowScore /
+// setSupportID.  The run ends in the result scene (FrontierGateResultScene,
+// scene 0x66A), reached two ways: Retire sends FrontierGateEnd and the
+// interval scene changes scene on the reply; a lost battle sends MissionEnd
+// and FrontierGateBattleEndScene::updateEvent @0x15DB740 moves on ONLY when
+// FrontierGateComInfo::getResult() is set — which nothing but
+// FrontierEndInfoResponse (mu0kXAlV) does.  Without it the scene sits in
+// state 2 for good.
+// ---------------------------------------------------------------------------
+
+json FrontierBattleInfo {
+    doc """
+    The run's battle state, key eIQ79KO2 — the same group in both directions.
+
+    REQUEST (MissionEnd, createBodyFrontierGateBattle @0x13A8ED4): the client's
+    view after the battle.  RESPONSE (FrontierBattleInfoResponse::readParam
+    @0x142E25C, a singleton): the state the next battle starts from; the
+    server sends it in MissionStart (so a new run starts at 0) and echoes it in
+    MissionEnd.  Every value is StrToInt'd, so scores are int32 on this path
+    even though FrontierGateComInfo stores them as long long.
+    """
+
+    field high_score type="i64::str" {
+        key "TPR79fyI"
+        doc "REQUEST: FrontierGateComInfo::getHighScore, the gate's best before this battle.  RESPONSE: FrontierBattleInfo::setScore and FrontierGateComInfo::setHighScore — the best the result scene compares the run against (its new-record animation)."
+    }
+
+    field note type="str" {
+        key "7cev0fzQ"
+        doc "FrontierBattleInfo::setNote — the run's bonus tallies, ...,fronterBonus:a@b@c@d@e@f@g@h (win, no-death, spark, overkill, multi-kill, weakness hits, and the two SG damage scores), which createBodyFrontierGateBattle reads back, adds the battle's counts to and resends.  Empty starts a run at zero."
+    }
+
+    field progress type="i32::str" {
+        key "pG2n1A28"
+        doc "Floors cleared in the run.  REQUEST: the previous progress + BattleState::getBattleOrder - (1 if the battle was lost), i.e. waves won so far.  RESPONSE: FrontierBattleInfo::setProgress and FrontierGateComInfo::setPlayProgress.  A floor is a wave: a gate's floor rewards top out at the sum of its missions' battleCount (gate 1: 6 x 5 = 30)."
+    }
+
+    field support_id type="str" {
+        key "NungTq5g"
+        doc "FrontierBattleInfo::setSupportID (StrToInt then IntToString) — the support BattleParty::setPartyPassiveList @0x10B65D4 applies (it null-checks the FrontierSupportMst lookup).  Sent only when the run has a support: 0 would become the id 0."
+        optional #true
+    }
+
+    field od_info type="str" {
+        key "H7f9NAXu"
+        doc "FrontierBattleInfo::setOdInfo — REQUEST: FrontierGateComInfo::getOdInfo.  Read back by MissionScene::updateFrontierGateUnitStatus @0x1812770; the server returns what the client last sent, verbatim."
+    }
+
+    field now_score type="i64::str" {
+        key "PYbfxpTp"
+        doc "The run's score.  REQUEST: ChallengeBattleResultList::getTotalScore, which for Frontier Gate is this battle's score plus FrontierBattleInfo::getNowScore.  RESPONSE: FrontierBattleInfo::setNowScore and FrontierGateComInfo::setNowScore — the total the result scene shows."
+    }
+}
+
+json FrontierGateMissionRef {
+    doc "Request group dPM7oJDl on a Frontier Gate MissionEnd (createBody @0x13A8B98): the gate the battle belongs to.  Same key as the FrontierGateInfo list, a different class."
+
+    field frogate_id type="i32::str" {
+        key "hBNPQAU0"
+        doc "FrontierGateComInfo::getFrogateGateID."
+    }
+}
+
+json FrontierGateMissionRun {
+    doc "Request group Mg8K8Y1a on a Frontier Gate MissionStart (MissionStartRequest::createBody @0x13AB230): the run the battle belongs to."
+
+    field frogate_id type="i32::str" {
+        key "hBNPQAU0"
+        doc "FrontierGateNum::getFrogateID."
+    }
+
+    field support_id type="str" {
+        key "NungTq5g"
+        doc "FrontierGateNum::getSelSupportID."
+    }
+
+    field frogate_num type="i32::str" {
+        key "2FQdEbG3"
+        doc "FrontierGateNum::getFrogateNum — the run handle."
+    }
+}
+
+json FrontierEndInfo {
+    doc """
+    The run's result, key mu0kXAlV (FrontierEndInfoResponse::readParam
+    @0x142E564, a singleton into FrontierGateEndInfo).  Any param also calls
+    FrontierGateComInfo::setResult(true), which is what sends a lost battle's
+    FrontierGateBattleEndScene on to the result scene.
+
+    What FrontierGateResultScene shows of it (setParam @0x15EBE40): the grade
+    (setRankSam), the merit points (setPoint) and, only above x1, the bonus
+    rate (setContributionLayout @0x15EE9FC).  The score on screen is the
+    client's own run total (FrontierGateComInfo::getNowScore), not score below;
+    zel and karma have no reader.
+    """
+
+    field grade_id type="str" {
+        key "Cdv07KEU"
+        doc "setResGradeID.  setRankSam @0x15F2CAC switches on a one-character 1..7 through the table at 0x2348AD0: 1 D, 2 C, 3 B, 4 A, 5 S, 6 SS, 7 SSS (HunterResult<rank>.sam); anything else draws D.  Same values and art as Frontier Hunter's F_CHLNG_MISSION_GRADE_MST."
+    }
+
+    field zel type="i32::str" {
+        key "Najhr8m6"
+        doc "setResZel — no reader (getResZel has no caller)."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "setResKarma — no reader."
+    }
+
+    field score type="i32::str" {
+        key "TPR79fyI"
+        doc "setResScore — copied to the scene (+0x3C8) but not drawn."
+    }
+
+    field achieve_point type="i32::str" {
+        key "idfCDG70"
+        doc "setResAchieveP — the Merit Points (ACHIEVE_POINT) line under the CHALLENGE_PARTICIPATION_BONUS Reward header."
+    }
+
+    field bonus_rate type="f32::str" {
+        key "5Z1LNoyH"
+        doc "setResBonusRate (StrToFloat).  Drawn as a multiplier only when above 1.0, so 1 is the neutral value."
+    }
+
+    field prestige_points type="i32::str" {
+        key "sc83dkh3"
+        doc "setPrestigePoints — the guild prestige line."
+    }
+}
+
+json FrontierResRewardInfo {
+    doc """
+    One reward the run earned, key QXFCkE67 (FrontierResRewardInfoResponse::
+    readParam @0x14324B8).  A FULL REPLACE (removeAllObjects on row 0), and
+    FrontierGateUtils::frontierEndClean @0x11E87E0 empties the list on the way
+    back to the gate list, so an empty send leaves nothing stale.
+    FrontierGateResultScene::setRewardList keeps the rows with a non-zero
+    tar_type and shows them one per tap under CHALLENGE_GET_BONUS (Rewards).
+    """
+
+    field tar_type type="i32::str" {
+        key "30Kw4WBa"
+        doc "setTarType — the present type; setReward @0x15EFE84 names and draws it (items, units, zel, karma, gems, keys, selector and summon tickets, event tokens, medals)."
+    }
+
+    field tar_id type="str" {
+        key "TdDHf59J"
+        doc "setTarID."
+    }
+
+    field tar_cnt type="i32::str" {
+        key "wJsB35iH"
+        doc "setTarCnt."
+    }
+
+    field tar_param type="str" {
+        key "37moriMq"
+        doc "setTarParam."
+    }
+
+    field reward_type type="i32::str" {
+        key "IkmC8gG2"
+        doc "setRewardType — rewardLabel @0x15F41A8: 1 CHALLENGE_FLOOR_CLEAR (Stage<floor> Cleared!!), 2 CHALLENGE_EVALUATION_BONUS (Esteem Reward).  The reward MST's cond_type."
+    }
+
+    field reward_param type="str" {
+        key "empaR60j"
+        doc "setRewardParam — rewardLabel sets it as the <param=floor> of the label, so the floor for reward_type 1; the score threshold for 2, whose label has no param."
+    }
+
+    field present_flg type="i32::str" {
+        key "6n9PgKbv"
+        doc "setPresentFlg — no reader.  Sent as 1 for a reward queued to the present box, 0 for currency credited at once."
+    }
+}

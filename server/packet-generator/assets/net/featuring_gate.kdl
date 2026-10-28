@@ -1,0 +1,179 @@
+json FeatureGatingInfo {
+    doc """
+    Feature gating, keyed 2375D38i (FeatureGatingInfoResponse), emitted inside
+    UserInfo.  This is what draws the level_lock overlays —
+    vortex_quest_locked.png and parade_locked.png.
+
+    HOW THE CLIENT USES IT (decoded 2026-08-09,
+    tools/ida/audits/FeatureGating_vortex_audit.txt).  FeatureGatingHandler
+    keeps two internal lists, both built from these rows; neither has a
+    response class of its own:
+
+      DungeonCategoryInfo   dungeon id -> feature id
+      LevelGatingInfo       feature id -> required level
+
+    and the lock predicate is:
+
+      bool shouldGateLocked(int featureId) {
+          for (g : levelGatingList)
+              if (g->getFeatureID() == featureId)
+                  return UserTeamInfo::shared()->getLv() < g->getRequiredLevel();
+          return false;              // no row for that id => not locked
+      }
+
+    **It is a PLAYER LEVEL comparison, not a quest check** — the folder name
+    level_lock/ is literal, and vortex_quest_locked.png is simply misnamed.
+    There is no way to express "cleared mission X" through this packet.
+
+    FEATURE IDS observed in AreaSPSelectScene::setDetailList:
+       2  the dungeon-key / Parade banner (also the literal in
+          DungeonSPConfirmScene::initialize, which draws parade_locked.png)
+       6  general Vortex areas — the `else` branch when an area holds more
+          than one dungeon, and getFeatureIDForDungeon's own default
+      12  area 150000 only
+    A single-dungeon area instead resolves its id through
+    getFeatureIDForDungeon(dungeonId), i.e. through the DungeonID field below.
+
+    PRECONDITIONS: the whole path sits behind `feature_gate` in
+    deploy/system/features.json, and the feature-2 branch additionally behind
+    `dungeon_key`.  Both are already 1.
+
+    The lock is SPRITE-ONLY — neither drawing path calls getRequiredLevel or
+    renders a label, so the required level is never shown to the player.  That
+    is what makes it safe to use an unreachable level to represent a condition
+    that is not really about level.
+
+    NOTE the client-side class is **FeatureGateMst**, not FeatureGatingInfo —
+    readParam builds a FeatureGateMst and ends with
+    FeatureGatingHandler::addObj().  The name here is kept as
+    FeatureGatingInfo because it is what the response class is called and what
+    UserInfoResp's field already references.
+
+    All 11 setters were recovered 2026-08-09 from
+    tools/ida/audits/FeatureGating_loader_audit.txt, including the four that
+    had no setter in any export.  Every type below is confirmed against that
+    pseudocode: StrToInt fields are the u32::str ones, byref-string fields are
+    the str ones.
+    """
+
+    field feature_id type="u32::str" {
+        key "e63D1BV0"
+        doc "setFeatureID.  The id shouldGateLocked() is called with — 2 Parade, 6 Vortex areas, 12 area 150000."
+    }
+
+    field feature_name type="str" {
+        key "De5dk137"
+        doc "setFeatureName.  Descriptive only; no drawing path reads it."
+    }
+
+    field req_id type="u32::str" {
+        key "3NHiD5Ei"
+        doc """
+        setReqID — the requirement TYPE.  **MUST BE 1 for a level gate.**
+
+        // CONFIRMED 2026-08-09 from FeatureGatingHandler::addObj @0x1C8738C
+        (tools/ida/audits/FeatureGating_addObj_audit.txt).  The loader's very
+        first act after building the dungeon-category entry is:
+
+            if (FeatureGateMst::getReqID(a2) != 1)
+                return CCObject::release(a2);
+
+        i.e. any row whose ReqID is not 1 is DISCARDED and never becomes a
+        LevelGatingInfo, so shouldGateLocked() finds nothing and reports
+        unlocked.  A previous guess of 4 — reasoned from
+        F_FUNCTION_RELEASE_MST's "4:4" row — was wrong, and silently so: the
+        rows went out on the wire and were dropped on arrival.
+
+        Other ReqID values presumably select other requirement types the
+        client does not implement a predicate for; only 1 reaches
+        LevelGatingInfo.
+        """
+    }
+
+    field req_value type="u32::str" {
+        key "37DXiFyl"
+        doc """
+        setReqValue — the required LEVEL.
+
+        // CONFIRMED by the same pseudocode: after the ReqID == 1 check the
+        loader does
+            LevelGatingInfo::init(v53, getFeatureID(a2), getReqValue(a2));
+        so this field is exactly what LevelGatingInfo::getRequiredLevel()
+        returns, and shouldGateLocked compares it against
+        UserTeamInfo::getLv().  req_value, not req_id, carries the level.
+        """
+    }
+
+    field dungeon_id type="u32::str" {
+        key "MHx05sXt"
+        doc """
+        setDungeonID — populates the DungeonCategoryInfo list, mapping this
+        dungeon to feature_id.  Only consulted for areas holding exactly one
+        dungeon; multi-dungeon areas take the hardcoded 6 / 12 instead.
+        Optional so rows that only declare a level requirement can omit it.
+        """
+        optional #true
+    }
+
+    field start_date type="str" {
+        key "qA7M9EjP"
+        doc """
+        setStartDate.  `str`, not an int: cross-class reuse names this setter
+        in GachaInfoResponse, BundlePacksInfoResponse and
+        UserTownLocationDetailResponse, and net/frontier_gate.kdl documents it
+        as taking a std::string with no numeric conversion.
+        // UNVERIFIED whether the gate is time-windowed at all.  Optional and
+        omitted by default — if the lock fails to appear, populating this and
+        end_date is the first thing to try.
+        """
+        optional #true
+    }
+
+    field end_date type="str" {
+        key "SzV0Nps7"
+        doc """
+        setEndDate.  CONFIRMED as a byref-string setter alongside start_date.
+        Pairs with it; same optional treatment.
+        """
+        optional #true
+    }
+
+    field locked_text type="str" {
+        key "6d8Njpq9"
+        doc """
+        setLockedText — the message shown while the feature is gated.
+
+        // CONFIRMED 2026-08-09.  This hash had NO setter in any export and was
+        previously omitted as unknowable.
+        // WORTH TRYING if the overlay refuses to draw: a gate row with no
+        locked_text may be treated as incomplete and skipped.  Optional and
+        omitted for now because we have no captured value and inventing UI copy
+        is worse than sending nothing.
+        """
+        optional #true
+    }
+
+    field unlocked_text type="str" {
+        key "Db6D38hg"
+        doc "setUnlockedText — the message shown once the requirement is met.  CONFIRMED 2026-08-09; previously had no setter in any export."
+        optional #true
+    }
+
+    field unlocked_gift_text type="str" {
+        key "43Xzety8"
+        doc "setUnlockedGiftText — the message shown for the unlock reward.  CONFIRMED 2026-08-09; previously had no setter in any export."
+        optional #true
+    }
+
+    field reward_group_id type="u32::str" {
+        key "03DerWh3"
+        doc """
+        setRewardGroupID — the reward handed out when the feature unlocks.
+        StrToInt, so genuinely an int.
+        // CONFIRMED 2026-08-09; previously had no setter in any export.
+        Omitted: we grant nothing on unlock, and a fabricated group id could
+        point the client at a reward table entry that does not exist.
+        """
+        optional #true
+    }
+}

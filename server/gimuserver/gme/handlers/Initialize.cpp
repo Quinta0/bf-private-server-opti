@@ -1,0 +1,224 @@
+#include "App.hpp"
+#include "Handlers.hpp"
+#include <gimuserver/gme/common/NewsPosts.hpp>
+
+#include <gimuserver/db/PacketInterface.hpp>
+#include <gimuserver/gme/common/Common.hpp>
+#include <gimuserver/gme/common/BraveSlots.hpp>
+#include <gimuserver/gme/common/MstVersions.hpp>
+#include <gimuserver/gme/common/DailySpin.hpp>
+#include <gimuserver/gme/common/DailyTask.hpp>
+#include <gimuserver/gme/common/SelectorRotation.hpp>
+
+HANDLEF(Initialize)
+{
+	InitializeReq req = {};
+	const auto& ec = glz::read<glz::opts{ .error_on_unknown_keys = false }>(req, json);
+	if (ec)
+	{
+		const auto& fmte = glz::format_error(ec, json);
+		LOG_DEBUG << "Gme Initialize Error during JSON read: " << fmte;
+		co_return HandleResult::error("Deserialization error", fmte);
+	}
+
+	// NOTE: A real server would verify the gumi token first...
+	// TODO: Handle MSTs to answer
+
+	// Copy the cached response and build on top of it.
+	InitializeResp resp = theServer()->cache().initializeResp();
+
+	// The owner's news posts, if any are live: the NEW badge on Home's INFO
+	// and the page it opens (NewsPosts.hpp).
+	gme::applyNewsNotice(resp.notice_info);
+
+	// Transfer ID and password (LZ2PfNm4 / 4WSu1irc).  UserInfoResponse::
+	// readParam stores both into UserInfo, and the transfer Issue screen shows
+	// the account id; only TransferCodeIssue's reply may set them, so a new
+	// user gets them empty (getLoginInfo already leaves them empty for
+	// existing users).
+	resp.login_info.account_id = "";
+	resp.login_info.password = "";
+	// Assume we are a new user until proven otherwise. The game checks if these
+	// values are empty to decide whether to enter the tutorial flow or not.
+	resp.login_info.handle_name = "";
+	resp.login_info.user_id = "";
+
+	// After GuestLogin, Initialize is the first encrypted GME request the client
+	// sends during normal startup. It receives the Gumi Live ID returned by the
+	// account login flow and decides whether the client should resume an existing
+	// game user or enter the new-user/tutorial flow.
+	//
+	// The client's user id is not enforced here: after an account transfer
+	// that failed past Confirm OK, the keychain holds the target's id while the
+	// device is still bound to its own gumi user (see getUserIdentity).
+	const auto identity = (co_await gme::getUserIdentity(theDb(), req.login_info, true, true)).data;
+
+	// If we didn't find a user for this Gumi Live ID, we just return an empty user_id
+	// and let the client enter the tutorial flow. Otherwise, we return the user info
+	// stored in the database.
+	if (!identity.userId.empty())
+	{
+		resp.login_info = std::move((co_await gme::getLoginInfo(theDb(), identity)).nonEmpty());
+		// The Summoner Rank 50 selector.  UserInfo alone was not enough: the
+		// client sends it far less often than it starts (16 against 77 starts in
+		// one hour on 10-18), so 14 of 21 players past level 50 had never been
+		// paid.  Here and in the 30-minute UpdateInfo it lands within a session.
+		co_await gme::grantStarterSelectorIfDue(theDb(), identity);
+	}
+
+	//resp.user_info.gumi_live_token = req.user_info.gumi_live_token;
+	//resp.user_info.gumi_live_userid = req.user_info.gumi_live_userid;
+
+	resp.signal_key.key = "C7vnXA5T";
+
+	// The MST version/download channel (KeC10fuL).
+	//
+	// ⚠ MERGE, NEVER REPLACE.  `resp` is a copy of the cached Initialize
+	// response, and that already carries the 169 rows of
+	// deploy/mst/version_info_mst.json -- the BASELINE versions the client's
+	// existing cache is matched against (M_LEVEL_MST v19, M_GACHA_MST v952,
+	// and so on).
+	//
+	// This line used to be a plain assignment, on the reasoning that "an empty
+	// list is the correct 'nothing to update' answer".  It is not.  Handing the
+	// client an empty version table for data it has already cached tells it
+	// every one of those tables is unknown, and it answers by refreshing the
+	// lot: "Refreshing the latest data files. Application will close now." --
+	// then does it again on the next boot, forever.  The client never even
+	// reached the home screen.
+	//
+	// It is the exact failure this session's audit keeps finding: a plausible
+	// value overwriting real state, healthy-looking on the wire.
+	//
+	// So: keep the baseline, and let a staged download table override its row.
+	{
+		auto staged = gme::mstVersions();
+		for (auto& row : staged)
+		{
+			const auto it = std::find_if(resp.mst.begin(), resp.mst.end(),
+				[&row](const ::VersionInfo& base) { return base.id == row.id; });
+			if (it != resp.mst.end())
+				*it = std::move(row);
+			else
+				resp.mst.push_back(std::move(row));
+		}
+		LOG_INFO << "Initialize: MST versions = " << resp.mst.size()
+			<< " row(s) (" << staged.size() << " from staged downloads)";
+	}
+
+	resp.challenge_arena_user_info.user_id = "n9ZMPC0t"; // rank name?
+	resp.challenge_arena_user_info.unkstr2 = "F"; // ranking?
+	resp.challenge_arena_user_info.league_id = 1;
+
+	resp.summoner_journal.user_id = identity.userId;
+	// ⚠ THE REWARDS TILE DOES NOT EXIST WHILE THIS IS 0.
+	// RewardsTopScene::loadMenuList @0xE42440 reads
+	// getSummonerJournalFlag() first thing and `cbz w0` past the whole tile
+	// (@0xE424B0), so the menu renders SEVEN tiles instead of eight — which
+	// is why the 32Gwida0 / 2y48D13d / 3a83iY3r probes never captured a
+	// body: the screen they belong to was unreachable.
+	//
+	// It has to ride here rather than on the Journal's own response, because
+	// loadMenuList needs it before the screen can be opened at all.
+	//
+	// Per the wiki the Journal is new-Summoner-only and disappears once every
+	// mission is done and every prize claimed, so 0 is the legitimate
+	// "finished" state and this is the switch that retires the feature.
+	resp.summoner_journal.journal_flag = 1;
+	resp.summoner_journal.points = 0;
+
+	// Daily Spin (the Rewards menu's task_dailyloginspin tile).
+	//
+	// ⚠ `user_current_count` IS "spins ALREADY USED today", and it is what
+	// decides whether the HOME SCREEN force-opens the wheel.  This is not a
+	// cosmetic counter — get it wrong and the player cannot reach Home at all.
+	//
+	//     DailyLoginRewardsUserInfo::isDailyLoginAvailable @0x1CC8278
+	//       if (this->[0x24]) return false;   // one-shot per-session latch
+	//       this->[0x24] = 1;
+	//       return this->[0x1c] < 1;          // user_current_count < 1
+	//
+	// and its ONLY two callers are HomeScene2::updateEvent @0x16F2D9C and
+	// AnotherHomeScene::updateEvent @0x16E5128.  Below 1 means "hasn't spun
+	// today", so Home opens the wheel over itself; the wheel then only closes
+	// once `used >= limit` (DailyLoginScene::updateEvent state 1 @0xE52FDC,
+	// else-branch state 7 = exit to Home).  Reporting 0 against a non-zero
+	// limit with no working spin handler locked the client out of Home
+	// entirely — see handbook §7.14.
+	//
+	// It is now read from user_daily_spin and rolls over on the spin day (08:00
+	// UTC, the client's midnight: DayClock::DailySpin), so a fresh day
+	// legitimately offers the wheel again and the DailyLogin (4aClzokO)
+	// handler is what closes it.
+	//
+	// Guarded on a resolved user: this reply also serves the new-user/tutorial
+	// flow, where userId is deliberately empty, and loading there would insert
+	// a spin row keyed on "".  With no user we report the day as already spun,
+	// which is the one value that cannot trap anybody in the wheel.
+	resp.daily_login_rewards.id = gme::dailySpinAnchor(1);
+	resp.daily_login_rewards.current_day = 1;
+	resp.daily_login_rewards.user_current_count = gme::kDailySpinLimit;
+	resp.daily_login_rewards.user_spin_limit_count = gme::kDailySpinLimit;
+	resp.daily_login_rewards.next_reward_id = gme::dailySpinAnchor(2);
+	{
+		auto label = gme::dailySpinGemLabel(1);
+		resp.daily_login_rewards.remaining_days_till_guaranteed_reward = std::move(label.counter);
+		resp.daily_login_rewards.message = std::move(label.message);
+	}
+
+	if (!identity.userId.empty())
+	{
+		// The machine's only medal source on this server — Raid Battle, the
+		// live one, does not exist here.  Sits beside the daily spin, but its
+		// day still turns at 00:00 UTC while the spin's turns at 08:00 UTC
+		// (see grantDailyBraveMedals).
+		co_await gme::grantDailyBraveMedals(theDb(), identity);
+
+		// DAILY TASKS.  ⚠ Initialize ships the RAW six-row table straight out
+		// of the cache and the client takes the first three, so the Home popup
+		// showed AV/QE/VV (file order) while the Rewards screen showed the real
+		// rotation — two different boards in one session.  Worse, the popup's
+		// first tile was Arena Victory, which this server cannot count at all.
+		// Both screens now come from the same builder.
+		co_await gme::fillDailyTaskTables(
+			theDb(), identity, resp.daily_tasks, resp.daily_task_prizes);
+
+		const auto spin = co_await gme::loadDailySpin(theDb(), identity);
+		// ⚠ These two are REWARD IDS, not day numbers.  The client groups the
+		// wheel by the row this id belongs to, so a day number here draws a
+		// different day's prizes than the spin scores against — sending 7 drew
+		// day 2's wheel (200,000 Karma and all) while the spin ran on day 7.
+		//
+		// ⚠ THE PAIR IS "last prize / wheel in front of you", NOT "today /
+		// tomorrow".  The client draws next_reward_id's group whenever it
+		// differs from id's (setupSpinWheelRewards @0xE52778), so this line
+		// sending today's anchor as BOTH pinned the wheel to `id` — which
+		// happened to be right only while the two were the same day.  See
+		// gme::dailySpinWheel, which also keeps `id` resolvable: the client
+		// calls getGroupType() on it with no null check.
+		const auto wheel = gme::dailySpinWheel(spin);
+		resp.daily_login_rewards.id = wheel.id;
+		resp.daily_login_rewards.next_reward_id = wheel.nextRewardId;
+		resp.daily_login_rewards.current_day = spin.spinDay;
+		resp.daily_login_rewards.user_current_count = spin.spinsUsed;
+		// Distance to the next guaranteed Gem, BOTH HALVES EMPTY once none is
+		// left — see dailySpinGemLabel.  Shared with the DailyLogin handler
+		// deliberately; computing it in two places is how the reward id came to
+		// be right in one emitter and wrong in the other.
+		auto label = gme::dailySpinGemLabel(spin.spinDay);
+		resp.daily_login_rewards.remaining_days_till_guaranteed_reward = std::move(label.counter);
+		resp.daily_login_rewards.message = std::move(label.message);
+	}
+
+	std::string buffer{};
+	const auto& ec2 = glz::write_json(resp, buffer);
+	if (ec2)
+	{
+		const auto& glze = glz::format_error(ec2, buffer);
+		LOG_DEBUG << "Gme Initialize Error during JSON writing: " << glze;
+		co_return HandleResult::error("Serialization error", glze);
+	}
+
+	co_return HandleResult::success(buffer);
+}
+

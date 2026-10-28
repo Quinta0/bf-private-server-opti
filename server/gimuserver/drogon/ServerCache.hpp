@@ -1,0 +1,690 @@
+#pragma once
+
+#include "ServerConfig.hpp"
+
+#include <array>
+#include <map>
+#include <set>
+#include <vector>
+
+/*!
+* Cache of the server
+*/
+class ServerCache final : public trantor::NonCopyable
+{
+public:
+	/*!
+	* Setup the server cache.
+	* @param[in] serverObj Configuration object of the plugin
+	*/
+	void Setup(const Json::Value& serverObj);
+
+	/*!
+	* Gets the banner configuration (dls).
+	* @return DLS string
+	*/
+	inline const auto& dls() const { return m_dls; }
+
+	/*!
+	* Gets the server feature configuration.
+	* @return Feature string
+	*/
+	inline const auto& feature() const { return m_feature; }
+
+	/*!
+	* Gets the common portion of the initialize response.
+	* @return Initialize respose
+	*/
+	inline const auto& initializeResp() const { return m_initrsp;  }
+
+	/*!
+	* Gets the common portion of the user info response.
+	* @return User info response
+	*/
+	inline const auto& userInfoResp() const { return m_userrsp; }
+
+	/*!
+	* Vortex dungeon-key catalog (Metal / Jewel / Imp).
+	*
+	* A view onto the copy already held for the Initialize response rather than
+	* a second vector — the client is sent this table verbatim, so there is only
+	* ever one authoritative copy.  Consumers: the DungeonKey handlers.
+	*/
+	inline const auto& dungeonKeyMst() const { return m_initrsp.dungeon_keys; }
+
+	/*!
+	* Gets the cached summon list response.
+	* @return GachaList response
+	*/
+	inline const auto& gachaListRsp() const { return m_gachaListRsp; }
+
+	/*!
+	* Gets the cached slot response.
+	* @return ControlCenter response
+	*/
+	inline const auto& braveSlotsResp() const { return m_controlCenterRsp; }
+
+	/*!
+	* Server config.
+	* @return Server config
+	*/
+	inline const auto& serverConfig() const { return m_serverConfig; }
+
+	/*!
+	* Unit master data (F_UNIT_MST): deploy/mst/unit_mst.json (wrapper key
+	* "2r9cNSdt"), plus unit_mst_homebrew.json appended, plus the rows of
+	* <balance_root>/server/unit_mst.json replacing theirs by id.
+	* @return Vector of UnitMst entries
+	*/
+	inline const auto& unitMst() const { return m_unitMst; }
+
+	/*!
+	* The rows <balance_root>/server/unit_mst.json replaced, as they were
+	* BEFORE the override (shipped or homebrew), keyed by unit id.  Empty when
+	* balance_root is off or overrides nothing.  The stat migration seeds a
+	* fresh unit_stat_basis from these so owned units still follow the first
+	* publish (see BalanceSync).
+	*/
+	inline const auto& unitMstBeforeBalance() const { return m_unitMstBeforeBalance; }
+
+	/*!
+	* Item master data (F_ITEM_MST, wrapper key "2C7LDzYk").  Loaded for
+	* server-side item lookup (drop validation, sphere stats).  See
+	* mst/item.kdl.
+	* @return Vector of ItemMst entries (1668 rows)
+	*/
+	inline const auto& itemMst() const { return m_itemMst; }
+
+	/*!
+	* Grand Mission ("Campaign") master data, one getter per table.  The
+	* Campaign handlers use these for mission/reward validation; see
+	* mst/grand_mission.kdl for the field maps and
+	* tools/MST_PORTING_BACKLOG.md for the 2026-07-19 port pass.
+	* @return Vector of the matching GrandMission*Mst entries
+	*/
+	inline const auto& achievementSubjectMst() const { return m_achievementSubjectMst; }
+	inline const auto& achievementTradeMst() const { return m_achievementTradeMst; }
+	inline const auto& achievementDeliverRateMst() const { return m_achievementDeliverRateMst; }
+	inline const auto& grandMissionMst() const { return m_grandMissionMst; }
+	inline const auto& grandMissionMapMst() const { return m_grandMissionMapMst; }
+	inline const auto& grandMissionSpotMst() const { return m_grandMissionSpotMst; }
+	inline const auto& grandMissionRouteMst() const { return m_grandMissionRouteMst; }
+	inline const auto& grandMissionIconMst() const { return m_grandMissionIconMst; }
+	inline const auto& grandMissionTreasureMst() const { return m_grandMissionTreasureMst; }
+	inline const auto& grandMissionFlgMst() const { return m_grandMissionFlgMst; }
+	inline const auto& grandMissionEndCndMst() const { return m_grandMissionEndCndMst; }
+	inline const auto& grandMissionEventMst() const { return m_grandMissionEventMst; }
+	inline const auto& grandMissionRewardMst() const { return m_grandMissionRewardMst; }
+
+	/*!
+	* Raid Battle master data, one getter per table (13 of 14 — BOSS_PARTS
+	* has no response class in the binary).  See mst/raid.kdl for the field
+	* maps and tools/MST_PORTING_BACKLOG.md for the 2026-07-19 port pass.
+	* @return Vector of the matching Raid*Mst entries
+	*/
+	inline const auto& raidWorldMst() const { return m_raidWorldMst; }
+	inline const auto& raidMapMst() const { return m_raidMapMst; }
+	inline const auto& raidRcMst() const { return m_raidRcMst; }
+	inline const auto& raidPlaystyleMst() const { return m_raidPlaystyleMst; }
+	inline const auto& raidBossMst() const { return m_raidBossMst; }
+	inline const auto& raidBossRouteMst() const { return m_raidBossRouteMst; }
+	inline const auto& raidMissionMst() const { return m_raidMissionMst; }
+	inline const auto& raidMissionBossMst() const { return m_raidMissionBossMst; }
+	inline const auto& raidMissionClearCndMst() const { return m_raidMissionClearCndMst; }
+	inline const auto& raidMissionPointMst() const { return m_raidMissionPointMst; }
+	inline const auto& raidPointMst() const { return m_raidPointMst; }
+	inline const auto& raidUserRouteMst() const { return m_raidUserRouteMst; }
+	inline const auto& raidBattleGroupMst() const { return m_raidBattleGroupMst; }
+	inline const auto& raidBossPartsMst() const { return m_raidBossPartsMst; }
+
+	/*!
+	* Colosseum (PvP arena) master data — brackets, extra rules, formations
+	* and support effects.  Field maps in mst/colosseum.kdl.
+	*/
+	inline const auto& colosseumClassMst() const { return m_colosseumClassMst; }
+	inline const auto& colosseumExtraRuleMst() const { return m_colosseumExtraRuleMst; }
+	inline const auto& colosseumFormationMst() const { return m_colosseumFormationMst; }
+	inline const auto& colosseumSupportMst() const { return m_colosseumSupportMst; }
+
+	/*!
+	* Dual Brave Burst master data — pair catalog and bond recipes.
+	* Field maps in mst/dbb.kdl.
+	*/
+	inline const auto& dbbMst() const { return m_dbbMst; }
+	inline const auto& dbbBondRecipeMst() const { return m_dbbBondRecipeMst; }
+
+	/*!
+	* Guild master data — level curve, member skills, point exchange shop.
+	* Field maps in mst/guild.kdl.
+	*/
+	inline const auto& guildInfoMst() const { return m_guildInfoMst; }
+	inline const auto& guildMemberSkillMst() const { return m_guildMemberSkillMst; }
+	inline const auto& guildPointExchangeMst() const { return m_guildPointExchangeMst; }
+
+	/*!
+	* Age-banded real-money spend caps.  Field map in mst/purchase.kdl.
+	*/
+	inline const auto& purchaseAgeLimitMst() const { return m_purchaseAgeLimitMst; }
+
+	/*!
+	* Frontier Gate master data — gate catalog and support effects.
+	* Field maps in mst/frontier_gate.kdl.
+	*/
+	inline const auto& frontierGateMst() const { return m_frontierGateMst; }
+	inline const auto& frontierGateSupportMst() const { return m_frontierGateSupportMst; }
+	inline const auto& frontierGateRewardMst() const { return m_frontierGateRewardMst; }
+	inline const auto& functionReleaseMst() const { return m_functionReleaseMst; }
+
+	/*!
+	* Dungeon -> its mission ids, ascending.  A DERIVED INDEX over
+	* F_MISSION_MST, not the table itself: only the id and dungeon_id columns
+	* are kept, so this is ~1500 small vectors rather than 3433 full rows.
+	*
+	* Exists because FrontierGateInfo needs two things the gate catalog cannot
+	* answer and deploy/archive/mission.json does not cover (it holds a handful
+	* of Grand Gaia missions; Frontier Gate's live in the 3000xxx space):
+	*   - the gate's ENTRY mission id, which the client requires before it will
+	*     render a quest tile at all (verified 2026-08-07 with a live client:
+	*     entries with an empty j28VNcUW do not appear on the select screen);
+	*   - the gate's battle count, which is simply how many missions its dungeon
+	*     holds, and which the tile prints as "Battles N".
+	*
+	* Note the full mission_mst vector was deliberately dropped in c49782e as
+	* unconsumed (PR #31 review).  This is not that cache coming back — it is a
+	* two-column topology index with a named consumer.  If FrontierGateInfo
+	* stops needing it, delete it.
+	*/
+	inline const auto& missionsByDungeon() const { return m_missionsByDungeon; }
+
+	/*! Every mission that lives inside the Vortex, for the VV daily task. */
+	inline const auto& vortexMissions() const { return m_vortexMissions; }
+
+	/*!
+	* mission id -> its FIRST-CLEAR reward string, for the 787 missions that
+	* have one.  Comma-separated `type:id:amount:?:?` in the shared reward
+	* vocabulary (3 zel, 8 gem, 6 unit, 4/5/7 item, 11 karma, 17 SP) --
+	* see MissionMst::clear_rewards.  Missions with no reward are absent.
+	*/
+	inline const auto& missionClearRewards() const { return m_missionClearRewards; }
+
+	/*!
+	* mission id -> the missions that must be cleared before it unlocks.
+	*
+	* Only missions WITH a prerequisite appear; an absent entry means the
+	* mission is available from the start. Derived from MissionMst's
+	* need_mission_id, the same field AreaMst and DungeonMst use, which encodes
+	* Grand Gaia's progression graph (Mistral runs 1 -> 2 -> 10 -> ... -> 85,
+	* and area "Morgan" needs 85).
+	*
+	* Consumer: UserInfo's PermitPlace progression gate.
+	*/
+	inline const auto& missionNeeds() const { return m_missionNeeds; }
+
+	/*!
+	* Id of the Frontier Hunter event currently advertised as running.
+	*
+	* Every row in challenge_mst.json (F_FROGATE's sibling, F_FROHUN_MST) is a
+	* real 2014-2022 window and all of them have expired, so Setup() keeps the
+	* newest one open and records its id here.  ChallengeBase returns it as the
+	* active event under cvg8hzp9.  0 when the table is empty.
+	*/
+	inline int32_t activeChallengeId() const { return m_activeChallengeId; }
+
+	/*!
+	* Ids PermitPlace must allow before a Frontier Gate run can be entered.
+	*
+	* UserInfo injects dense id ranges that cover the Grand Gaia numbering space
+	* only; Frontier Gate lives outside it entirely (gate 91's mission 9010001
+	* is land 99, area 3000001, dungeon 9000002).  Permitting the gates'
+	* dungeons alone was not enough -- the mission fetched its assets and then
+	* crashed because its parent land/area were unreachable.
+	*
+	* Collected per gate at boot so the permit list grows by the ~100 ids
+	* Frontier Gate needs rather than by a blanket widening.
+	*/
+	struct TopologyPermits
+	{
+		std::set<int32_t> lands;
+		std::set<int32_t> areas;
+		std::set<int32_t> dungeons;
+		std::set<int32_t> missions;
+
+		// Missions that carry a MissionMst.need_mission_id, held back from
+		// `missions` so PermitPlace can decide them per request against the
+		// player's cleared set.  Vortex ids sit above kSpecialIdFloor and so
+		// are skipped by the Grand Gaia progression gate; without this the
+		// parade tiers were all permitted at once and you could open Mega
+		// without ever clearing the base.  Same shape as missionNeeds():
+		// mission id -> the missions that must be cleared first.
+		std::map<int32_t, std::vector<int32_t>> gatedMissions;
+
+		// Dungeons whose every mission is in gatedMissions, held back from
+		// `dungeons` so PermitPlace permits the dungeon only once one of them
+		// is.  Permitted outright, a locked dungeon drew a tile that opened on
+		// an empty quest list (Glitch in the Heart > Side: Terminus before
+		// Vektor and Galene are cleared, ticket #120).
+		// Dungeon id -> its missions.
+		std::map<int32_t, std::vector<int32_t>> gatedDungeons;
+
+		// Missions belonging to a dungeon that a DungeonKey opens.  Held back
+		// entirely: which of them are permitted depends on WHICH TIER the
+		// player bought, which only UserInfo can know.  Blanket-permitting
+		// them showed every parade tier at once.
+		std::set<int32_t> keyGatedMissions;
+	};
+	inline const TopologyPermits& frontierGatePermits() const { return m_frontierGatePermits; }
+
+	/*!
+	* Grand Quest topology — the land, area, dungeons and missions of
+	* F_GRAND_MISSION_MST, permitted as a whole.
+	*
+	* The client will not even SHOW the mode without one of these entries:
+	* GameUtils::checkGrandPermit @0x11A767C walks the Grand Missions, looks each
+	* one's dungeon up in the permit list (the dungeon id comes from the
+	* like-numbered F_MISSION_MST row, copied over by
+	* CampaignUtils::missionMstReflect) and returns isEnterable() for the one
+	* whose place id is "5000000".  Grand ids sit above kSpecialIdFloor, so the
+	* Grand Gaia progression gate skips them; they are collected here instead.
+	*/
+	inline const TopologyPermits& grandQuestPermits() const { return m_grandQuestPermits; }
+
+	/*!
+	* Ids PermitPlace must allow before the Vortex (gate 99) renders any tile.
+	*
+	* Same failure as Frontier Gate above, one subsystem over: Vortex content
+	* lives in land 99 with area ids 100000-101999, dungeon ids 100000-102999
+	* and mission ids 100000-102999, so **every** one of its 88 areas, 104
+	* dungeons and 292 missions falls outside UserInfo's dense Grand Gaia
+	* ranges (lands 1-2, areas 1-1000, dungeons 1-2000, missions 1-4000).
+	* Nothing was permitted, so the client had nothing to draw -- the reported
+	* "no tiles in Vortex".
+	*
+	* Land 99 is not Vortex alone: it is the catch-all "special content" land
+	* that also holds Frontier Hunter (area 1000000+), Frontier Gate (3000000+)
+	* and Grand Quest (5000000+).  Scoped to area id < 200000 so this permits
+	* the Vortex block only -- 494 entries against the ~7100 the dense ranges
+	* already emit -- rather than blanket-opening every special subsystem.
+	* Plus the land-99 areas NESTED under a Vortex category whatever their id
+	* (Travellers, Vortex Trials, Seasons Past: 73 areas from 700000 up to
+	* 25600001, Trial of the Gods aside), which the range alone cut off
+	* (ticket #19).
+	*
+	* This set is the ALWAYS-OPEN portion: the land, every Vortex area, and the
+	* 103 dungeons that carry no weekday banner (collab/event/frog/goddess
+	* content, plus the two key-gated parades).  The 7 weekday dungeons live in
+	* vortexDayPermits() instead.
+	*/
+	inline const TopologyPermits& vortexPermits() const { return m_vortexPermits; }
+
+	/*!
+	* Land/area/dungeon/mission ids the ACTIVE Frontier Hunter challenge needs
+	* permitted.
+	*
+	* The lobby's Enter button does not fire a request of its own:
+	* ChallengeLobbyScene::missionScene @0x155C45C goes straight to
+	* MissionSelectScene2 with ChallengeBase::getDunMst(), the ordinary
+	* quest-select screen.  So entry reuses the whole existing mission pipeline
+	* and the only thing standing in its way is the permit list -- without these
+	* ids the select screen has nothing to draw.
+	*/
+	inline const TopologyPermits& challengePermits() const { return m_challengePermits; }
+
+	/*!
+	* Land/area/dungeon/mission ids for Trial of the Gods (dungeon 800051).
+	*
+	* Its six missions sit above PermitPlace's kSpecialIdFloor, so the Grand
+	* Gaia progression gate never reaches them and nothing else permitted them:
+	* the client already knew their names and the map had no tile.
+	*/
+	inline const TopologyPermits& trialPermits() const { return m_trialPermits; }
+
+	/*!
+	* The Vortex weekday rotation, indexed 0 = Monday .. 6 = Sunday.
+	*
+	* Only dungeons and missions -- the parent areas are permitted
+	* unconditionally by vortexPermits() so the area tile stays on the map and
+	* only the dungeon tile inside it appears and disappears, which is how the
+	* rotation reads in-game.
+	*
+	* The schedule is NOT in any MST: DungeonMst has no day column (every one
+	* was checked).  The only day signal the shipped data carries is the banner
+	* filename -- sp_quest_banner_{monday,tuesday,...,weekend}N.png -- so that
+	* is what this is derived from at boot.  Seven dungeons match:
+	*
+	*   Mon  100000 Gathering of Souls    Mon  100050 Souls Training Ground
+	*   Tue  100100 Faerie Paradise       Wed  100200 Cave of Greed
+	*   Thu  100500 Golden Slumberland    Fri  100400 Remains of Eternity
+	*   Sat+Sun 100300 Garden of God
+	*
+	* Note the shipped data gives the weekend its OWN dungeon rather than
+	* opening the weekday ones -- see ServerConfig::vortexWeekendOpensAll for
+	* the switch that overrides that.
+	*
+	* 100100 and 100300 are open every day by default
+	* (ServerConfig::vortexAlwaysOpenDungeons).
+	*/
+	inline const TopologyPermits& vortexDayPermits(size_t weekdayIndex) const
+	{
+		return m_vortexDayPermits.at(weekdayIndex);
+	}
+
+	/*!
+	* Mission id -> the Grand Gaia quest dungeon it belongs to, absent for any
+	* mission that earns no clear Gem.
+	*
+	* Clearing every mission in one of these dungeons pays 1 Gem, once — the
+	* "1 Gem from fully completing a stage in a Quest map" on the wiki's
+	* In-Game Credits page.  203 dungeons carry a Gem across 989 missions, so
+	* roughly one Gem per five missions.
+	*
+	* ⚠ The wiki says this two ways and they are not the same size.  Quests
+	* says "Finishing an AREA rewards you with 1 Gem", which is 26 Gems for the
+	* whole campaign; In-Game Credits says a STAGE, which is the dungeon and is
+	* the 203 above.  The dungeon reading is the one implemented: it is the one
+	* the project owner remembered ("one gem for completing a mission set"), it
+	* matches the word "stage", and 26 Gems across 989 missions cannot sustain
+	* a 3-Gem summon.  To switch, index by mission.area_id here instead —
+	* MissionEnd reads whatever this maps to and needs no other change.
+	*
+	* Quest content only.  Vortex, Frontier Gate, Frontier Hunter and Grand
+	* Quest all live on land 99 and are not a "Quest map"; event and collab
+	* content sits above the id floor.
+	*/
+	inline const auto& missionQuestDungeon() const { return m_missionQuestDungeon; }
+
+	/*!
+	* The area table as the CLIENT should hold it — areaMst() minus the Vortex
+	* areas not worth a tile, with Parade Garden floated to the top.
+	*
+	* Sent on UserInfo at 3SG2wX0R, which is a full replace of the client's
+	* AreaMstList, so this is deliberately the WHOLE table and not just the
+	* Vortex slice.  Use areaMst() for anything server-side; this one exists
+	* only to be serialised.  See UserInfoResp::area_mst for the readParam
+	* evidence, and Setup() for what the curation drops.
+	*/
+	inline const auto& clientAreaMst() const { return m_clientAreaMst; }
+
+	/*!
+	* Vortex areas that are deliberately not drawn — empty shells, untranslated
+	* collab content, and repeats of a tile the player already has.
+	*/
+	inline const auto& vortexHiddenAreas() const { return m_vortexHiddenAreas; }
+
+	/*!
+	* Summoner Unit master data — the player avatar's level curve, per-element
+	* progression, arm catalog, ability tree, EX skills and illustrations.
+	* Field maps in mst/summoner.kdl.
+	*/
+	inline const auto& summonerAbilityMst() const { return m_summonerAbilityMst; }
+	inline const auto& summonerAbilityLevelMst() const { return m_summonerAbilityLevelMst; }
+	inline const auto& summonerAbilityUpMst() const { return m_summonerAbilityUpMst; }
+	inline const auto& summonerArmMst() const { return m_summonerArmMst; }
+	inline const auto& summonerArmElementMst() const { return m_summonerArmElementMst; }
+	inline const auto& summonerElementLevelMst() const { return m_summonerElementLevelMst; }
+	inline const auto& summonerExSkillMst() const { return m_summonerExSkillMst; }
+	inline const auto& summonerImageMst() const { return m_summonerImageMst; }
+	inline const auto& summonerLevelMst() const { return m_summonerLevelMst; }
+
+	/*!
+	* Skill catalog and its sidecars.  Field maps in mst/skill.kdl (SkillMst)
+	* and mst/skill_ext.kdl.
+	*/
+	inline const auto& skillMst() const { return m_skillMst; }
+	inline const auto& skillLevelMst() const { return m_skillLevelMst; }
+	inline const auto& leaderSkillMst() const { return m_leaderSkillMst; }
+
+	/*!
+	* Unit evolution recipes, standard and Omni.  Field maps in
+	* mst/unit_evo.kdl.
+	*/
+	inline const auto& unitEvoMst() const { return m_unitEvoMst; }
+	inline const auto& unitEvoOmniMst() const { return m_unitEvoOmniMst; }
+	inline const auto& unitEvoOmniTypeMst() const { return m_unitEvoOmniTypeMst; }
+	inline const auto& unitEvoOmniRecipeMst() const { return m_unitEvoOmniRecipeMst; }
+
+	/*!
+	* Unit side-tables — types, extras, EP3 costs, animation manifests,
+	* comments and the Frontier Evolution tree.  Field maps in
+	* mst/unit_ext.kdl and mst/mission_ep3.kdl.
+	*/
+	inline const auto& unitTypeMst() const { return m_unitTypeMst; }
+	inline const auto& unitExtMst() const { return m_unitExtMst; }
+	inline const auto& unitEp3Mst() const { return m_unitEp3Mst; }
+	inline const auto& unitCgsMst() const { return m_unitCgsMst; }
+	inline const auto& unitCommentMst() const { return m_unitCommentMst; }
+	inline const auto& unitFeSkillMst() const { return m_unitFeSkillMst; }
+	inline const auto& unitFeCategoryMst() const { return m_unitFeCategoryMst; }
+	inline const auto& feSkillMst() const { return m_feSkillMst; }
+	inline const auto& missionEp3Mst() const { return m_missionEp3Mst; }
+
+	/*!
+	* World geography — gates, areas, dungeons.  Field maps in mst/area.kdl.
+	*/
+	inline const auto& gateMst() const { return m_gateMst; }
+	inline const auto& areaMst() const { return m_areaMst; }
+	inline const auto& dungeonMst() const { return m_dungeonMst; }
+
+	/*!
+	* Shop, medal, help-detail and fixed-PvP tables.  Field maps in
+	* mst/shop.kdl.
+	*/
+	inline const auto& shopItemMst() const { return m_shopItemMst; }
+	inline const auto& medalMst() const { return m_medalMst; }
+	inline const auto& helpDetailMst() const { return m_helpDetailMst; }
+	inline const auto& pvpFixedSettingMst() const { return m_pvpFixedSettingMst; }
+
+private:
+	/*!
+	* DLS cached JSON.
+	*/
+	std::string m_dls;
+
+	/*!
+	* Cached data of response.
+	*/
+	FeatureCheck m_feature{};
+
+	/*!
+	* Cached common data of the Initialize response
+	*/
+	InitializeResp m_initrsp{};
+
+	/*!
+	* Cached slot response
+	*/
+	SlotGameInfoR m_controlCenterRsp{};
+
+	/*!
+	* Server configuration.
+	*/
+	ServerConfig m_serverConfig;
+
+	/*!
+	* User info response.
+	*/
+	UserInfoResp m_userrsp{};
+
+	/*!
+	* Summon list response.
+	*/
+	GachaListResp m_gachaListRsp{};
+
+	/*!
+	* Unit master data, keyed/iterated by Unit handler ports.
+	*/
+	std::vector<UnitMst> m_unitMst;
+
+	/*!
+	* Pre-override copies of the unit rows the balance overlay replaced.
+	*/
+	std::map<int32_t, UnitMst> m_unitMstBeforeBalance;
+
+	/*!
+	* Item master data (wrapper key "2C7LDzYk"), looked up by item_id.
+	* Loaded from deploy/mst/item_mst.json.
+	*/
+	std::vector<ItemMst> m_itemMst;
+
+	/*!
+	* Grand Mission ("Campaign") master data, loaded from
+	* deploy/mst/grand_mission_*.json (wrapper keys documented in
+	* mst/grand_mission.kdl).
+	*/
+	std::vector<AchievementSubjectMst> m_achievementSubjectMst;
+	std::vector<AchievementTradeMst> m_achievementTradeMst;
+	std::vector<AchievementDeliverRateMst> m_achievementDeliverRateMst;
+	std::vector<GrandMissionMst> m_grandMissionMst;
+	std::vector<GrandMissionMapMst> m_grandMissionMapMst;
+	std::vector<GrandMissionSpotMst> m_grandMissionSpotMst;
+	std::vector<GrandMissionRouteMst> m_grandMissionRouteMst;
+	std::vector<GrandMissionIconMst> m_grandMissionIconMst;
+	std::vector<GrandMissionTreasureMst> m_grandMissionTreasureMst;
+	std::vector<GrandMissionFlgMst> m_grandMissionFlgMst;
+	std::vector<GrandMissionEndCndMst> m_grandMissionEndCndMst;
+	std::vector<GrandMissionEventMst> m_grandMissionEventMst;
+	std::vector<GrandMissionRewardMst> m_grandMissionRewardMst;
+
+	/*!
+	* Raid Battle master data, loaded from deploy/mst/raid_*.json
+	* (wrapper keys documented in mst/raid.kdl).
+	*/
+	std::vector<RaidWorldMst> m_raidWorldMst;
+	std::vector<RaidMapMst> m_raidMapMst;
+	std::vector<RaidRcMst> m_raidRcMst;
+	std::vector<RaidPlaystyleMst> m_raidPlaystyleMst;
+	std::vector<RaidBossMst> m_raidBossMst;
+	std::vector<RaidBossRouteMst> m_raidBossRouteMst;
+	std::vector<RaidMissionMst> m_raidMissionMst;
+	std::vector<RaidMissionBossMst> m_raidMissionBossMst;
+	std::vector<RaidMissionClearCndMst> m_raidMissionClearCndMst;
+	std::vector<RaidMissionPointMst> m_raidMissionPointMst;
+	std::vector<RaidPointMst> m_raidPointMst;
+	std::vector<RaidUserRouteMst> m_raidUserRouteMst;
+	std::vector<RaidBattleGroupMst> m_raidBattleGroupMst;
+	std::vector<RaidBossPartsMst> m_raidBossPartsMst;
+
+	// Colosseum — mst/colosseum.kdl
+	std::vector<ColosseumClassMst> m_colosseumClassMst;
+	std::vector<ColosseumExtraRuleMst> m_colosseumExtraRuleMst;
+	std::vector<ColosseumFormationMst> m_colosseumFormationMst;
+	std::vector<ColosseumSupportMst> m_colosseumSupportMst;
+
+	// Dual Brave Burst — mst/dbb.kdl
+	std::vector<DbbMst> m_dbbMst;
+	std::vector<DbbBondRecipeMst> m_dbbBondRecipeMst;
+
+	// Guild — mst/guild.kdl
+	std::vector<GuildInfoMst> m_guildInfoMst;
+	std::vector<GuildMemberSkillMst> m_guildMemberSkillMst;
+	std::vector<GuildPointExchangeMst> m_guildPointExchangeMst;
+
+	// Purchase age caps — mst/purchase.kdl
+	std::vector<PurchaseAgeLimitMst> m_purchaseAgeLimitMst;
+
+	// Frontier Gate — mst/frontier_gate.kdl
+	std::vector<FrontierGateMst> m_frontierGateMst;
+	std::vector<FrontierGateSupportMst> m_frontierGateSupportMst;
+	std::vector<FrontierGateRewardMst> m_frontierGateRewardMst;
+	std::vector<FunctionReleaseMst> m_functionReleaseMst;
+
+	// dungeon_id -> ascending mission ids.  Derived index over F_MISSION_MST;
+	// the rows themselves are not retained.  Consumer: FrontierGateInfo.
+	std::map<int32_t, std::vector<int32_t>> m_missionsByDungeon;
+	std::set<int32_t> m_vortexMissions;
+	std::map<int32_t, std::string> m_missionClearRewards;
+
+	// mission id -> prerequisite mission ids.  Only missions that HAVE a
+	// prerequisite are present.  Consumer: UserInfo's PermitPlace gate.
+	std::map<int32_t, std::vector<int32_t>> m_missionNeeds;
+
+	// Frontier Hunter event kept open by Setup().  Consumer: ChallengeBase.
+	int32_t m_activeChallengeId = 0;
+
+	// Land/area/dungeon/mission ids Frontier Gate needs permitted.
+	// Consumer: UserInfo's PermitPlace injection.
+	TopologyPermits m_frontierGatePermits;
+	TopologyPermits m_grandQuestPermits;
+
+	// Land/area/dungeon/mission ids the Vortex (gate 99) needs permitted.
+	// Consumer: UserInfo's PermitPlace injection.
+	TopologyPermits m_vortexPermits;
+
+	// Trial of the Gods' topology.
+	// Consumer: PermitPlace's static base.
+	TopologyPermits m_trialPermits;
+
+	// The active Frontier Hunter challenge's topology.
+	TopologyPermits m_challengePermits;
+
+	// The Vortex weekday rotation, 0 = Monday .. 6 = Sunday.  Dungeons and
+	// missions only; areas stay in m_vortexPermits.
+	// Consumer: UserInfo's PermitPlace injection.
+	std::array<TopologyPermits, 7> m_vortexDayPermits;
+
+	// Mission -> its Grand Gaia quest dungeon.
+	// Consumer: MissionEnd's dungeon-clear Gem.
+	std::map<int32_t, int32_t> m_missionQuestDungeon;
+
+	// Vortex areas curated out of the tile list at boot.
+	// Consumers: m_clientAreaMst and the m_vortexPermits collection.
+	std::set<int32_t> m_vortexHiddenAreas;
+
+	// m_areaMst minus m_vortexHiddenAreas, Parade Garden reordered.
+	// Consumer: UserInfo's 3SG2wX0R emission.
+	std::vector<AreaMst> m_clientAreaMst;
+
+	// Summoner Unit — mst/summoner.kdl
+	std::vector<SummonerAbilityMst> m_summonerAbilityMst;
+	std::vector<SummonerAbilityLevelMst> m_summonerAbilityLevelMst;
+	std::vector<SummonerAbilityUpMst> m_summonerAbilityUpMst;
+	std::vector<SummonerArmMst> m_summonerArmMst;
+	std::vector<SummonerArmElementMst> m_summonerArmElementMst;
+	std::vector<SummonerElementLevelMst> m_summonerElementLevelMst;
+	std::vector<SummonerExSkillMst> m_summonerExSkillMst;
+	std::vector<SummonerImageMst> m_summonerImageMst;
+	std::vector<SummonerLevelMst> m_summonerLevelMst;
+
+	// Skills — mst/skill.kdl + mst/skill_ext.kdl
+	std::vector<SkillMst> m_skillMst;
+	std::vector<SkillLevelMst> m_skillLevelMst;
+	std::vector<LeaderSkillMst> m_leaderSkillMst;
+
+	// Unit evolution — mst/unit_evo.kdl
+	std::vector<UnitEvoMst> m_unitEvoMst;
+	std::vector<UnitEvoOmniMst> m_unitEvoOmniMst;
+	std::vector<UnitEvoOmniTypeMst> m_unitEvoOmniTypeMst;
+	std::vector<UnitEvoOmniRecipeMst> m_unitEvoOmniRecipeMst;
+
+	// Unit side-tables — mst/unit_ext.kdl + mst/mission_ep3.kdl
+	std::vector<UnitTypeMst> m_unitTypeMst;
+	std::vector<UnitExtMst> m_unitExtMst;
+	std::vector<UnitEp3Mst> m_unitEp3Mst;
+	std::vector<UnitCgsMst> m_unitCgsMst;
+	std::vector<UnitCommentMst> m_unitCommentMst;
+	std::vector<UnitFeSkillMst> m_unitFeSkillMst;
+	std::vector<UnitFeCategoryMst> m_unitFeCategoryMst;
+	std::vector<FeSkillMst> m_feSkillMst;
+	std::vector<MissionEp3Mst> m_missionEp3Mst;
+
+	// World geography — mst/area.kdl
+	std::vector<GateMst> m_gateMst;
+	std::vector<AreaMst> m_areaMst;
+	std::vector<DungeonMst> m_dungeonMst;
+
+	// Shop / medal / help / fixed-PvP — mst/shop.kdl
+	std::vector<ShopItemMst> m_shopItemMst;
+	std::vector<MedalMst> m_medalMst;
+	std::vector<HelpDetailMst> m_helpDetailMst;
+	std::vector<PvpFixedSettingMst> m_pvpFixedSettingMst;
+
+public:
+	// Required by gameplay handlers, including selector summons and the Bazaar.
+	inline const auto& unitSelectorGacha() const { return m_unitSelectorGacha; }
+	inline const auto& missionMst() const { return m_missionMst; }
+	inline const auto& eventTokenMst() const { return m_eventTokenMst; }
+
+private:
+	std::vector<UnitSelectorGachaMst> m_unitSelectorGacha;
+	std::vector<MissionMst> m_missionMst;
+	std::vector<EventTokenInfo> m_eventTokenMst;
+};

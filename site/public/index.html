@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>bfrevive · the Brave Frontier Global fan revival</title>
+<meta name="description" content="Brave Frontier Global is back as a fan revival. Join the bfrevive Discord to download the game and play again.">
+<link rel="canonical" href="https://example.com/">
+<meta name="theme-color" content="#070914">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="bfrevive">
+<meta property="og:url" content="https://example.com/">
+<meta property="og:title" content="bfrevive · the Brave Frontier Global fan revival">
+<meta property="og:description" content="Brave Frontier Global is back as a fan revival. Join the Discord to download and play again.">
+<meta property="og:image" content="https://example.com/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Brave Frontier Revive logo above three units and a floating citadel">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The Brave Frontier Revive logo above three units and a floating citadel">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="preload" href="/assets/rodin-eb.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" as="image" href="/assets/bg-tall.webp" media="(orientation: portrait)">
+<link rel="preload" as="image" href="/assets/bg-wide.webp" media="(orientation: landscape)">
+<link rel="preload" as="image" href="/assets/button.webp">
+<style>
+@font-face {
+  font-family: "Rodin";
+  src: url(/assets/rodin-eb.woff2) format("woff2");
+  font-weight: 400 900;
+  font-display: swap;
+}
+:root {
+  --night: #070914;
+  --navy: #0d1330;
+  --ink: #fbf6e8;
+  --muted: #d9d0b8;
+  --gold: #f7d27a;
+  --gutter: 16px;
+  --font: "Rodin", "Arial Black", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --line: #1c0c00;
+  /* the game's text style: light fill with a hard dark outline */
+  --outline: 0 2px 0 var(--line), 2px 0 0 var(--line), -2px 0 0 var(--line), 0 -2px 0 var(--line),
+             1.5px 1.5px 0 var(--line), -1.5px 1.5px 0 var(--line), 1.5px -1.5px 0 var(--line), -1.5px -1.5px 0 var(--line);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--night); color: var(--ink); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--night);
+  font: 400 16px/1.5 var(--font);
+  overflow-x: hidden;
+}
+img { display: block; max-width: 100%; height: auto; }
+h1, h2, p, ol, ul { margin: 0; }
+
+/* ------------------------------------------------------------ hero: the title screen */
+.hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+  padding: max(10px, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
+           max(18px, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+}
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -4;
+  background:
+    linear-gradient(180deg, rgba(7, 9, 20, .55) 0%, rgba(7, 9, 20, .05) 28%, rgba(7, 9, 20, .1) 50%, rgba(7, 9, 20, .8) 80%, var(--night) 100%),
+    url(/assets/bg-tall.webp) center top / cover no-repeat var(--navy);
+}
+/* fades the art (circle, rays, units) into the page instead of cutting it off */
+.hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(26%, 220px);
+  background: linear-gradient(rgba(7, 9, 20, 0), var(--night));
+  pointer-events: none;
+}
+.rays {
+  position: absolute;
+  z-index: -3;
+  top: -2%;
+  left: 50%;
+  width: min(150vw, 1100px);
+  max-width: none;
+  translate: -50% 0;
+  opacity: .5;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: breathe 7s ease-in-out infinite alternate;
+}
+
+.stage { position: absolute; inset: 0; z-index: -2; pointer-events: none; }
+.stage img { position: absolute; max-width: none; }
+.circle {
+  width: min(118vw, 640px);
+  left: 50%;
+  top: 56%;
+  translate: -50% -50%;
+  opacity: .32;
+  animation: spin 140s linear infinite;
+}
+.unit { animation: appear 1.4s .15s cubic-bezier(.2, .7, .2, 1) both, float 7s 1.6s ease-in-out 4 alternate; }
+.unit.flip { transform: scaleX(-1); }
+.u-phoenix { --w: min(118vw, 66svh, 640px); width: var(--w); left: calc(50% - var(--w) / 2); top: 27%; }
+.u-earth   { width: min(58vw, 33svh); left: -11vw; bottom: 17.5%; animation-delay: .35s, 2s; }
+.u-water   { width: min(60vw, 34svh); right: -13vw; bottom: 20%; animation-delay: .45s, 2.4s; }
+.u-light, .u-dark { display: none; }
+
+.brand { position: relative; text-align: center; width: 100%; max-width: 640px; animation: drop 1.1s cubic-bezier(.2, .8, .2, 1) both; }
+.logo {
+  width: min(88vw, 520px, 74svh);
+  margin: 0 auto;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, .55));
+}
+.tagline {
+  margin-top: 4px;
+  font-size: clamp(20px, 6vw, 34px);
+  line-height: 1.15;
+  letter-spacing: .01em;
+  text-shadow: var(--outline), 0 6px 18px rgba(0, 0, 0, .9);
+}
+.tagline em { font-style: normal; color: var(--gold); }
+.sub {
+  margin-top: 6px;
+  font-size: clamp(13px, 3.6vw, 17px);
+  color: var(--muted);
+  text-shadow: var(--outline), 0 4px 12px rgba(0, 0, 0, .9);
+}
+
+.cta-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  animation: rise .9s .45s cubic-bezier(.2, .8, .2, 1) both;
+}
+.cta {
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  display: block;
+  flex: none;
+  width: min(118vw, 640px, 128svh);
+  aspect-ratio: 626 / 178;
+  color: #fff;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s ease, filter .15s ease;
+}
+/* glow behind the button, then the game's red marble button art, then the label */
+.cta::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 16% 18%;
+  border-radius: 999px;
+  background: radial-gradient(closest-side, rgba(255, 160, 50, .75), rgba(255, 120, 30, 0));
+  filter: blur(14px);
+  animation: pulse 2.6s ease-in-out 5;
+}
+.cta::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  /* sprite: normal state on top, the game's pressed state below */
+  background: url(/assets/button.webp) 0 0 / 100% 202.247% no-repeat;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .6));
+}
+.cta:active::after { background-position: 0 100%; }
+.cta-label {
+  position: absolute;
+  inset: 25% 21% 21%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.08;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.cta-main {
+  font-size: clamp(15px, 5vw, 27px);
+  font-size: clamp(12px, 4.4cqi, 30px);
+  letter-spacing: .02em;
+  text-shadow: var(--outline), 0 3px 6px rgba(0, 0, 0, .5);
+}
+.cta-sub {
+  margin-top: 2px;
+  font-size: clamp(11px, 3.2vw, 16px);
+  font-size: clamp(9px, 2.7cqi, 18px);
+  letter-spacing: .14em;
+  color: #ffe7a3;
+  text-shadow: var(--outline);
+}
+.cta:hover { filter: brightness(1.08); }
+.cta:active { transform: translateY(2px); }
+.cta:focus-visible { outline: none; }
+/* white ring on the red pill: gold would vanish against the gold bezel */
+.cta:focus-visible .cta-label {
+  outline: 3px solid #fff;
+  outline-offset: 1px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 7px rgba(20, 8, 0, .85), 0 0 22px 8px rgba(255, 255, 255, .45);
+}
+.cta-note {
+  margin-top: 2px;
+  font-size: clamp(12px, 3.4vw, 15px);
+  color: var(--muted);
+  text-align: center;
+  text-shadow: var(--outline);
+  text-wrap: balance;
+}
+
+.spark {
+  position: absolute;
+  width: 64px;
+  aspect-ratio: 1;
+  background: url(/assets/sparkle.webp) center / contain no-repeat;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  opacity: 0;
+  animation: twinkle 3.2s ease-in-out 4;
+}
+.brand .s1 { left: 6%; top: 24%; animation-delay: .4s; }
+.brand .s2 { right: 9%; top: 8%; width: 44px; animation-delay: 1.5s; }
+.brand .s3 { right: 22%; top: 46%; width: 36px; animation-delay: 2.4s; }
+.cta-wrap .s4 { left: 16%; top: 8%; width: 48px; animation-delay: 1s; }
+.cta-wrap .s5 { right: 15%; top: 48%; width: 40px; animation-delay: 2.1s; }
+
+/* ------------------------------------------------------------ lower sections */
+.lower { position: relative; isolation: isolate; }
+/* the game's menu backdrop: the sword-in-magic-circle emblem */
+.lower::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  width: min(100%, 760px);
+  aspect-ratio: 2 / 3;
+  background: url(/assets/base.webp) center / cover no-repeat;
+  -webkit-mask-image: radial-gradient(closest-side, #000 45%, transparent);
+  mask-image: radial-gradient(closest-side, #000 45%, transparent);
+  pointer-events: none;
+}
+.section {
+  position: relative;
+  padding: 44px var(--gutter) 8px;
+  text-align: center;
+}
+.divider { width: min(100%, 560px); margin: 0 auto 26px; opacity: .9; }
+.plate {
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  height: 70px;
+  max-width: 100%;
+  padding: 0 4px;
+  border-style: solid;
+  border-width: 16px 56px;
+  border-image: url(/assets/plate.webp) 16 56 / 16px 56px;
+  font-size: clamp(15px, 4.6vw, 21px);
+  font-weight: 400;
+  line-height: 38px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--gold);
+  text-shadow: var(--outline);
+}
+.plate::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -6px -12px;
+  border-radius: 14px;
+  background: rgba(12, 10, 26, .9);
+}
+.lede {
+  max-width: 34em;
+  margin: 14px auto 0;
+  font-size: clamp(14px, 3.9vw, 17px);
+  color: var(--muted);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .8);
+  text-wrap: balance;
+}
+
+.six-grid {
+  list-style: none;
+  padding: 0;
+  margin: 18px auto 0;
+  max-width: 1100px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 6px;
+}
+.six-grid li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+.six-grid li::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 8%;
+  right: 8%;
+  bottom: 14px;
+  height: 34%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(247, 210, 122, .28), rgba(247, 210, 122, 0));
+}
+.six-grid img { width: 100%; aspect-ratio: 360 / 300; object-fit: contain; }
+.six-grid span {
+  margin-top: -4px;
+  font-size: clamp(13px, 3.8vw, 18px);
+  letter-spacing: .04em;
+  color: var(--gold);
+  text-shadow: var(--outline);
+}
+
+/* gold window: the game's journal frame as a 9-slice; plain edges stretch, the
+   bottom ornament is drawn on top at its own size and the name plate sits on the top edge */
+.panel {
+  position: relative;
+  max-width: 620px;
+  margin: 34px auto 0;
+  padding: 0 4px 12px;
+  border-style: solid;
+  border-width: 32px 26px;
+  border-image: url(/assets/frame.webp) 44 100 fill / 32px 73px;
+}
+.panel::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -32px;
+  translate: -50% 0;
+  width: 84px;
+  height: 32px;
+  background: url(/assets/frame-ornament.webp) center / 100% 100% no-repeat;
+}
+.panel .plate { margin-top: -59px; }
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  counter-reset: step;
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  column-gap: 12px;
+  align-items: center;
+}
+.steps li::before {
+  content: counter(step);
+  grid-row: span 2;
+  width: 40px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  background: radial-gradient(circle at 35% 30%, #ff9a48, #b8260e 70%);
+  box-shadow: 0 0 0 2px #4a2400, 0 4px 10px rgba(0, 0, 0, .6);
+  font-size: 19px;
+  text-shadow: var(--outline);
+}
+.steps b { font-weight: 400; font-size: clamp(15px, 4.2vw, 19px); color: var(--gold); text-shadow: var(--outline); }
+.steps span { font-size: clamp(13px, 3.6vw, 15px); color: var(--muted); line-height: 1.4; }
+
+footer {
+  padding: 40px var(--gutter) max(28px, env(safe-area-inset-bottom));
+  text-align: center;
+}
+footer p {
+  max-width: 40em;
+  margin: 0 auto;
+  font: 12px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #a39c88;
+  text-wrap: balance;
+}
+
+/* ------------------------------------------------------------ layout variants */
+@media (min-width: 600px) {
+  .six-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+}
+
+/* short portrait phones: keep the flanking units off the centrepiece */
+@media (orientation: portrait) and (max-height: 760px) {
+  .u-earth { width: min(52vw, 31svh); left: -14vw; bottom: 16%; }
+  .u-water { width: min(54vw, 32svh); right: -16vw; bottom: 18%; }
+}
+
+@media (orientation: landscape) {
+  .hero-bg {
+    background:
+      linear-gradient(180deg, rgba(7, 9, 20, .5) 0%, rgba(7, 9, 20, .05) 30%, rgba(7, 9, 20, .15) 55%, rgba(7, 9, 20, .85) 86%, var(--night) 100%),
+      radial-gradient(ellipse at 50% 45%, rgba(7, 9, 20, 0) 40%, rgba(7, 9, 20, .55) 100%),
+      url(/assets/bg-wide.webp) center 18% / cover no-repeat var(--navy);
+  }
+}
+
+/* landscape phones and other short screens: everything sized by height */
+@media (orientation: landscape) and (max-height: 559px) {
+  .hero { gap: 4px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .logo { width: min(55svh, 48vw); }
+  .tagline { margin-top: 0; font-size: clamp(17px, 6.5svh, 28px); }
+  .sub { margin-top: 2px; font-size: clamp(11px, 3.8svh, 15px); }
+  .cta { width: min(92svh, 640px); }
+  .cta-note { font-size: clamp(11px, 3.4svh, 13px); }
+  .circle { width: min(96svh, 640px); top: 50%; }
+  .u-phoenix { --w: min(56vw, 100svh, 640px); top: 4%; }
+  .u-earth { width: min(30vw, 66svh); left: 0; bottom: 3%; }
+  .u-water { width: min(31vw, 68svh); right: 0; bottom: 5%; }
+}
+
+/* wide screens: the full five-unit title composition */
+@media (min-width: 900px) and (min-aspect-ratio: 1/1) and (min-height: 560px) {
+  :root { --gutter: 32px; }
+  .hero { padding-top: 22px; padding-bottom: 26px; }
+  .stage { left: 50%; right: auto; width: min(100%, 1800px); translate: -50% 0; }
+  .circle { width: min(52vw, 780px); top: 54%; }
+  .u-phoenix { --w: clamp(380px, 40vw, min(64svh, 860px)); top: 22%; }
+  .u-light, .u-dark { display: block; }
+  .u-light { width: clamp(200px, 24vw, 45svh); left: 11%; top: 15%; animation-delay: .55s, 2.2s; }
+  .u-earth { width: clamp(220px, 26vw, 51svh); left: -1%; bottom: 3%; }
+  .u-water { width: clamp(210px, 26vw, 51svh); right: 10%; top: 17%; bottom: auto; }
+  .u-dark { width: clamp(190px, 20vw, 44svh); right: 1%; bottom: 2%; animation-delay: .65s, 2.8s; }
+  .brand { max-width: min(880px, 90vw); }
+  .logo { width: clamp(380px, 34vw, min(56svh * 1.63, 860px)); }
+  .tagline { font-size: clamp(24px, 3.4svh, 48px); }
+  .sub { font-size: clamp(14px, 1.8svh, 24px); }
+  .cta { width: min(720px, 80svh, 48vw); }
+  .cta-note { font-size: clamp(13px, 1.6svh, 20px); }
+  .section { padding-top: 56px; }
+}
+
+/* ------------------------------------------------------------ motion */
+@keyframes drop { from { opacity: 0; transform: translateY(-18px) scale(1.04); } }
+@keyframes rise { from { opacity: 0; transform: translateY(18px); } }
+@keyframes appear { from { opacity: 0; } }
+@keyframes float { to { translate: 0 -10px; } }
+@keyframes spin { to { rotate: 360deg; } }
+@keyframes breathe { from { opacity: .32; } to { opacity: .6; } }
+@keyframes pulse { 50% { opacity: .45; } }
+@keyframes twinkle {
+  0%, 100% { opacity: 0; transform: scale(.3) rotate(0deg); }
+  45% { opacity: 1; transform: scale(1) rotate(25deg); }
+  70% { opacity: 0; transform: scale(.5) rotate(45deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .spark { display: none; }
+}
+</style>
+</head>
+<body>
+<main>
+  <section class="hero" aria-labelledby="title">
+    <div class="hero-bg" aria-hidden="true"></div>
+    <img class="rays" src="/assets/rays.webp" width="480" height="389" alt="">
+    <div class="stage" aria-hidden="true">
+      <img class="circle" src="/assets/circle.webp" width="440" height="439" alt="">
+      <picture>
+        <source media="(min-width: 900px) and (min-aspect-ratio: 1/1) and (min-height: 560px)"
+                srcset="/assets/unit-light-460.webp 460w, /assets/unit-light-720.webp 720w" sizes="24vw">
+        <img class="unit flip u-light" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" width="720" height="671" alt="">
+      </picture>
+      <picture>
+        <source media="(min-width: 900px) and (min-aspect-ratio: 1/1) and (min-height: 560px)"
+                srcset="/assets/unit-dark-460.webp 460w, /assets/unit-dark-720.webp 720w" sizes="20vw">
+        <img class="unit u-dark" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" width="720" height="927" alt="">
+      </picture>
+      <picture>
+        <source media="(min-width: 900px) and (min-aspect-ratio: 1/1) and (min-height: 560px)"
+                srcset="/assets/unit-phoenix-640.webp 640w, /assets/unit-phoenix-1000.webp 1000w" sizes="40vw">
+        <source media="(min-width: 600px) and (min-height: 700px)" srcset="/assets/unit-phoenix-1000.webp">
+        <img class="unit u-phoenix" src="/assets/unit-phoenix-800.webp" width="800" height="804" alt="" fetchpriority="high">
+      </picture>
+      <picture>
+        <source media="(min-width: 900px) and (min-aspect-ratio: 1/1) and (min-height: 560px)"
+                srcset="/assets/unit-earth-460.webp 460w, /assets/unit-earth-720.webp 720w" sizes="26vw">
+        <source media="(min-width: 600px) and (min-height: 700px)" srcset="/assets/unit-earth-720.webp">
+        <img class="unit flip u-earth" src="/assets/unit-earth-460.webp" width="460" height="370" alt="">
+      </picture>
+      <picture>
+        <source media="(min-width: 900px) and (min-aspect-ratio: 1/1) and (min-height: 560px)"
+                srcset="/assets/unit-water-460.webp 460w, /assets/unit-water-720.webp 720w" sizes="26vw">
+        <source media="(min-width: 600px) and (min-height: 700px)" srcset="/assets/unit-water-720.webp">
+        <img class="unit u-water" src="/assets/unit-water-460.webp" width="460" height="410" alt="">
+      </picture>
+    </div>
+
+    <header class="brand">
+      <h1 id="title">
+        <img class="logo" src="/assets/logo-560.webp" srcset="/assets/logo-560.webp 560w, /assets/logo-860.webp 860w"
+             sizes="(min-width: 900px) 34vw, 88vw" width="860" height="528" alt="Brave Frontier Revive" fetchpriority="high">
+      </h1>
+      <p class="tagline">Welcome back, <em>Summoner.</em></p>
+      <p class="sub">A fan revival of Brave Frontier Global</p>
+      <span class="spark s1" aria-hidden="true"></span>
+      <span class="spark s2" aria-hidden="true"></span>
+      <span class="spark s3" aria-hidden="true"></span>
+    </header>
+
+    <div class="cta-wrap">
+      <a class="cta" href="https://discord.gg/<invite>" rel="noopener">
+        <span class="cta-label"><span class="cta-main">Join the Discord</span><span class="cta-sub">to download</span></span>
+      </a>
+      <p class="cta-note">For Android. The download and setup guide are in our Discord.</p>
+      <span class="spark s4" aria-hidden="true"></span>
+      <span class="spark s5" aria-hidden="true"></span>
+    </div>
+  </section>
+
+  <div class="lower">
+    <section class="section" aria-labelledby="six-title">
+      <img class="divider" src="/assets/divider.webp" width="640" height="30" alt="" loading="lazy">
+      <h2 class="plate" id="six-title">The heroes return</h2>
+      <p class="lede">Vargas, Selena, Lance, Eze, Atro and Magress are ready to fight for Grand Gaia again.</p>
+      <ul class="six-grid">
+        <li><img src="/assets/six-vargas.webp" width="360" height="295" alt="" loading="lazy" decoding="async"><span>Vargas</span></li>
+        <li><img src="/assets/six-selena.webp" width="360" height="297" alt="" loading="lazy" decoding="async"><span>Selena</span></li>
+        <li><img src="/assets/six-lance.webp" width="360" height="271" alt="" loading="lazy" decoding="async"><span>Lance</span></li>
+        <li><img src="/assets/six-eze.webp" width="360" height="291" alt="" loading="lazy" decoding="async"><span>Eze</span></li>
+        <li><img src="/assets/six-atro.webp" width="360" height="254" alt="" loading="lazy" decoding="async"><span>Atro</span></li>
+        <li><img src="/assets/six-magress.webp" width="360" height="255" alt="" loading="lazy" decoding="async"><span>Magress</span></li>
+      </ul>
+    </section>
+
+    <section class="section" aria-labelledby="how-title">
+      <div class="panel">
+        <h2 class="plate" id="how-title">How to play</h2>
+        <ol class="steps">
+          <li><b>Join the Discord</b><span>Use the button at the top of this page.</span></li>
+          <li><b>Download</b><span>Grab the Android APK and the setup guide there.</span></li>
+          <li><b>Summon</b><span>Install, log in and step back into Grand Gaia.</span></li>
+        </ol>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <img class="divider" src="/assets/divider.webp" width="640" height="30" alt="" loading="lazy">
+  <p>bfrevive is a fan-made revival of Brave Frontier Global. It is not affiliated with or endorsed by gumi Inc. or Alim Co., Ltd. Brave Frontier and all game artwork belong to their respective owners.</p>
+</footer>
+</body>
+</html>

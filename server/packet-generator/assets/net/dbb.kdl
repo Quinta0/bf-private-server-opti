@@ -1,0 +1,234 @@
+import "../net/signal_key.kdl"
+import "../net/user.kdl"
+
+json DbbBondNode {
+    doc """
+    One bond or unbond -- the `5eDLn6pr` group of DbbBondRequest::createBody
+    @0x1C75870.  All four params go out through the std::string overload.
+    """
+
+    field main_unit_id type="i32::str" {
+        key "KoC1ogir"
+        doc "setMainUnitId -- the user_unit_id whose detail page the Bond button was on."
+    }
+
+    field sub_unit_id type="i32::str" {
+        key "d5enutLC"
+        doc "setSubUnitId -- the partner picked from DbbSelectBondScene, or the one being released."
+    }
+
+    field bond_type type="i32::str" {
+        key "deKa4iva"
+        doc """
+        1 = bond, 2 = unbond.  One request serves both buttons:
+        setDbbTypeBond @0x1C75810 writes the literal "1" and setDbbTypeUnbond
+        @0x1C75824 writes "2" into the same member, and
+        DbbSelectBondScene::doBondRequest picks between them.
+        """
+    }
+
+    field bond_level type="i32::str" {
+        key "M81OjLwr"
+        doc """
+        The level the pairing ALREADY has, echoed rather than requested:
+        doBondRequest reads it straight off UserUnitDbbInfo::getBondLevel().
+        It is 0 on a first bond.  Raising a bond is a separate flow that has not
+        been traced yet -- see DbbBondReq.
+        """
+    }
+}
+
+json DbbBondReq {
+    doc """
+    DbbBond (GroupId 0EtanubR, AES key Tr7dR4dR) -- pair two units for a Dual
+    Brave Burst, or release the pair.
+
+    Sent by DbbSelectBondScene::doBondRequest @0x1E9B7F0, which is reached from
+    the Bond button on a unit's detail page
+    (UnitDetailUserUnitScene::dbbSelectBondSceneMove @0x1BD0A78).  The partner
+    list comes from DbbMstList::getDbbMstListByUnitId, so only the 141 pairings
+    DbbMst names are offerable.
+
+    ⚠ This is the BOND, not the boost.  Raising a rank is UnitBondBoost, below
+    -- it is named Unit*, not Dbb*, which is why a search for "Dbb.*Request"
+    missed it on the first pass.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[DbbBondNode]" {
+        key "5eDLn6pr"
+        doc "The pair, and which button was pressed."
+    }
+}
+
+json DbbBondResp {
+    doc """
+    The bond list after the change.
+
+    Both blocks are REPLACE lists (see UserUnitDbbInfo), so they go back in
+    full every time -- including empty, which is the only way an unbond can
+    reach the client: the scene does not drop the pairing itself.
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field dbbInfo type="[UserUnitDbbInfo]" {
+        key "sxorQ3Mb"
+        doc "Every bond this player holds."
+        optional #true
+    }
+
+    field dbbLevelInfo type="[UserUnitDbbLevelInfo]" {
+        key "tR4katob"
+        doc "The level of each of them."
+        optional #true
+    }
+}
+
+
+json UnitBondBoostTarget {
+    doc "Which pairing is being raised -- the `fTV3A0By` group of UnitBondBoostRequest::createBody @0x1C75CCC.  The group key is the DbbMst wrapper hash reused as a request group."
+
+    field dbb_id type="str" {
+        key "XIvaD6Jp"
+        doc "DbbMst.id of the pairing.  The only thing that identifies it: the units are looked up from the stored bond."
+    }
+}
+
+json UnitBondBoostMaterial {
+    doc """
+    One material the player picked -- a node of the `8Z2NQrx1` group.
+
+    createBody builds these from four arrays on DbbBondRecipeSelection, and the
+    array it came from is what `29MgiJIQ` records:
+
+      getUnitArray()      -> 1   the named golem units
+      getDupUnitArray()   -> 1   duplicates of the same, picked separately
+      (a second dict)     -> 2
+      getItemDict()       -> 3   ordinary items (Geminus Tome)
+      getEleShardDict()   -> 4   element shards
+
+    Kinds 1 and 2 are UNITS and name a user_unit_id; 3 and 4 are ITEMS and name
+    an item_id.  That split is what the handler consumes from -- it never
+    guesses which table an id belongs to.
+    """
+
+    field target_id type="str" {
+        key "inU8Q4gL"
+        doc "user_unit_id for a unit kind, item_id for an item kind."
+    }
+
+    field slot type="str" {
+        key "mnZ5K4Ii"
+        doc "\"-1\" for a unit (a unit row is one object, it has no index); the dict position for an item.  Not used by the server."
+    }
+
+    field kind type="i32::str" {
+        key "29MgiJIQ"
+        doc "1 or 2 = unit, 3 or 4 = item.  See the struct doc."
+    }
+
+    field count type="i32::str" {
+        key "H6k1LIxC"
+        doc "How many.  Always \"1\" for a unit, since each names its own row."
+    }
+}
+
+json UnitBondBoostReq {
+    doc """
+    UnitBondBoost (GroupId tr5rOwro, AES key fus9A2ut) -- raise a Dual Brave
+    Burst bond from rank N to N+1.
+
+    ⚠ THE SERVER DOES NOT TAKE THE CLIENT'S WORD FOR THE PRICE.  The recipe is
+    DbbBondRecipeMst keyed by (element pair, target rank), and the handler reads
+    it itself: the two bonded units give the element pair, the stored bond gives
+    the current rank.  The material list below only says WHICH of the player's
+    interchangeable objects to consume -- it can never introduce a cheaper
+    bill, and a list that does not cover the recipe is refused.
+
+    Registered the same day DbbMst first went out: the boost button is on the
+    bond screen, so it became reachable the moment the catalogue did.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field target type="[UnitBondBoostTarget]" {
+        key "fTV3A0By"
+        doc "The pairing being raised."
+    }
+
+    field materials type="[UnitBondBoostMaterial]" {
+        key "8Z2NQrx1"
+        doc "What the player selected to pay with."
+        optional #true
+    }
+}
+
+json UnitBondBoostResp {
+    doc "The bond at its new rank, plus everything the payment emptied."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field dbbInfo type="[UserUnitDbbInfo]" {
+        key "sxorQ3Mb"
+        doc "Every bond this player holds."
+        optional #true
+    }
+
+    field dbbLevelInfo type="[UserUnitDbbLevelInfo]" {
+        key "tR4katob"
+        doc "The level of each of them -- this is the one that moved."
+        optional #true
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "The header, because every recipe costs zel and karma."
+        optional #true
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "4ceMWH6k"
+        doc "The roster after the fodder was consumed -- a full REPLACE, which is what removes the eaten units from the client's list."
+        optional #true
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "The item warehouse, for the shards and tomes a recipe eats.  A full replace."
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "The item dictionary beside it."
+        optional #true
+    }
+}

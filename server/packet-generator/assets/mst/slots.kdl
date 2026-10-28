@@ -1,0 +1,275 @@
+json SlotGameInfo {
+    doc "TODO"
+    field id type="i32::str" {
+        key "zS45RFGb"
+        doc "TODO"
+    }
+
+    field name type="str" {
+        key "I1Cki7Pb"
+        doc "TODO"
+    }
+
+    field reel_pos type="str" {
+        key "h1PSnk5t"
+        doc "TODO"
+    }
+
+    field use_medal type="[str]::sep(at)" {
+        key "b5yeVr61"
+        // ⚠ TWO fields, '@'-separated: "<medalId>@<costPerPull>".  Sending only
+        // one CRASHES the client, and not where you would look for it.
+        //
+        // RandallSlotActionScene::initialize @0x1A6D86C splits this and then
+        // reads BOTH elements without checking how many came back:
+        //     [0] -> string::assign into scene+0x360  (the id later handed to
+        //            UserBraveMedalInfoList::getObjectWithMedalID)
+        //     [1] -> add x0, x8, #0x18; StrToInt -> scene+0x378  (the cost)
+        // 0x18 is one std::string, so [1] is the SECOND element.  With a
+        // single-field value that read runs off the end of the vector and
+        // StrToInt faults inside msvcp120 on a garbage string object.
+        //
+        // "UseMedal" names the pair, not a count - the id half is what the
+        // medal lookup keys on.
+        doc "TODO"
+    }
+
+    field slot_help_url type="str" {
+        key "jsRoN50z"
+        doc "TODO"
+    }
+
+    field slot_image type="str" {
+        key "TX98PnpE"
+        doc "TODO"
+    }
+
+}
+
+json SlotGamePictureInfo {
+    doc "TODO"
+    field id type="i32::str" {
+        key "sE6tyI9i"
+        doc "TODO"
+    }
+
+    field picture_name type="str" {
+        key "iQM9dH0F"
+        doc "TODO"
+    }
+}
+
+
+json SlotGameInfoR {
+    doc """
+    The Brave Slots machine definition, as stored in
+    deploy/system/brave_slots.json.
+
+    THIS IS THE STORAGE SHAPE, NOT THE WIRE SHAPE.  It is serialized into
+    SlotgameInfoResp, whose C38FmiUn is a JSON STRING - see there.
+    """
+
+    field info type="SlotGameInfo" {
+        key "C38FmiUn"
+        doc "Machine configuration: id, name, reel positions, the medal it spends, sprite list, help url."
+    }
+
+    field pictures type="[SlotGamePictureInfo]" {
+        key "rY6j0Jvs"
+        doc "The reel symbols, by picture id."
+    }
+
+    field reels type="[SlotGameReelInfo]" {
+        key "iW62Scdg"
+        doc "The reel strips.  One row per id named in info.reel_pos, or the scene crashes - see SlotGameReelInfo."
+    }
+}
+
+json SlotgameInfoResp {
+    doc """
+    The Brave Slots definition ON THE WIRE, keyed C7J9hbmr
+    (SlotgameInfoResponse).
+
+    ⚠ TWO things about this shape are not guessable, and getting either wrong
+    leaves SlotgameStandInfo empty - which is silent, because the handler still
+    "succeeds":
+
+    1. THE ROOT KEY IS C7J9hbmr, NOT C38FmiUn.  GameResponseParser::
+       getResponseObject dispatches on C7J9hbmr; C38FmiUn is a FIELD inside it
+       and appears nowhere in that table.  Emitting the inner struct is the
+       handbook 6.11 wrapper trap, and it is what we shipped until 2026-08-21:
+       the client could not dispatch the reply at all, so the slot machine ran
+       on default data and RandallSlotActionScene::downloadFiles asked for no
+       sprites, because getSlotgameInfo()->getSlotImage() had nothing in it.
+
+    2. ALL THREE FIELDS ARE JSON STRINGS, not nested structures.  readParam @0x1447E5C
+       runs strlen() then picojson::parse() over the value and looks the inner
+       fields up in the resulting map, so the whole SlotGameInfo has to be
+       serialized and embedded as one string.
+    """
+
+    field game_info type=str {
+        key "C38FmiUn"
+        doc "SlotGameInfo serialized to JSON and embedded AS A STRING.  The client picojson-parses it (readParam @0x1447EA8)."
+    }
+
+    field pictures type=str {
+        key "rY6j0Jvs"
+        doc "The reel symbols, serialized to JSON and embedded AS A STRING - readParam @0x14486F8 runs strlen() and picojson::parse() over this exactly like C38FmiUn."
+    }
+
+    field reels type=str {
+        key "iW62Scdg"
+        doc "Reel definitions, also a picojson-parsed STRING (readParam @0x1448A2C).  We have no data for it, so it goes out as an empty JSON array."
+    }
+}
+
+json ControlCenterEnterResp {
+    doc """
+    ControlCenterEnter (uYF93Mhc) response.
+
+    Fired by LoginScene and RandallSummonScene - NOT by any Slots scene - but
+    it is what seeds SlotgameStandInfo, because getResponseObject is a global
+    key->class registry (handbook 7.12.4): any response carrying C7J9hbmr
+    populates the client's slot state regardless of which handler sent it.  So
+    the machine is configured at login, long before the tile is opened.
+    """
+
+    field slotgame type="SlotgameInfoResp" {
+        key "C7J9hbmr"
+        doc "The Brave Slots machine definition."
+    }
+}
+
+json SlotGameReelInfo {
+    doc """
+    One reel strip.
+
+    RandallSlotActionScene::setReelInit @0x1A6DAD4 splits
+    SlotgameInfo::getSlotReelPos() ("1,2,3") on commas and, for EACH entry,
+    calls SlotgameReelInfoList::getObject(id) then getSlotReelData().
+
+    ⚠ getObject returns NULL when the id is absent (@0x1305628) and
+    setReelInit does not check before dereferencing - so a machine whose
+    reel_pos names a reel we did not send crashes the scene.  Every id in
+    reel_pos MUST have a row here.
+    """
+
+    field id type="i32::str" {
+        key "PINm2pM5"
+        doc "Reel id, matched against the entries in SlotgameInfo.reel_pos.  QUOTED, because this rides inside a picojson-parsed string (see SlotgameInfoResp)."
+    }
+
+    field reel_data type="str" {
+        key "Z8eJi4pq"
+        doc "The strip: comma-separated picture ids the reel cycles through, split on ',' at @0x1A6DC10."
+    }
+}
+
+json VideoAdInfo {
+    doc "TODO"
+    field id type="i32::str" {
+        key "k3ab6D82"
+        doc "TODO"
+    }
+
+    field available_value type="i32::int" {
+        key "Diwl3b56"
+        doc "TODO"
+    }
+
+    field region_id type="i32::str" {
+        key "Y3de0n2p"
+        doc "TODO"
+    }
+
+    field video_enabled type="bool::int" {
+        key "26adZ1iy"
+        doc "TODO"
+    }
+
+    field next_available_time_left type="i64::int" {
+        key "oohpPLCt"
+        doc "TODO"
+    }
+}
+
+json VideoAdRegion {
+    doc "TODO"
+    
+    field id type="i32::str" {
+        key "Y3de0n2p"
+        doc "TODO"
+    }
+
+    field country_code type="str" {
+        key "j3d6E2ia"
+        doc "TODO"
+    }
+
+}
+
+json VideoAdsSlotGameStandInfo {
+    doc "TODO"
+    field ads_count type="i32::int" {
+        key "wRIgGCHh"
+        doc "TODO"
+    }
+
+    field max_ads_count type="i32::int" {
+        key "JwBrVzIZ"
+        doc "TODO"
+    }
+
+    field current_bouns type="i32::int" {
+        key "BrMgnCaT"
+        doc "TODO"
+    }
+
+    field max_bouns_count type="i32::int" {
+        key "E9gMeBW0"
+        doc "TODO"
+    }
+
+    field ads_bonus_flag type="i32::int" {
+        key "qqdr4HlW"
+        doc "TODO"
+    }
+
+    field next_day_timer type="i32::int" {
+        key "er8Ups6U"
+        doc "TODO"
+    }
+}
+
+json VideoAdsSlotGameInfo {
+    doc "TODO"
+
+    // TODO(arves): Fix...
+
+    field game_info type=/*"SlotGameInfo::str"*/"str" {
+        key "C38FmiUn"
+        doc "TODO"
+    }
+
+    field reel_info type=/*"SlotGameReelInfo::str"*/"str" {
+        key "iW62Scdg"
+        doc "TODO"
+    }
+
+    field picture_info type=/*"SlotGamePictureInfo::str"*/"str" {
+        key "rY6j0Jvs"
+        doc "TODO"
+    }
+
+    field game_stand_info type=/*"VideoAdsSlotGameStandInfo::str"*/"str" {
+        key "tclBMiv2"
+        doc "TODO"
+    }
+
+
+    // game_info = { "C38FmiUn": str, "string": True }
+    // reel_info = { "iW62Scdg": str, "string": True }
+    // picture_info = { "rY6j0Jvs": str, "string": True }
+    // game_stand_info = { "tclBMiv2": str, "string": True }
+}

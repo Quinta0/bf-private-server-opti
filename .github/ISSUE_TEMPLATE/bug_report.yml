@@ -1,0 +1,100 @@
+name: Bug report
+description: Something in the server, Workers or tools does not work as it should.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please check that it has not been reported
+        already. **Do not paste real hostnames, IP addresses, tokens or account ids**; replace
+        them with placeholders such as `example.com` or `203.0.113.10`. Security problems go
+        through the Security tab, not here.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Where does the problem happen?
+      options:
+        - Game server (server/)
+        - Cloudflare Workers (cdn-worker/)
+        - Site / unit finder (site/)
+        - APK patcher or other tools (tools/)
+        - Build or deployment (docker/, prod/)
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps, commands or in-game actions that trigger the bug.
+      placeholder: |
+        1. Start the server with `docker/run.sh`
+        2. Log in on the client and open ...
+        3. Tap ...
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Output of `git rev-parse --short HEAD`.
+      placeholder: "e.g. 953b7a0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker build (docker/build.sh)
+        - Windows build (rebuild.bat / Visual Studio)
+        - Linux build (CMake preset)
+        - Cloudflare Workers (wrangler)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Client and device
+      description: For in-game bugs. The server targets client v2.19.6.
+      placeholder: "e.g. patched v2.19.6, Android 14 emulator"
+  - type: input
+    id: request
+    attributes:
+      label: Request involved
+      description: The request name or group id from the server log, if you know it.
+      placeholder: "e.g. MissionEnd / 9TvyNR5H"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Server log lines, stack traces or test output. This is rendered as code automatically.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this has not been reported yet.
+          required: true
+        - label: I removed real hostnames, IPs, tokens and personal data from this report.
+          required: true
+        - label: I did not attach game data, art or APK files.
+          required: true

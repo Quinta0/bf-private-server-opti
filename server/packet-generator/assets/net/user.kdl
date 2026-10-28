@@ -1,0 +1,3066 @@
+import "gumi_live.kdl"
+
+str-enum GameTargetOs {
+    doc "Supported operative systems"
+
+    variant Android {
+        doc "Android platform"
+        value "2"
+    }
+
+    variant WindowsRT {
+        doc "Windows 8.1 (Windows RT) platform"
+        value "7"
+    }
+}
+
+str-enum GameLanguages {
+    doc "Supported game languages"
+
+    variant English {
+        doc "English"
+        value "en"
+    }
+}
+
+json LoginInfoResp {
+    // AUDIT 2026-08-24: this struct serves BOTH DIRECTIONS.  UserInfoResponse::
+    // readParam @0x13FED80 reads 22 keys; BaseRequest::createUserInfoTag
+    // @0x13A04D8 sends 10.  A field missing from readParam is REQUEST-ONLY, not
+    // dead -- each is marked below.  createUserInfoTag also sends 236dItKo and
+    // aXf114Oz, which are NOT declared here (both real, both ignored by us).
+    // Three fields are fictional; see them.  Full audit in
+    // tools/SERVER_COMPONENT_AUDIT.md.
+    doc "Main object that holds all the player information."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setUserID @0x13FEE4C.  ID of the user for this session."
+    }
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setHandleName @0x13FEEEC.  Username shown in-game."
+    }
+
+    field account_id type="str" {
+        key "LZ2PfNm4"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setAccountID @0x13FEF8C.  Account ID used in account transfering."
+    }
+
+    field password type="str" {
+        key "4WSu1irc"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setPassword @0x13FF02C.  Password used for account transfering."
+    }
+
+     // # TODO: this is UserSpecialScenarioInfoList we just dont have this yet
+    field model_change_count type="i32::str" {
+        key "nrg19RGe"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setModelChangeCnt @0x13FF420 (also sent up by createUserInfoTag).  How many times has the user transferred to a new device. May be used to avoid getting first time playing rewards twice."
+    }
+
+    field code_expire_date type="i32::str" {
+        key "iyJH5k6p"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setCodeExpireDate @0x13FF4B0."
+    }
+
+    field friend_id type="str" {
+        key "98WfKiyA"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setFriendID @0x13FF0CC.  Player ID that is used for the friend system."
+    }
+
+    field contact_id type="str" {
+        key "90LWtVUN"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setContactID @0x13FF16C (also sent up by createUserInfoTag @0x13A04D8).  ID of the player used in the ticketing system for player support."
+    }
+
+    field target_os type="GameTargetOs" {
+        key "DFY3k6qp"
+        doc "REQUEST-ONLY -- BaseRequest::createUserInfoTag @0x13A04D8."
+    }
+
+    field device_name type="str" {
+        key "iN7buP0j"
+        doc "REQUEST-ONLY -- BaseRequest::createUserInfoTag @0x13A04D8."
+    }
+
+    field device_id type="str" {
+        key "Ma5GnU0H"
+        doc "REQUEST-ONLY -- not in UserInfoResponse::readParam.  Sent by CreateUserRequest::createBody @0x13A2ABC, InitializeRequest @0x13A52E0, InitializeRequest2 @0x13A5800, TransferCodeCheck @0x13AD84C, TransferCodeIssue @0x13ADA4C, Transfer @0x13ADCA8, URLMst @0x13AE6FC."
+    }
+
+    field unk type="str" {
+        key "dzhBs92A"
+        doc "REQUEST-ONLY -- CreateUserRequest::createBody @0x13A2AD8 and TransferRequest::createBody @0x13ADC1C.  Not read from any response."
+    }
+
+    field country_code type="str" {
+        key "hceYTcAK"
+        doc "REQUEST-ONLY -- InitializeRequest::createBody @0x13A5328 and InitializeRequest2 @0x13A58FC only."
+    }
+
+    field current_language type="GameLanguages" {
+        key "h7LYasNK"
+        doc "REQUEST-ONLY -- InitializeRequest::createBody @0x13A5354 and InitializeRequest2 @0x13A5928 only."
+    }
+
+    field tutorial_status type="i32::str" {
+        key "9sQM2XcN"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setTutoChapterID @0x13FF244.  Get the current tutorial script to execute."
+    }
+
+    field tutorial_end_flag type="bool::str" {
+        key "sv6BEI8X"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setTutoEndFlg @0x13FF2A8.  Checks if the player has finished the tutorial or not."
+    }
+
+    field unk2 type="i32::str" {
+        key "6W5Jbrse"
+        doc "FICTIONAL -- this key exists in NEITHER arm64 libgame.so NOR x86 BraveFrontier.Windows.exe (raw byte search, both binaries agree, so not a build difference).  Nothing can read it.  Inert and inherited from upstream, so left in place rather than forked."
+    }
+
+    field unk3 type="str" {
+        key "iN7cCN9i"
+        doc "FICTIONAL -- this key exists in NEITHER arm64 libgame.so NOR x86 BraveFrontier.Windows.exe (raw byte search, both binaries agree, so not a build difference).  Nothing can read it.  Inert and inherited from upstream, so left in place rather than forked."
+    }
+
+    field early_bird_end type="i64::int" {
+        key "iN7cYU9i"
+        doc "Time in seconds until the Gem banner sale ends."
+    }
+
+    field user_scenario_info type="str" {
+        key "N4XVE1uA"
+        doc """
+        The client's own cutscene progress, echoed back so a fresh login
+        restores it.  UserInfoResponse::readParam @0x13FF340 hands the value
+        straight to UserScenarioInfoList::parse, which REPLACES the client's
+        list.  Per land (UserScenarioInfoList::getSaveStr @0x12A06A4):
+        "<eventId>,<eventType>@<areaEventId>@<landId>@<landEventDone>&",
+        then "|<viransilStart>,<viransilEnd>".
+
+        The client alone writes it -- DeckEdit, DungeonEventUpdate and a few
+        deck/chat requests upload it (BaseRequest::createDungeonEventUserInfoTag
+        @0x13A0B8C) -- so the server's copy can only be as new as the last
+        upload.  Optional so replies other than the login ones (MissionEnd)
+        can leave it OUT: an echo there re-parsed a stale copy over events the
+        player had just watched, and they played again after every clear.
+        """
+        optional #true
+    }
+
+    field user_special_scenario_info type="str" {
+        key "9yVsu21R"
+        doc "The one-off named intros the client has played (\"randall,frontiergate_v2,\"), UserSpecialScenarioInfoList.  Client-authored and uploaded with the same requests as N4XVE1uA; optional for the same reason."
+        optional #true
+    }
+
+    field first_desc type="str" {
+        key "7oV00FeR"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setFirstDesc @0x13FF744 (also sent up by createUserInfoTag)."
+    }
+
+    field friend_invitation_flag type="i32::str" {
+        key "y2v7Sd01"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setFriendInvitationFlg @0x13FF4E8."
+    }
+
+    field encrypt_iv type="str" {
+        key "8kN1tgYU"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setEncryptIv @0x13FF604."
+    }
+
+    field encrypted_friend_id type="str" {
+        key "PA0QwZs1"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setEncryptedFriendID @0x13FF6A4."
+    }
+
+    field debug_mode type="bool::int" {
+        key "5MPcr0sp"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setDebugMode @0x13FF574.  Enables several debug features (like skipping summoning animation) on the account."
+    }
+
+    // Gumi live v1/v2 login api
+    field gumi_live_userid type="str" {
+        key "iN7buP2h"
+        doc "Gumi live API User ID. (used for example in IAP)"
+    }
+
+    field gumi_live_token type="str" {
+        key "iN7buP1i"
+        doc "User token of the Gumi live API."
+    }
+
+    field facebook_id type="i64::int" {
+        key "K29dp2Q"
+        doc "Facebook ID of the associated account."
+    }
+
+    field unk4 type="str" {
+        key "k29akH2I"
+        doc "FICTIONAL -- this key exists in NEITHER arm64 libgame.so NOR x86 BraveFrontier.Windows.exe (raw byte search, both binaries agree, so not a build difference).  Nothing can read it.  Inert and inherited from upstream, so left in place rather than forked."
+    }
+
+    field build_platform_id type="str" {
+        key "j2lk52Be"
+        doc "REQUEST-ONLY -- BaseRequest::createUserInfoTag @0x13A04D8."
+    }
+
+    field unk5 type="i32::int" {
+        key "37d2Hi5p"
+        doc "TODO"
+    }
+
+    field pointer_name type="str" {
+        key "fKSzGDFb"
+        doc "REQUEST-ONLY -- BaseRequest::createUserInfoTag @0x13A04D8."
+    }
+
+    field feature_gate type="i32::int" {
+        key "a37D29iJ"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setFeatureGate @0x13FFA5C."
+    }
+
+    field unk6 type="str" {
+        key "32k0ahkD"
+        doc "TODO"
+    }
+
+   /*field service_request_endpoint_param type="str" {
+        key "ABh7acL2"
+        doc "Read by UserInfoResponse::readParam @0x13FED80 -> setServiceRequestEndpointParam @0x13FFBB0.  Extra parameters that are passed to the DLS API server in the request object EXTRA_PARAMS."
+        optional #true
+    }*/
+
+    field dlc_url type="str" {
+        key "23t3D28i"
+        doc "TODO"
+        // "default": DefaultType.Omit
+        optional #true
+    }
+
+    /*
+    field associated_user_id type="str" {
+        key "uJP4aeg9"
+        doc "TODO"
+    }*/
+
+}
+
+json UserPartyDeckInfo {
+    doc "TODO"
+
+    field user_unit_id type="u32::str" {
+        key "edy7fq3L"
+        doc "TODO"
+    }
+
+    field deck_type type="u32::str" {
+        key "U9ABSYEp"
+        doc "TODO"
+    }
+
+    field deck_num type="u32::str" {
+        key "zsiAn9P1"
+        doc "TODO"
+    }
+
+    field member_type type="i32::str" {
+        key "gr48vsdJ"
+        doc "TODO"
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "TODO"
+    }
+
+}
+
+json DeckEditTeamInfo {
+    doc "Team fields posted by DeckEditRequest."
+
+    field activeDeck type="u32::str" {
+        key "Z0Y4RoD7"
+        doc "Active deck selected by the client."
+    }
+
+    field arenaDeck type="str" {
+        key "gKNfIZiA"
+        doc "Arena deck number (UserTeamInfo.arena_deck_num).  DeckEditRequest sends it alongside the active deck; persisted to user_info.active_arena_deck so the arena deck survives a relaunch.  String so a malformed value is skipped rather than failing the whole deck save."
+        optional #true
+    }
+
+}
+
+json UserTeamInfo {
+    doc """
+    The shared HUD block, attached under fEi17cnx by ~16 handlers.
+
+    Dispatch: getResponseObject strcmp @0x1392618 -> UserTeamInfoResponse ctor
+    @0x1392630.  readParam @0x1403220 is a FLAT strcmp chain over the
+    UserTeamInfo::shared() singleton @0x1403250 -- no removeAllObjects, no
+    addObject, and an unmatched key falls through to `mov w0,#1; ret` @0x1403DF0.
+    Unknown keys are therefore INERT.
+
+    THE BASE+ADD PAIRS ARE SUMMED BY THE CLIENT.  Four fields have getters with
+    zero call sites and are still live, because a derived getter adds them:
+
+      getSumUnitCnt      @0x12AB380 = ouXxIY63 + Px1X7fcd
+      getSumFrdCnt       @0x12AB5B8 = 3u41PhR2 + 2rR5s6wn
+      getMaxWarehouseCnt @0x12ABBD8 = 5pjoGBC4 + iI7Wj6pM
+      getTotalGems       @0x12AC62C = d37CaiX1 + 92uj7oXB
+
+    The capacity the client enforces is always the PAIR, never the base alone.
+
+    Nine fields below (the unk* ones) are not in readParam at all -- see each.
+    Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+    }
+
+    field level type="u32::str" {
+        key "D9wXQI2V"
+        doc "Current player level."
+    }
+
+    field exp type="u32::str" {
+        key "d96tuT2E"
+        doc """
+        Current EXP progress within this level.
+        This is residual EXP toward the next level.
+        """
+    }
+
+    field max_action_point type="i32::str" {
+        key "YnM14RIP"
+        doc "ASSUMED (call site cited, consumer not yet read).  setMaxActionPoint @0x140336C.  19 readers, top: GameScene::updateHeader, GameScene::setHeaderControl, AppDelegate::applicationDidEnterBackground."
+    }
+
+    field energy type="u32::str" {
+        key "0P9X1YHs"
+        doc "Current energy/action point count."
+    }
+
+    field unk type="i32::str" {
+        key "V0yJS7vZ"
+        doc "DEAD -- absent from readParam AND from both client binaries (arm64 libgame.so and x86 BraveFrontier.Windows.exe).  Inert: readParam falls through on unknown keys @0x1403DF0.  Inherited from upstream commit 4541706; left in place rather than forked."
+    }
+
+    field energy_full_seconds type="i32::str" {
+        key "f0IY4nj8"
+        doc "Seconds until energy/action points are full."
+    }
+
+    field max_fight_point type="i32::str" {
+        key "9m5FWR8q"
+        doc "The ARENA Orb cap.  setMaxFightPoint @0x14033BC.  4 readers: GameScene::updateArenaLight, ShopHelFightScene::touchBegan (the shop's Arena Orbs restore, SHOP_HEL_FIGHT_TITLE 'Arena Orbs' — ShopUse type 4), AppDelegate::applicationDidEnterBackground.  Not the Hunter Orbs: those are ChallengeHeaderInfo Aube (see ChallengeBase)."
+    }
+
+    field fight_point type="i32::str" {
+        key "YS2JG9no"
+        doc "Current ARENA Orbs.  setFightPoint @0x14033E4.  14 readers, top: GameScene::updateArenaLight, ArenaTopScene::touchBegan, ShopHelFightScene::touchBegan (refuses the restore when this equals 9m5FWR8q).  The client regenerates it locally (UserTeamInfo::decFightRestTimer, DefineMst recover_time_fight 3600s)."
+    }
+
+    field unk2 type="i32::str" {
+        key "32HCWt51"
+        doc "DEAD on this class -- not in UserTeamInfoResponse::readParam.  The key is real but belongs to UserVortexArenaInfoResponse @0xEEAC94 (a shared key is not a shared concept).  Inert here."
+    }
+
+    field fight_rest_timer type="i32::str" {
+        key "jp9s8IyY"
+        doc "setFightRestTimer @0x1403980 -> member 0x170.  Read by getFightRestTimer and by getFightRecoveryTime @0x12AC168, which consults DefineMst when the value is non-zero."
+    }
+
+    field max_unit_count type="i32::str" {
+        key "ouXxIY63"
+        doc "Base unit-box capacity.  setMaxUnitCnt @0x140340C -> member 0x78.  NOT read alone: getSumUnitCnt @0x12AB380 adds Px1X7fcd, and Utils::canEnterMissions @0xF42F6C REFUSES MISSION ENTRY when that sum is below UserUnitInfoList::getCount() @0xF42F88."
+    }
+
+    field add_unit_count type="i32::str" {
+        key "Px1X7fcd"
+        doc "Extra unit slots, ADDED to ouXxIY63.  setAddUnitCnt @0x1403434 -> member 0x84; getAddUnitCnt has zero call sites but getSumUnitCnt @0x12AB380 reads the offset.  gme::getTeamInfo sends the starting 100 here (kBaseUnitBoxSlots) while ouXxIY63 carries user_info.max_unit_count — the slots bought with gems through ShopUse type 2.  Only the sum matters: GameUtils::isUnitFull / isUserUnitFull are the lone readers of ouXxIY63 and have no callers."
+    }
+
+    field deck_cost type="i32::str" {
+        key "QYP4kId9"
+        doc "Squad cost cap.  setDeckCost @0x140345C.  Utils::canEnterMissions @0xF42FC4 refuses entry unless BasePartyInfoList::getCost() <= this."
+    }
+
+    field active_deck type="i32::str" {
+        key "Z0Y4RoD7"
+        doc "TWO setters from one key: setActiveDeckNum @0x14039E8 (member 0x190, 40 readers incl. GameUtils::isCurrentDeckUnit) and setServerActiveDeckNum @0x14039FC (member 0x1ac, ZERO readers -- a mirror nothing consumes)."
+    }
+
+    field arena_deck_num type="i32::int" {
+        key "gKNfIZiA"
+        doc "ASSUMED (call site cited, consumer not yet read).  setArenaDeckNum @0x1403AE0.  14 readers, top: UserPartyInfoList::getActiveDeck, PlayerParty::entry, VortexArenaSuggestEnemyScene::setTeamInfo."
+    }
+
+    field reinforcement_deck type="[i32::int]::sep(comma)" { // TODO(arves): Force array (size 3) with comma
+        key "TwqMChon"
+        doc "THREE setters from one key, which is what makes it a 3-element comma array: setReinforcementDeckNum @0x1403BBC (0x19c), setReinforcementDeckEx1Num @0x1403BF0 (0x1a0), setReinforcementDeckEx2Num @0x1403C08 (0x1a4).  17/13/10 readers, mostly OptionTopScene and PartyEditTopScene2."
+    }
+
+    field max_friend_count type="i32::str" {
+        key "3u41PhR2"
+        doc "Base friend capacity: the level's UserLevelMst friend_count (10 at lv 1, 50 from lv 81).  setMaxFrdCnt @0x14034AC -> member 0xa0; summed with 2rR5s6wn by getSumFrdCnt @0x12AB5B8 (18 readers, all friend-request scenes)."
+    }
+
+    field add_friend_count type="i32::str" {
+        key "2rR5s6wn"
+        doc "Friend slots BOUGHT with gems (ShopUse type 7, 5 per step), ADDED to 3u41PhR2.  setAddFrdCnt @0x14034D4 -> member 0xac; getAddFrdCnt has zero call sites, getSumFrdCnt @0x12AB5B8 reads the offset.  ShopFriendExtScene::touchBegan stops selling once getSumFrdCnt reaches UserLevelMst::getSumFriendCnt (friend_count + add_friend_count), so the level MST's add_friend_count is the most that can be bought — sending it here gave the slots away and made the purchase unreachable.  Server: user_info.max_friend_count holds the bought slots; gme::getTeamInfo sends min(bought, the level's add_friend_count)."
+    }
+
+    field warehouse_count type="i32::str" {
+        key "5pjoGBC4"
+        doc "Base item-box capacity.  setWarehouseCnt @0x14037F0 -> member 0x110.  Summed with iI7Wj6pM by getMaxWarehouseCnt @0x12ABBD8 (32 readers).  GameScene::checkOverItemBox @0x163BC14 returns max < activeCount, and Utils::canEnterMissions @0xF42FA0 BLOCKS MISSION ENTRY on it.  Server-side this maps to DB column max_warehouse_count, not warehouse_count."
+    }
+
+    field add_warehouse_count type="i32::str" {
+        key "iI7Wj6pM"
+        doc "Purchased item-box expansions, ADDED to 5pjoGBC4.  setAddWarehouseCnt @0x1403818 -> member 0x11c; getAddWarehouseCnt has zero call sites, getMaxWarehouseCnt @0x12ABBD8 reads the offset."
+    }
+
+    field friend_point type="i32::str" {
+        key "J3stQ7jd"
+        doc "ASSUMED (call site cited, consumer not yet read).  setFriendPoint @0x14034FC.  9 readers, top: GameScene::updateFooter, SummonsConfirmScene::setGachaInfo, SummonsDetailScene::setGachaInfo."
+    }
+
+    field zel type="u64::str" {
+        key "Najhr8m6"
+        doc "Current total Zel owned by the player."
+    }
+
+    field karma type="u64::str" {
+        key "HTVh8a65"
+        doc "Current total Karma owned by the player."
+    }
+
+    field brave_coin type="i32::int" {
+        key "03UGMHxF"
+        doc """
+        THE GEM BALANCE.  setBraveCoin @0x140369C is a red herring -- all 118
+        readers are gem spending: GuildExchangeScene::setGems, ShopBuyCoinScene,
+        ShopHelFightScene, ColosseumTopScene::ticketShopDialog,
+        RaidSceneBase::raidHeartShopCheck.
+
+        Server-side this is deliberately mapped to the gems column
+        (PacketInterfaceSchemas.hpp).  Do NOT repoint it at a real brave-coin
+        column -- that zeroes the HUD and breaks gem spending.
+        """
+    }
+
+    field friend_message type="str" {
+        key "bM7RLu5K"
+        doc "TWO setters from one key: setFriendMessage @0x140372C (4 readers, PlayerInfoScene2 / DeckEditRequest::createBody) and setFriendMessageOrg @0x14037B8, a pristine copy read once by StepScene::noticeOK."
+    }
+
+
+    field want_gift type="str" {
+        key "s2WnRw9N"
+        doc "ASSUMED (call site cited, consumer not yet read).  setWantGift @0x14038A8.  4 readers: FixGiftInfoRequest::createBody, GiftRecieveListScene2::setWantGift, GiftRecieveScene2::getGiftMstList."
+    }
+
+    field present_count type="i32::str" {
+        key "EfinBo65"
+        doc "CONFIRMED consumer: the Rewards badges.  setPresentCnt @0x14038E0.  HomeScene2::setLayoutControl lights the Rewards button when getPresentCnt() > 0 (cmp @0x16EDCA0); RewardsTopScene::checkForBadgeAlert badges the Presents tile; AnotherHomeScene::setPresentCntBadge draws the count.  The client never counts presents itself, so gme::getTeamInfo sends the number of unclaimed user_presents rows — every reply carrying team_info refreshes it."
+    }
+
+    field friend_agree_count type="i32::str" {
+        key "qVBx7g2c"
+        doc "UNREAD.  setFriendAgreeCnt @0x1403908 -> member 0x14c; getFriendAgreeCnt has ZERO call sites."
+    }
+
+    field gift_receive_count type="i32::str" {
+        key "1RQT92uE"
+        doc "UNREAD.  setGiftRecieveCnt @0x1403930 -> member 0x158; getGiftRecieveCnt has ZERO call sites."
+    }
+
+    field unk3 type="i32::str" {
+        key "kW5QuUz7"
+        doc "DEAD -- absent from readParam AND from both client binaries.  Inert.  Inherited from upstream commit 4541706."
+    }
+
+    field unk4 type="i32::str" {
+        key "3w6YDS4z"
+        doc "DEAD on this class -- belongs to UserTeamArchiveResponse @0x14020F4.  Inert here."
+    }
+
+    field colosseum_ticket type="i32::str" {
+        key "lKuj3Ier"
+        doc "ASSUMED (call site cited, consumer not yet read).  setColosseumTicket @0x1403AB8.  10 readers, top: ArenaBattleStartConnectScene::initialize, VortexArenaResultRewardScene::initSet."
+    }
+
+    field unk5 type="i32::str" {
+        key "JmFn3g9t"
+        doc "DEAD on this class -- 19 readers, all arena / friend / raid / guild response classes.  Inert here."
+    }
+
+    field summon_ticket type="i32::str" {
+        key "9r3aLmaB"
+        doc """
+        Summon ticket count.  setSummonTicket @0x12AC550 is strh -- A 16-BIT
+        STORE.  Anything above 65535 WRAPS, despite this field being i32 here.
+
+        It is one of four packed u16 counters (0x1c0 summon, 0x1c2 energy,
+        0x1c4 item-space, 0x1c6 inventory-space) that getTotalTickets @0x12AC590
+        sums.  The other three have no readParam entry, so the server cannot
+        set them by any key.
+        """
+    }
+
+    field brave_points_total type="i32::str" {
+        key "bya9a67k"
+        doc "ASSUMED (call site cited, consumer not yet read).  setBravePointsTotal @0x1403CB0.  14 readers, top: DailyTaskMenuMileStoneScene::setClaimButton, PlayerInfoBattleResultScene::getActual."
+    }
+
+    field current_brave_points type="i32::str" {
+        key "22rqpZTo"
+        doc "ASSUMED (call site cited, consumer not yet read).  setBravePointsCurrent @0x1403CD8.  21 readers, top: DailyTaskMenuRedeemPrizesScene::setClaimButton, ChallengeArenaResultScene::updateEvent."
+    }
+
+    field rainbow_coin type="i32::str" {
+        key "KAZmxkgy"
+        doc "ASSUMED (call site cited, consumer not yet read).  setRainbowCoin @0x1403D00.  3 readers: SummonsDetailScene::setGachaInfo and ::touchBegan."
+    }
+
+    field unk6 type="i32::str" {
+        key "AKP8t3xK"
+        doc "DEAD on this class -- belongs to ChallengeArenaUserInfoResponse @0xE61654.  Inert here."
+    }
+
+    field unk7 type="i32::str" {
+        key "Nou5bCmm"
+        doc "DEAD on this class -- ChallengeArenaUserInfoResponse @0xE6162C / ChallengeArenaBattleEndRequest::createBody @0xE8956C.  Inert here."
+    }
+
+    field slot_game_flag type="i32::int" {
+        key "s3uU4Lgb"
+        doc "Brave Slots gate.  setSlotgameFlg @0x1403C88 (bool).  BadgeInfo::newFlagControl @0x11F360C does tbz w0,#0 -- bit 0 clear skips the slots badge entirely -- then requires UserReleaseInfoList::isRelease(4).  Also gates RandallSummonScene::setLayout @0x1A2DBF8."
+    }
+
+    field completed_task_count type="i32::str" {
+        key "3a8b9D8i"
+        doc "ASSUMED (call site cited, consumer not yet read).  setCompletedTaskCount @0x1403D28.  4 readers: RewardsTopScene::checkForBadgeAlert, AnotherHomeScene / HomeScene2 setLayoutControl."
+    }
+
+    field inbox_message_count type="i32::int" {
+        key "7qncTHUJ"
+        doc "ASSUMED (call site cited, consumer not yet read).  setInboxMessagesCnt @0x1403D50.  11 readers, top: GameScene::updateFooter, FriendTop2Scene::setLayoutControl."
+    }
+
+    field unk8 type="i32::int" {
+        key "38d7D18b"
+        doc "DEAD -- absent from readParam AND from both client binaries.  Inert.  Inherited from upstream commit 4541706."
+    }
+
+    field unk9 type="i32::int" {
+        key "D38bda8B"
+        doc "DEAD -- absent from readParam AND from both client binaries.  Inert.  Inherited from upstream commit 4541706."
+    }
+
+    field mysterybox_count type="i32::int" {
+        key "Qo9doUsp"
+        doc "CONFIRMED consumer: the Mystery Chest badges.  setMysteryBoxCount @0x1403D78.  HomeScene2::setLayoutControl (+0xe44) badges the Rewards button and RewardsTopScene::checkForBadgeAlert (+0xfc) the Mystery Chest tile from getMysteryBoxCount.  gme::getTeamInfo sends the number of unclaimed, unexpired user_mystery_boxes rows."
+    }
+
+    field paid_gems type="i32::int" {
+        key "d37CaiX1"
+        doc "setPaidGems @0x1403DA0 -> member 0x1dc.  Summed with 92uj7oXB by getTotalGems @0x12AC62C; also UserPiadFreeGemsInfoScene::setLayoutControl."
+    }
+
+    field free_gems type="i32::int" {
+        key "92uj7oXB"
+        doc "setFreeGems @0x1403DC8 -> member 0x1d8.  Summed with d37CaiX1 by getTotalGems @0x12AC62C."
+    }
+
+    field max_equip_slot_count type="i32::str" {
+        key "gEX30r1b"
+        doc "UNREAD.  setMaxEqpSlotCnt @0x1403484 -> member 0x94; the only getter reading that offset is getMaxEqpSlotCnt, which has ZERO call sites."
+    }
+
+}
+
+json UserUnitInfo {
+    doc "Player-owned unit records."
+
+    field user_unit_id type="u32::str" {
+        key "edy7fq3L"
+        doc """
+        Unique id attributed to a specific unit of a given user.
+        Duplicates of the same unit will receive unique user unit ids.
+        """
+    }
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+    }
+
+    field unit_id type="u32::str" {
+        key "pn16CNah"
+        doc """
+        Unique identifier for the unit's archive record.
+        Used to look up this unit in the MST assets.
+        """
+    }
+
+    field unit_type_id type="u32::str" {
+        key "nBTx56W9"
+        doc """
+        Specifies the unit type, e.g. Lord, Anima, Breaker, Guardian, or Oracle.
+        TODO: Figure out which numeric value maps to each type.
+        """
+    }
+
+    field unit_lvl type="u32::str" {
+        key "D9wXQI2V"
+        doc "TODO"
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "TODO"
+    }
+
+    field total_exp type="i32::str" {
+        key "gQInj3H6"
+        doc "TODO"
+    }
+
+    field base_hp type="u32::str" {
+        key "e7DK0FQT"
+        doc """
+        Current HP stat for this unit before imp/stat-up bonuses.
+        Includes level-based stat growth because this client passes
+        base_hp into GameUtils::getUnitHp(base_hp, unit_lvl, ...),
+        which currently returns base_hp unchanged. This suggests the
+        server is expected to store the unit's level-adjusted normal
+        HP in this bucket. Naturally, this applies to all base_* stats.
+        """
+    }
+
+    field add_hp type="i32::str" {
+        key "cuIWp89g"
+        doc """
+        A stat bonus that folds SILENTLY into the displayed total.
+        setAddHp, vtable-dispatched from readParam.
+
+        ⚠ NOT THE IMP BUCKET -- that is ext_hp.  Probed in-client
+        2026-09-05 with distinct values in both buckets on one unit:
+        the card drew "HP 5365 [111]" from base 5243 + add 11 +
+        ext 111, so the big stat is base+add+ext and the small orange
+        figure beside it is ext_* ALONE.
+
+        // UNVERIFIED: what actually feeds this.  Nothing on this
+        server writes it, and nothing should until its source is known.
+        """
+    }
+
+    field ext_hp type="u32::str" {
+        key "TokWs1B3"
+        doc """
+        THE IMP BUCKET, and the small orange number the unit card draws
+        beside the HP stat.  CONFIRMED in-client 2026-09-05 by probing
+        add_* and ext_* with distinct values: the card showed
+        "HP 5365 [111]" for base 5243 + add 11 + ext 111.
+
+        Written by UnitMix, clamped to UnitMst.param_max (imQJdg64) for
+        this stat -- the cap the orange figure is measured against.
+        """
+    }
+
+    field limit_over_hp type="i32::int" {
+        key "ISj9u5VL"
+        doc "TODO"
+    }
+
+    field base_atk type="u32::str" {
+        key "67CApcti"
+        doc """
+        Current ATK stat for this unit before imp/stat-up bonuses.
+        See base_hp for why base_* stores the unit's level-adjusted normal stats.
+        """
+    }
+
+    field add_atk type="i32::str" {
+        key "RT4CtH5d"
+        doc """
+        A stat bonus that folds SILENTLY into the displayed total.
+        setAddAtk, vtable-dispatched from readParam.
+
+        ⚠ NOT THE IMP BUCKET -- that is ext_atk.  Probed in-client
+        2026-09-05 with distinct values in both buckets on one unit:
+        the card drew "HP 5365 [111]" from base 5243 + add 11 +
+        ext 111, so the big stat is base+add+ext and the small orange
+        figure beside it is ext_* ALONE.
+
+        // UNVERIFIED: what actually feeds this.  Nothing on this
+        server writes it, and nothing should until its source is known.
+        """
+    }
+
+    field ext_atk type="u32::str" {
+        key "t4m1RH6Y"
+        doc """
+        THE IMP BUCKET, and the small orange number the unit card draws
+        beside the ATK stat.  CONFIRMED in-client 2026-09-05 by probing
+        add_* and ext_* with distinct values: the card showed
+        "HP 5365 [111]" for base 5243 + add 11 + ext 111.
+
+        Written by UnitMix, clamped to UnitMst.param_max (imQJdg64) for
+        this stat -- the cap the orange figure is measured against.
+        """
+    }
+
+    field limit_over_atk type="i32::int" {
+        key "D6bKH5eV"
+        doc "TODO"
+    }
+
+    field base_def type="u32::str" {
+        key "q08xLEsy"
+        doc """
+        Current DEF stat for this unit before imp/stat-up bonuses.
+        See base_hp for why base_* stores the unit's level-adjusted normal stats.
+        """
+    }
+
+    field add_def type="i32::str" {
+        key "GcMD0hy6"
+        doc """
+        A stat bonus that folds SILENTLY into the displayed total.
+        setAddDef, vtable-dispatched from readParam.
+
+        ⚠ NOT THE IMP BUCKET -- that is ext_def.  Probed in-client
+        2026-09-05 with distinct values in both buckets on one unit:
+        the card drew "HP 5365 [111]" from base 5243 + add 11 +
+        ext 111, so the big stat is base+add+ext and the small orange
+        figure beside it is ext_* ALONE.
+
+        // UNVERIFIED: what actually feeds this.  Nothing on this
+        server writes it, and nothing should until its source is known.
+        """
+    }
+
+    field ext_def type="u32::str" {
+        key "e6mY8Z0k"
+        doc """
+        THE IMP BUCKET, and the small orange number the unit card draws
+        beside the DEF stat.  CONFIRMED in-client 2026-09-05 by probing
+        add_* and ext_* with distinct values: the card showed
+        "HP 5365 [111]" for base 5243 + add 11 + ext 111.
+
+        Written by UnitMix, clamped to UnitMst.param_max (imQJdg64) for
+        this stat -- the cap the orange figure is measured against.
+        """
+    }
+
+    field limit_over_def type="i32::int" {
+        key "3CsiQA0h"
+        doc "TODO"
+    }
+
+    field base_rec type="u32::str" {
+        key "PWXu25cg"
+        doc """
+        Current REC stat for this unit before imp/stat-up bonuses.
+        See base_hp for why base_* stores the unit's level-adjusted normal stats.
+        """
+    }
+
+    field add_rec type="i32::str" {
+        key "C1HZr3pb"
+        doc """
+        A stat bonus that folds SILENTLY into the displayed total.
+        setAddHeal, vtable-dispatched from readParam.
+
+        ⚠ NOT THE IMP BUCKET -- that is ext_rec.  Probed in-client
+        2026-09-05 with distinct values in both buckets on one unit:
+        the card drew "HP 5365 [111]" from base 5243 + add 11 +
+        ext 111, so the big stat is base+add+ext and the small orange
+        figure beside it is ext_* ALONE.
+
+        // UNVERIFIED: what actually feeds this.  Nothing on this
+        server writes it, and nothing should until its source is known.
+        """
+    }
+
+    field ext_rec type="u32::str" {
+        key "X6jf8DUw"
+        doc """
+        THE IMP BUCKET, and the small orange number the unit card draws
+        beside the REC stat.  CONFIRMED in-client 2026-09-05 by probing
+        add_* and ext_* with distinct values: the card showed
+        "HP 5365 [111]" for base 5243 + add 11 + ext 111.
+
+        Written by UnitMix, clamped to UnitMst.param_max (imQJdg64) for
+        this stat -- the cap the orange figure is measured against.
+        """
+    }
+
+    field limit_over_rec type="i32::int" {
+        key "XJs2rPx0"
+        doc "TODO"
+    }
+
+    field unk type="i32::str" {
+        key "xujp1nz2"
+        doc "TODO"
+    }
+
+    field element type="str" {
+        key "iNy0ZU5M"
+        doc "TODO"
+    }
+
+    field leader_skill_id type="i32::str" {
+        key "oS3kTZ2W"
+        doc "TODO"
+    }
+
+    field bb_id type="str" {
+        key "nj9Lw7mV"
+        doc "Denotes the bb skill id for this unit."
+    }
+
+    field bb_lvl type="u32::str" {
+        key "3NbeC8AB"
+        doc "Denote bb skill level; max should be level 10."
+    }
+
+    field sbb_id type="str" {
+        key "iEFZ6H19"
+        doc """
+        Denotes the sbb skill id for this unit.
+        Leave empty if not unlocked.
+        """
+    }
+
+    field sbb_lvl type="u32::str" {
+        key "RQ5GnFE2"
+        doc "Denote sbb skill level; max should be level 10."
+    }
+
+    field equipitem_frame_id type="i32::str" {
+        key "0R3qTPK9"
+        doc """
+        SLOT 1's WAREHOUSE ROW: the item index (UserWarehouseInfo n6E8iMf3) of
+        the sphere copy equipped there, 0 when the slot is empty.  Not a sphere
+        type, despite the name.
+
+        BINARY-CONFIRMED (arm64 libgame.so):
+          * ItemSphereSelectScene::eqpSphere @0x1738980 writes the chosen copy's
+            index into it (setEquipItemFrameID, vtable +0x1d8);
+          * UserUnitInfoList::updateSphereEquipList @0x12BA7F8 keys the client's
+            "which unit wears this row" map on it, skipping "0";
+          * the sphere picker (setSphereList @0x172F0F8), the "equipped / total"
+            header (GameScene::getSphereNumString via getSphereEqpCount) and
+            GameUtils::decWarehouseItem all look warehouse rows up in that map.
+        So a sphere type here marks whichever row happens to have that index as
+        equipped, and the real copy as free.  The unit's slot ICON comes from
+        equipitem_id, never from this field (GameUtils::setEquipSphereIcon).
+        """
+    }
+
+    field equipitem_id type="i32::str" {
+        key "Ge8Yo32T"
+        doc "TODO"
+    }
+
+    field equipitem_frame_id2 type="i32::str" {
+        key "RXfC31FA"
+        doc """
+        SLOT 2's WAREHOUSE ROW **AND** THE UNIT'S SPHERE CAPACITY.  Three-valued:
+
+            -1     no second slot -- the client does not draw it at all
+             0     slot present, empty
+            >0     slot present, holding the copy in that warehouse row
+
+        // CORRECTED 2026-10-02: the >0 case was documented as an ItemMst
+        // sphere_type (1..14).  It is the equipped copy's warehouse row, exactly
+        // as for slot 1 -- see equipitem_frame_id for the binary evidence.
+        // GameUtils::setEquipSphereIcon @0x118F344 reads this field only to
+        // compare it with "-1" (slot B drawn or not); the -1/0 sentinel below
+        // is unaffected by the correction.
+
+        A unit is born with ONE slot; the second is granted only by fusing a
+        Sphere Frog (unit 20302), which moves this field -1 -> 0.
+
+        CONFIRMED IN-CLIENT 2026-09-05.  UnitMixMainScene::mixUnitDoubleSphereCheck
+        @0x1C118F8 walks the fusion material list, calls
+        UserUnitInfoBase::getEquipItemFrameID2 (vtable+0x1f0) and compares the
+        result against the literal string "-1" (mov w22, #0x312d); any material
+        that is NOT "-1" raises UNIT_MIX_CONFIRM_SPHERE, "A Unit with max Sphere
+        capacity has been selected as an Ingredient.  *Max Sphere capacity will
+        not be passed down."  UnitDetailUserUnitScene tests the same sentinel in
+        14 places.  Probing one unit at -1 against another left at 0 drew one
+        slot on the first and two on the second.
+
+        // WE SENT 0 FOR EVERY UNIT, so every unit showed both slots and the
+        // Sphere Frog had nothing to grant.  See the ext_count note below for
+        // why the earlier search missed this.
+
+        Related: unit.kdl before_eqp_frame_id2 / after_eqp_frame_id2 report the
+        change across a fusion, which is how the frog's effect is shown on the
+        result screen.
+        """
+    }
+
+    field equipitem_id2 type="i32::str" {
+        key "mZA7fH2v"
+        doc "TODO"
+    }
+
+    field received_order type="u32::str" {
+        key "Bvkx8s6M"
+        doc """
+        Numeric acquired-sort key.
+        The client only uses this value for acquired-order unit sorting, so the
+        server populates it from the monotonically increasing user_unit_id
+        instead of storing a separate timestamp.
+        """
+    }
+
+    field unk2 type="i32::str" {
+        key "DbMVG16I"
+        doc "TODO"
+    }
+
+    field is_new type="bool::str" {
+        key "dJNpLc81"
+        doc """
+        Client-visible new badge for an owned unit row.
+
+        This only marks a newly obtained owned unit, not whether the unit is
+        new to the player.
+        """
+    }
+
+    field extra_passive_skill_id type="i32::str" {
+        key "cP83zNsv"
+        doc "TODO"
+    }
+
+    field extra_passive_skill_id2 type="i32::str" {
+        key "LjY4DfRg"
+        doc "TODO"
+    }
+
+    field add_extra_passive_skill_id type="i32::str" {
+        key "T4rewHa9"
+        doc "TODO"
+    }
+
+    field unit_img_type type="i32::int" {
+        key "2pAyFjmZ"
+        doc "TODO"
+    }
+     // # TODO: is this really a str?
+    field omni_level type="i32::int" {
+        key "49sa3sld"
+        doc "TODO"
+    }
+
+    field ext_count type="i32::int" {
+        key "5gXxT7LZ"
+        doc """
+        The SPHERE FROG bit: 1 if this unit has been given a second sphere
+        slot, 0 otherwise.  Backed by user_units.sphere_ext.
+
+        // RENAMED FROM: "TODO", and never populated -- the server sent 0 for
+        // every unit.  setExtCnt @0x12B4CA8; the pair getExtCnt @0x12B4D44
+        // reads member 0x364 XORed with the byte at 0x368, one of the client's
+        // obfuscated fields, so this is a value it expects to be tamper-worthy.
+
+        The MECHANIC is not inferred -- it is the game's own help text,
+        MST_HELP_SUBTOPIC_100_8 "Sphere Capacity Increase": fusing the unit
+        "Sphere Frog" (20302) raises the base unit's sphere capacity, one
+        extra slot per unit and no more, inherited through evolution, and
+        granted by nothing else.  UNIT_DETAIL_SPHERE_EXT ("Fuse to get another
+        Sphere slot!") is the label the frog's own detail page shows.
+
+        // RESOLVED 2026-09-05 -- THIS KEY IS *NOT* THE CARRIER, BUT THE
+        // MECHANIC IS REAL.  Sphere capacity lives in equipitem_frame_id2
+        // (RXfC31FA) as a "-1" sentinel, documented above.  Read sites for
+        // getExtCnt really are only ChallengeArena party copies, so the client
+        // does not appear to read THIS field -- that observation was correct.
+        //
+        // // THE CONCLUSION DRAWN FROM IT WAS NOT.  An earlier pass took the
+        // // dead read sites, plus "no capacity symbol in libgame.so", plus
+        // // unit_mst having no slot column, plus setEquipSphereIcon drawing
+        // // both icons unconditionally, and concluded this build had DROPPED
+        // // sphere capacity entirely -- every unit simply has two slots, and
+        // // MST_HELP_SUBTOPIC_100_8 is legacy text.  ItemSphereEqp's gate was
+        // // removed on the strength of that.  All of it was wrong:
+        // //
+        // //   * it hunted for a slot COUNT.  The capacity is not a count, it
+        // //     is a sentinel value inside the frame id, which no search for
+        // //     "SphereSlot"/"EqpCnt"/capacity columns could ever surface;
+        // //   * several steps were xref-absence arguments over VIRTUAL getters
+        // //     (getEquipItemFrameID2 is vtable+0x1f0, reached by blr x8).
+        // //     so_xref cannot see virtual calls; absence proves nothing.
+        // //
+        // // What actually solved it was the game telling us: the fusion screen
+        // // warns that material units with max Sphere capacity do not pass it
+        // // down, and that warning string led straight to the check.
+        //
+        // Kept as the server-side boolean record of "a frog was fused", and as
+        // the thing ItemSphereEqp gates on.  The invariant every write site
+        // maintains is  eqip_item_frame_id2 == -1  <=>  sphere_ext == 0.
+        """
+    }
+
+    field fe_bp type="i32::str" {
+        key "bFQbZh3x"
+        doc """
+        setFeBP -- the unit's UNSPENT enhancement SP (Omni "SP Enhancements").
+        GameUtils::mixFeBpCheck @0x1EC4C80 tests
+            fe_bp + <SP the selected materials give> + fe_used_bp
+        against fe_max_usable_bp (+ Omni Emperor cap), and the fusion material
+        screen greys out every SP-only material (Burst/Omni Frogs on a max-level
+        Omni unit) when that sum has no room -- so sending 0/0/0 here is what
+        made frogs unusable for SP (#25).  The fusion result adds fe_used_bp to
+        UnitOpeResult before/after_fe_bp for display (parseMixResult @0x1C18D6C),
+        so those two carry unspent SP too.  Global wiki, Unit Skills rev 656738:
+        10 SP to start, 100 at most.
+        """
+    }
+
+    field fe_used_bp type="i32::str" {
+        key "3RgneFpP"
+        doc "setFeUsedBP -- SP already spent on enhancements (counts against fe_max_usable_bp together with fe_bp)."
+    }
+
+    field fe_max_usable_bp type="i32::str" {
+        key "GIO9DTif"
+        doc "setFeMaxUsableBP -- the SP limit: 100 (Global wiki), raised by Omni+ Boost (unit_evo_omni_mst ddD4lsc1) and, at Omni+3, by Omni Emperors to 130 (checkElemUnit compares against 0x82)."
+    }
+
+    field fe_skill_info type="str" {
+        key "Fnxab5CN"
+        doc """
+        setFeSkillInfo @0x12B7B14 — the unit's acquired SP enhancements.
+        Format, from the parser: groups joined by '/', each
+        `<category>@<skill>:<skill>...`; the categories land in the list
+        getFeCategory returns (helper-list icons), every skill id other than
+        "" or "0" in the list isFeSkill / getFeSkillInfoList read.  "" and "0"
+        mean none.  Categories are UnitFeSkillMst.category_id, skills
+        FeSkillMst ids.  Written by FeSkillGet, cleared by ShopUse type 9;
+        stored in user_units.fe_skill_info (30092026_UnitFeSkillInfo).
+        """
+    }
+
+}
+
+// ## --- request
+
+json LoginInfoReq {  // # TODO: actually support (GumiLiveInfo), as it's not support right now....
+    doc "TODO"
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "Username shown in-game."
+    }
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+    }
+
+    field contact_id type="str" {
+        key "90LWtVUN"
+        doc "TODO"
+    }
+
+    field model_change_count type="i32::str" {
+        key "nrg19RGe"
+        doc "TODO"
+    }
+
+    field device_name type="str" {
+        key "iN7buP0j"
+        doc "TODO"
+    }
+
+    field target_os type="GameTargetOs" {
+        key "DFY3k6qp"
+        doc "Operative system which runs the game"
+    }
+
+    field build_platform_id type="str" {
+        key "j2lk52Be"
+        doc "TODO"
+    }
+
+    field unk5 type="i32::str" {
+        key "37d2Hi5p"
+        doc "TODO"
+    }
+
+    field device_id type="str" {
+        key "Ma5GnU0H"
+        doc "Device advertisement ID (the same as vid in the gumi api login)"
+    }
+
+    field pointer_name type="str" {
+        key "fKSzGDFb"
+        doc "TODO"
+    }
+
+    field first_desc_mst_req type="str" {
+        key "7oV00FeR"
+        doc "TODO"
+    }
+
+    field notice_mst_list_req type="str" {
+        key "aXf114Oz"
+        doc "TODO"
+    }
+
+    field minfo type="str" {
+        key "236dItKo"
+        doc "TODO"
+    }
+
+    field current_language type="GameLanguages" {
+        key "h7LYasNK"
+        doc "Current game language"
+    }
+
+    field country_code type="str" {
+        key "hceYTcAK"
+        doc "Country code"
+    }
+
+    // The client reports which one-off scene intros it has already played as a
+    // trailing-comma list, e.g. "randall," then "randall,frontiergate_v2,"
+    // after entering Frontier Gate.  CAPTURED FROM: DungeonEventUpdate
+    // (BjAt1D6b) requests, 2026-08-07.
+    //
+    // Kept `str` deliberately rather than [str]::sep(comma): every observed
+    // value ends in a trailing comma, which the array codec would drop and
+    // then re-emit differently (handbook §3.3).
+    //
+    // This is the RESPONSE side's LoginInfoResp.user_special_scenario_info
+    // (same key) flowing the other way — the server stores what the client
+    // reports and echoes it back so the intros stay marked as seen.  Without
+    // it declared here the value was silently discarded by the lenient read.
+    field special_scenario_info type="str" {
+        key "9yVsu21R"
+        doc "Comma-terminated list of one-off scene intros the client has already shown (\"randall,frontiergate_v2,\").  Mirrors LoginInfoResp.user_special_scenario_info."
+    }
+
+    field scenario_info type="str" {
+        key "N4XVE1uA"
+        doc "Scenario progress marker included by some login-info requests."
+        optional #true
+    }
+
+    field tutorial_status type="i32::str" {
+        key "9sQM2XcN"
+        doc "Current tutorial chapter id posted by TutorialUpdateRequest."
+    }
+
+    field tutorial_end_flag type="bool::str" {
+        key "sv6BEI8X"
+        doc "Whether the client considers the tutorial complete."
+    }
+
+    // # TODO: MOVE TO GUMILIVEINFO !!!!!
+    field gumi_live_userid type="str" {
+        key "iN7buP2h"
+        doc "Gumi live API User ID. (used for example in IAP)"
+    }
+
+    field gumi_live_token type="str" {
+        key "iN7buP1i"
+        doc "User token of the Gumi live API."
+    }
+
+}
+
+json MstUrlList {
+    doc "TODO"
+
+    field id type="str" {
+        key "moWQ30GH"
+        doc "Normal (not crypted) name of the MST"
+    }
+
+    field version type="i32::str" {
+        key "d2RFtP8T"
+        doc "Saved MST version in the game"
+    }
+
+}
+
+json UserUnitDictionary {
+	doc """
+    Discovered unit entries used by the client unit dictionary.
+
+    UserUnitDictionaryResponse::readParam @0x1404ABC feeds TWO lists:
+
+      UserUnitDictionaryList           MERGE.  Each row replaces any entry with
+                                       the same unit id (getObjectWithUnitID,
+                                       erase, addObject).  The Unit Guide
+                                       (UnitDictionaryScene::setUnitDictionary)
+                                       and unit asset loading read this one.
+      UserUnitDictionaryReferenceList  REPLACED BY EVERY RESPONSE: row 0 /
+                                       field 0 calls removeAllObjects, then
+                                       every row is added.  Its only reader is
+                                       the summon lineup — SummonsListScene's
+                                       ctor stores existUnitID's answer per
+                                       unit (@0x16D4200 -> [entry+0x30]).
+
+    So ALWAYS SEND THE WHOLE DICTIONARY.  Only the newly obtained species is
+    harmless to the Unit Guide but leaves the lineup knowing just those
+    species until the next UserInfo.  The scene loads question_frame beside
+    unit_thum, which is presumably how it draws a unit it does not know
+    (UNVERIFIED in-client).
+
+    // WAS: "a response-local reference list used by result screens".  The
+    // xrefs show no result-screen reader; the lineup is the only one.
+    """
+
+	field user_id type="str" {
+		key "h7eY3sAK"
+		doc "User id that owns this dictionary entry."
+	}
+
+	field unit_id type="u32::str" {
+		key "pn16CNah"
+		doc "Discovered unit id."
+	}
+
+	field img_type_flag type="i32::str" {
+		key "2pAyFjmZ"
+		doc """
+		ALTERNATE ART, and the only thing that unlocks it.
+
+		readParam @0x1404D60 sends this key straight to
+		UserUnitDictionary::setImgTypeFlg (+0x48), and
+		UserUnitDictionaryList::isUnitImgType @0x12B1D80 -- the test behind the
+		art-swap arrow on the unit page, the Unit Guide, the summon lineup and
+		the event-token shop's "already owned" check -- is exactly
+		`getImgTypeFlg() == 1`.  Nothing else writes that member.
+
+		WHICH illustration is showing does not travel: unitImgTypeSet stores it
+		in a second member (+0x4c) that readParam never touches, and
+		UserUnitDictionaryList::unitImgTypeSave / unitImgTypeLoad persist it on
+		the device.  getUnitImgType() returns that member only while this flag
+		is 1, which is how one server bit gates a purely local preference, and
+		GameUtils::getUnitCutinImage @0x117D694 appends "_<n>" for n >= 2 --
+		unit_ills_full_<id>_2.png, which ships with the client for 60 species.
+
+		1 for a species whose alternate art this player has bought (Merit shop
+		reward type 15), 0 otherwise; see gme::loadUnitDictionary.
+		"""
+	}
+}
+
+json UserFavorite {
+	doc "Favorited/locked unit entry in UserInfo (list key 3kcmQy7B).  Same wire triple as UnitFavoriteEntry — the UnitFavorite handler persists user_units.favorite_flg and UserInfo reports the locked set back here so locks survive a reload."
+
+	field user_unit_id type="i32::str" {
+		key "edy7fq3L"
+		doc "Locked unit's user_units.user_unit_id.  Quoted decimal integer on the wire."
+	}
+
+	field favorite type="i32::str" {
+		key "5JbjC3Pp"
+		doc "Favorite/lock flag, always \"1\" for reported entries (unfavorited units are simply absent)."
+	}
+
+	field unit_img_type type="i32::str" {
+		key "2pAyFjmZ"
+		doc """
+		The same hash the unit dictionary carries, on a per-UNIT row rather than
+		per-species.  Sent 0: the alternate-art unlock is species-wide and rides
+		the dictionary (see UserUnitDictionary.img_type_flag), and the favourite
+		list's copy has no traced reader.
+		"""
+	}
+}
+
+json UserClearMissionInfo {
+	doc "Per-mission clear-history record (UserInfo list key UT1SVg59).  All 7 fields decoded via the UT1SVg59 readParam audit (handbook §8.27, tools/ida/audits/UT1SVg59_audit.txt).  THE progression driver: the client evaluates feature unlocks against this list — F_FUNCTION_RELEASE_MST rows condition type 2 = 'mission <param> cleared' (functions 8-19), and hardcoded early-feature gates (town etc.) key off the same set.  Backed by user_campaign_missions rows with state=2."
+
+	field user_id type="str" {
+		key "h7eY3sAK"
+		doc "Owning user id (setUserID — the one typed setter in readparam_analysis)."
+	}
+
+	field mission_id type="i32::str" {
+		key "j28VNcUW"
+		doc "Cleared mission's F_MISSION_MST id."
+	}
+
+	field clear_date type="str" {
+		key "JATWnN57"
+		doc "setClearDate — last-clear datetime string, formatted \"YYYY-MM-DD hh:mm:ss\" from user_campaign_missions.last_cleared_at.  // UNVERIFIED: exact client-expected format; std::string setter per audit."
+	}
+
+	field clear_cnt type="i32::str" {
+		key "HIQoGb10"
+		doc "setClearCnt — lifetime clear count for this mission."
+	}
+
+	field most_time type="i32::str" {
+		key "Wi4EFe6f"
+		doc "setMostTime — fastest clear (seconds).  Not tracked yet; sent as 0."
+	}
+
+	field get_bc type="i32::str" {
+		key "RWX38boG"
+		doc "setGetBc — lifetime battle crystals from this mission.  Not tracked yet; sent as 0."
+	}
+
+	field get_hc type="i32::str" {
+		key "bGx5ku0F"
+		doc "setGetHc — lifetime heart crystals from this mission.  Not tracked yet; sent as 0."
+	}
+}
+json UserWarehouseInfo {
+    doc "One owned item stack in the player's warehouse (potions, materials, spheres).  Response key 9wjrh74P (UserWarehouseInfoResponse).  Params per response_mappings.json: n6E8iMf3, kixHbe54, wgV86x1q, dJNpLc81, DbMVG16I."
+
+    field instance_id type="u32::str" {
+        key "n6E8iMf3"
+        doc "Warehouse row instance id (distinct from item_id): user_warehouse_rows.instance_id.  The client's getItemIndex; a unit's equipitem_frame_id/2 names the row of the sphere copy it wears by this id."
+    }
+
+    field item_id type="u32::str" {
+        key "kixHbe54"
+        doc "Item master id (joins to ItemMst.id)."
+    }
+
+    field item_num type="u32::str" {
+        key "wgV86x1q"
+        doc """
+        Quantity held in this stack.  AN EQUIPPED SPHERE COPY IS 1, not 0.
+
+        The client never changes a count when it equips or unequips: "equipped"
+        is only the unit's frame id naming this row (UserUnitInfo.
+        equipitem_frame_id).  And it reads equipped copies as ordinary rows --
+        the sphere picker skips a sphere row whose count is 0 (setSphereList
+        @0x172F264, getItemNum then cbz), decWarehouseItem protects the rows a
+        unit wears, and GameUtils::incWarehouseItem tops up any row below its
+        max stack, so a worn copy sent as 0 would vanish from the picker and
+        could even absorb the next crafted copy.  The server keeps
+        user_warehouse_rows.item_num 0 for a worn copy (user_items excludes it);
+        gme::loadWarehouseSnapshot puts 1 on the wire.
+        """
+    }
+
+    field new_flg type="i32::str" {
+        key "dJNpLc81"
+        doc """
+        setNewFlg -- the NEW badge on a warehouse stack.  NOT the lock/favorite
+        flag, which is what this field used to be called.
+
+        CORRECTED 2026-09-15.  UserWarehouseInfoResponse::readParam @0x14060E0
+        sends this key to UserWarehouseInfo::setNewFlg, and the KDL doc here
+        already admitted it was unconfirmed.  It was mapped in
+        PacketInterfaceSchemas to the `user_items.favorite_flg` COLUMN, so
+        locking an item would have made the client draw a NEW badge on it.
+        Latent rather than live only because every row in the save is still 0.
+
+        Locks have their own round trip and do not belong here: ItemFavorite
+        (`5JbjC3Pp` -> setFavorit) carries them, and UserInfo reports them back
+        through UserInfoResp.item_favorite.  So this is no longer fed from the
+        lock column and goes out as 0 -- nothing on this server tracks
+        item newness yet.
+        """
+    }
+
+    field disp_order type="i32::str" {
+        key "DbMVG16I"
+        doc "Display order in the item list.  // UNVERIFIED: see favorite_flg note."
+    }
+}
+
+// UserGiftInfo — one entry in the PLAYER-TO-PLAYER gift inbox.
+//
+// Every field below was `unk<N>` with a `TODO` doc until 2026-09-15.  The
+// names are not guesses: `UserGiftInfoResponse::readParam` @0x13FE4E8 was
+// mapped key-by-key with tools/readparam_map.py, and each one dispatches to a
+// UserGiftInfo setter by name.  Re-run that tool rather than editing these by
+// hand.
+//
+// GIFTS ARE NOT THE PRESENT BOX.  user_id_from / user_id_to make that plain:
+// this is one player sending another a gift, which needs a friend system this
+// server does not have.  The present box (`user_presents`) is the separate,
+// working thing that mission rewards and purchases land in.
+//
+// Nothing fills this struct yet — GetGiftInfo (ifYoPJ46) deliberately answers
+// with an empty object so that opening the gift screen cannot close the
+// session.  This schema is what a real implementation would fill.
+json UserGiftInfo {
+	doc "One entry in the player-to-player gift inbox (response key 30uygM9m).  Distinct from the present box; not yet implemented server-side."
+
+    field gift_identify_id type="i32::str" {
+        key "gNE76SLp"
+        doc "setGiftIdentifyID.  The inbox row's own id — what a claim would name.  STRING setter."
+    }
+
+    field user_id_from type="str" {
+        key "yDiG31Fe"
+        doc "setUserIDFrom.  The sender.  Half of the pair that makes this player-to-player rather than a present-box grant."
+    }
+
+    field user_id_to type="str" {
+        key "1px2dbX3"
+        doc "setUserIDTo.  The recipient."
+    }
+
+    field gift_id type="i32::str" {
+        key "eDj82kMN"
+        doc "setGiftID(int).  Which gift, as opposed to which inbox row."
+    }
+
+    field gift_type type="i32::str" {
+        key "2bvT9hKt"
+        doc "setGiftType(int).  Enum not yet decoded — no sample traffic exists for this screen."
+    }
+
+    field item_id type="i32::str" {
+        key "kixHbe54"
+        doc "setItemID.  Same key ItemMst uses for its own id.  STRING setter, so a quoted number is what it wants."
+    }
+
+    field possession type="i32::str" {
+        key "wgV86x1q"
+        doc "setPossession(int).  Quantity held / sent."
+    }
+
+    field gift_date type="str" {
+        key "aHSvC81N"
+        doc "setGiftDate.  A STRING setter, so this is modelled as str -- it was `datetime`, which generates a chrono_time the server cannot assign a date string to."
+    }
+
+    field gift_ymd type="i32::str" {
+        key "q5Y4gUnb"
+        doc "setGiftYmd(int).  The date again as a packed integer, alongside gift_date."
+    }
+
+    field recieve_flg type="i32::str" {
+        key "fa6WwE9u"
+        doc "setRecieveFlg(int).  Whether the recipient has claimed it.  (Spelling is the client's.)"
+    }
+
+    field unit_id type="i32::str" {
+        key "pn16CNah"
+        doc "setUnitID.  STRING setter.  Present so the inbox row can draw the sender's leader."
+    }
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "setHandlename.  Sender's display name.  (Lower-case `n` is the client's.)"
+    }
+
+    field unit_img_type type="i32::str" {
+        key "2pAyFjmZ"
+        doc "setUnitImgType(int).  Alternate art bit for the leader drawn on the row — the same flag reference_alternate_art covers."
+    }
+
+    field ep3_flg type="i32::int" {
+        key "jkldTrhL"
+        doc "setEp3Flg(int).  Episode-3 marker, shared with the arena/ranking rows.  // UNVERIFIED: this is the one field here still sent UNQUOTED, unlike everything around it."
+    }
+
+    field sex type="i32::str" {
+        key "9i2xhMaJ"
+        doc "setSex(int).  Sender's summoner avatar sex.  CORRECTED from type=str: the setter takes an int."
+    }
+
+    field element type="i32::str" {
+        key "iNy0ZU5M"
+        doc "setElement(int).  Sender's leader element.  CORRECTED from type=str: the setter takes an int, and FriendInfo's note records the same trap on this key."
+    }
+
+    field hair_id type="str" {
+        key "btZizNep"
+        doc "setHairID.  Sender's summoner hair.  STRING setter (by const reference)."
+    }
+
+    field arm_id type="str" {
+        key "RVVgyuor"
+        doc "setArmID -- the sender's equipped SUMMONER ARM, a STRING setter (const ref).  An earlier pass here claimed this key was NOT accepted by UserGiftInfoResponse::readParam; that was a tool blind spot, not a fact -- readParam has two dispatch shapes (`cbz w0,<handler>` and `cbnz w0,<skip>`) and only the first was being parsed, so keys in the second form went unseen.  All 18 fields of this struct are accepted."
+    }
+}
+
+json UserSummonerInfo {
+    doc """
+    The player's Summoner (the avatar behind the squad) — level, element
+    mastery, SP, equipment and derived stats.
+
+    Wire block `n5mdIUqj` -> UserSummonerInfoResponse::readParam @0x144EAD0,
+    33 keys into 32 setters.
+
+    ⚠ SINGLETON, NOT A LIST.  readParam opens with UserSummonerInfo::shared()
+    followed by init() (@0x144EB10/0x144EB14) before the first strcmp, so the
+    whole object is reset and refilled from one node.  Send exactly one row —
+    an empty array never runs readParam at all, which is what made reward
+    type 17 (Summoner SP) impossible to show.
+
+    // WAS A STUB: a single `mock` field keyed \"INVALID\".
+
+    ⚠ WE ONLY MODEL `sp`.  Every other field is emitted at the value
+    UserSummonerInfo::init() @0x127E9E8 already assigns, read out of the
+    binary rather than guessed — string fields \"\" except summoner_arm_id
+    \"10\", sex 1, element 1, exp/level pairs (0,1) six times over, sp 0,
+    friend point 0, hp/atk/def/hel 1, summon_limit 1, deck 0.  So sending
+    this block is a no-op for everything the summoner subsystem has not been
+    built for yet, and the one field we do own is truthful.
+
+    The exception is hp/atk/def/hel: init()'s 1/1/1/1 is a placeholder the
+    server is meant to overwrite, so we send SummonerLevelMst's row for the
+    level we send (level 1 = 4000/1500/1500/1500) instead of repeating it.
+
+    SP is earned per summoner level (SummonerLevelMst.get_sp, the same
+    iIDqD50O hash) and spent in SummonerAbilityListScene on
+    SummonerAbilityLevelMst.need_sp.  Cap: DefineMst.max_summoner_sp = 99999.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Owning user.  setUserID @0x127EBC0, member +0x18."
+    }
+
+    field sex type="i32::str" {
+        key "9i2xhMaJ"
+        doc "Summoner appearance sex.  setSex, member +0x30.  init() default 1."
+    }
+
+    field element type="i32::str" {
+        key "iNy0ZU5M"
+        doc "Summoner element.  setElement, member +0x34.  init() default 1."
+    }
+
+    field summoner_arm_id type="str" {
+        key "RVVgyuor"
+        doc "EQUIPPED arm id, member +0x38 — init() seeds it \"10\", the first of DefineMst.init_summoner_arm_id \"10,20\".  Same hash as UserSummonerArmsInfo.summoner_arm_id, which is the OWNED list; this is the one in hand."
+    }
+
+    field summoner_hair_id type="str" {
+        key "btZizNep"
+        doc "Hairstyle id, member +0x50.  init() default empty."
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "Summoner EXP, member +0x68."
+    }
+
+    field level type="i32::str" {
+        key "D9wXQI2V"
+        doc "Summoner level, member +0x6c.  init() default 1 — never send 0, SummonerLevelMst starts at 1."
+    }
+
+    field exp1 type="i32::str" {
+        key "FTTADDzF"
+        doc "Element 1 mastery EXP.  setExp1, member +0x70."
+    }
+
+    field level1 type="i32::str" {
+        key "Gbe7pD2H"
+        doc "Element 1 mastery level.  setLevel1, member +0x74.  init() default 1."
+    }
+
+    field exp2 type="i32::str" {
+        key "8VhOXCti"
+        doc "Element 2 mastery EXP.  setExp2, member +0x78."
+    }
+
+    field level2 type="i32::str" {
+        key "l7C3nzdE"
+        doc "Element 2 mastery level.  setLevel2, member +0x7c.  init() default 1."
+    }
+
+    field exp3 type="i32::str" {
+        key "MYFUzcTo"
+        doc "Element 3 mastery EXP.  setExp3, member +0x80."
+    }
+
+    field level3 type="i32::str" {
+        key "6PuPnB04"
+        doc "Element 3 mastery level.  setLevel3, member +0x84.  init() default 1."
+    }
+
+    field exp4 type="i32::str" {
+        key "0eIAr87V"
+        doc "Element 4 mastery EXP.  setExp4, member +0x88."
+    }
+
+    field level4 type="i32::str" {
+        key "gTPezJiG"
+        doc "Element 4 mastery level.  setLevel4, member +0x8c.  init() default 1."
+    }
+
+    field exp5 type="i32::str" {
+        key "bWfWAyCs"
+        doc "Element 5 mastery EXP.  setExp5, member +0x90."
+    }
+
+    field level5 type="i32::str" {
+        key "aqtX45n3"
+        doc "Element 5 mastery level.  setLevel5, member +0x94.  init() default 1."
+    }
+
+    field exp6 type="i32::str" {
+        key "tIHDv3Gk"
+        doc "Element 6 mastery EXP.  setExp6, member +0x98."
+    }
+
+    field level6 type="i32::str" {
+        key "Rt80vCfs"
+        doc "Element 6 mastery level.  setLevel6, member +0x9c.  init() default 1."
+    }
+
+    field sp type="i32::str" {
+        key "iIDqD50O"
+        doc "SUMMONER SP — the currency reward type 18’s sibling, type 17, pays.  setSp, member +0xa0.  Granted by SummonerLevelMst.get_sp (same hash), spent on SummonerAbilityLevelMst.need_sp.  Read by SummonerAbilityListScene, MissionResultSummonerTopScene and SummonerUnitStatusInfo."
+    }
+
+    field summoner_friend_point type="i32::str" {
+        key "J3stQ7jd"
+        doc "Summoner friend points, member +0xa4.  Same hash as the UserTeamInfo field of that name."
+    }
+
+    field hp type="i32::str" {
+        key "e7DK0FQT"
+        doc "Summoner HP, member +0xa8.  Derived: SummonerLevelMst.base_hp for `level` (4000 at 1).  init() leaves 1 as a placeholder."
+    }
+
+    field atk type="i32::str" {
+        key "67CApcti"
+        doc "Summoner ATK, member +0xac.  SummonerLevelMst.base_atk (1500 at level 1)."
+    }
+
+    field def type="i32::str" {
+        key "q08xLEsy"
+        doc "Summoner DEF, member +0xb0.  SummonerLevelMst.base_def (1500 at level 1)."
+    }
+
+    field hel type="i32::str" {
+        key "PWXu25cg"
+        doc "Summoner REC, member +0xb4.  SummonerLevelMst.base_rec (1500 at level 1).  \"hel\" is the client’s own spelling."
+    }
+
+    field summon_limit type="i32::str" {
+        key "SWfnWyuQ"
+        doc "setSummonLimit, member +0xb8.  init() default 1.  // UNVERIFIED: what it limits."
+    }
+
+    field ep3_current_deck_no type="i32::str" {
+        key "K8U410zY"
+        doc "setEp3CurrentDeckNo, member +0xbc.  init() default 0.  Episode-3 deck selection."
+    }
+
+    field summoner_ability_info type="str" {
+        key "mgNdrCEe"
+        doc "Purchased summoner abilities, packed string.  setSummonerAbilityInfo, member +0xc0.  ⚠ The key `kbOUiuPq` reaches the SAME setter (@0x144F224 vs @0x144F17C) — an alias we do not send; sending both would just overwrite one with the other."
+    }
+
+    field eqp_item_frame_id type="str" {
+        key "0R3qTPK9"
+        doc "Equipped frame item, member +0xd8."
+    }
+
+    field eqp_item_id type="str" {
+        key "Ge8Yo32T"
+        doc "Equipped item, member +0xf0."
+    }
+
+    field extra_passive_skill_id type="str" {
+        key "cP83zNsv"
+        doc "Extra passive skill, member +0x108.  Same hash as SummonerLevelMst.extra_passive_skill_id."
+    }
+
+    field extra_passive_skill_id2 type="str" {
+        key "LjY4DfRg"
+        doc "Second extra passive skill, member +0x120."
+    }
+}
+
+json UserSummonerArmsInfo {
+    doc """
+    One Summoner Arm the player owns, with its progress.
+
+    Wire block `dhMmbm5p` -> UserSummonerArmsInfoResponse::readParam @0x144E824
+    (arm64 libgame.so), 4 keys, list is a FULL REPLACE via removeAllObjects.
+
+    // WAS A STUB: a single `mock` field keyed "INVALID", so the server sent an
+    // empty array and nothing could own an arm.  That is what made reward type
+    // 18 (Summoner Arm -- see mst/mission.kdl clear_rewards) unclaimable.
+
+    The arm id indexes SummonerArmMst (JuBeb6YR, 23 rows: 10-190 by tens, plus
+    7011/8010/9010/9020).
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Owning user.  setUserID @0x144E8B8."
+    }
+
+    field summoner_arm_id type="str" {
+        key "RVVgyuor"
+        doc "Which arm, indexing SummonerArmMst.  setSummonerArmID @0x144E95C."
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "Arm EXP.  setExp @0x144E998."
+    }
+
+    field level type="i32::str" {
+        key "D9wXQI2V"
+        doc "Arm level.  setLevel @0x144E9C4."
+    }
+}
+
+json UserItemDictionaryInfo {
+	doc "One discovered item species for the item encyclopedia.  Response key bd5Rj6pN (UserItemDinctionaryInfoResponse [sic] in response_mappings.json); the client's readParam reads a single param kixHbe54 per node.  Mirrors UserUnitDictionary but for items."
+
+	field item_id type="u32::str" {
+		key "kixHbe54"
+		doc "Item master id the player has seen/owned (joins to ItemMst.id)."
+	}
+}
+
+json UserArenaInfo {
+    doc """
+    Per-user arena standing.  8jBJ7uKR -> UserArenaInfoResponse, readParam
+    @0x13FCDF0, and it is a SINGLETON parser.
+
+    ⚠ MUST CARRY ONE ROW EVEN WHEN EVERYTHING IS ZERO.  Every setter fires per
+    ROW, so an empty array never runs readParam and the client-side singleton is
+    never written -- it then draws whatever was in that memory.  With
+    "8jBJ7uKR":[] the Battle Record's Arena Record showed 9,765,061 Total
+    Entries, 14,614,711 Total Wins, 7,143,541 Offense Wins and 7,471,170 Defense
+    Wins.  Same trap as PQ56vbkI; see UserInfoResp.arena_archive.
+
+    Modelled 2026-08-31 from readParam (it was a one-field `mock` stub, the fifth
+    found).  Nothing instruments arena battles yet, so every counter is honestly
+    0 -- the point is that readParam runs.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "setUserID @0x13FCEB4."
+    }
+
+    field arena_rank_id type="str" {
+        key "JmFn3g9t"
+        doc "setArenaRankID @0x13FCF54, joins to ArenaRankMst.  NOTE this key is also declared on UserTeamInfo, where nothing reads it -- resolve it against the owning class (Rule Zero)."
+    }
+
+    field ranking_point type="i32::str" {
+        key "U4pMNjy0"
+        doc "setRankingPoint @0x13FCF8C."
+    }
+
+    field battle_cnt type="i32::str" {
+        key "69vnphig"
+        doc "setBattleCnt @0x13FCFB4 -- arena entries, NOT a stamina cost (a previously corrected misreading).  Renders as Total Entries."
+    }
+
+    field win_cnt type="i32::str" {
+        key "8CEu9Kcm"
+        doc "setWinCnt @0x13FCFDC -- renders as Total Wins.  Same key as UserTeamArchive.setWinCnt; different class, different counter."
+    }
+
+    field battle_cnt_accept type="i32::str" {
+        key "20iEWRCV"
+        doc "setBattleCntAccept @0x13FD004 -- defence side, battles accepted."
+    }
+
+    field win_cnt_accept type="i32::str" {
+        key "0rAkzg7L"
+        doc "setWinCntAccept @0x13FD02C -- defence side wins."
+    }
+
+    field max_arena_rank_id type="str" {
+        key "8uJ1XGwx"
+        doc "setMaxArenaRankID @0x13FD0BC -- highest rank ever held."
+    }
+
+    field current_position type="i32::str" {
+        key "2rqxaZ6K"
+        doc "setCurrentPosition @0x13FD0F4."
+    }
+
+    field battle_id type="str" {
+        key "xL0p2MkY"
+        doc "setBattleID @0x13FD184."
+    }
+}
+
+json UserTeamArchive {
+    doc """
+    THE TROPHY PROGRESS COUNTERS (lifetime, non-arena).
+
+    Every live field is read by exactly one consumer:
+    PlayerInfoBattleResultScene::getActual @0x1791EEC, 32KB of
+    TrophyMst::getTrophyID() compares that answer one trophy id per field.  Each
+    doc below therefore cites the TROPHY the field satisfies rather than a
+    reading of the setter name.  All 62 ids across this class and
+    UserTeamArenaArchive exist in deploy/mst/trophy_mst.json, whose Japanese
+    labels match the getter names independently.
+
+    Reached from PlayerInfoBattleResultScene::setTrophyList,
+    ArenaArchiveScene::setArchiveInfo and ColosseumArchiveScene::setTrophyList.
+
+    ⚠ THE SERVER POPULATES NONE OF THIS.  There is no handler, DB column or
+    schema mapping for UserTeamArchive, so the wire carries "zI2tJB7R":[] and
+    every trophy reads 0.  Modelled here (it was a one-field `mock` stub) so the
+    achievements feature has a verified target; filling it is a feature build.
+
+    Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "UNREAD.  setUserID @0x14020B4 stores it; no getter on this class reads it and getActual never asks for it."
+    }
+
+    field login_cnt type="i32::str" {
+        key "dD64grYH"
+        doc "Answers TROPHY 100010 (ログイン日数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setLoginCnt @0x14020EC."
+    }
+
+    field serial_login_day type="i32::str" {
+        key "3w6YDS4z"
+        doc "Answers TROPHY 100020 (連続ログイン日数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSerialLoginDay @0x1402114."
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "UNREAD.  setExp @0x140213C stores it; no getter on this class reads it and getActual never asks for it."
+    }
+
+    field zel_get type="i64::str" {
+        key "pThS5FE3"
+        doc "Answers TROPHY 100030 (累計獲得ゼル).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setZelGet @0x14021D4."
+    }
+
+    field zel_use type="i64::str" {
+        key "mn5Tj3fz"
+        doc "Answers TROPHY 100040 (総合ゼル使用額).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setZelUse @0x140227C."
+    }
+
+    field zel_sale type="i64::str" {
+        key "jG91JRxN"
+        doc "UNREAD.  setZelSale @0x1402324 stores it; no getter on this class reads it and getActual never asks for it."
+    }
+
+    field zel_unit_sale type="i64::str" {
+        key "06phPeqv"
+        doc "Answers TROPHY 100050 (総合ユニット売却額).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setZelUnitSale @0x14023CC."
+    }
+
+    field zel_item_sale type="i64::str" {
+        key "Zq8ej5IN"
+        doc "Answers TROPHY 100060 (総合アイテム売却額).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setZelItemSale @0x1402474."
+    }
+
+    field karma_get type="i64::str" {
+        key "isRx41jy"
+        doc "Answers TROPHY 100070 (累計獲得カルマ).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setKarmaGet @0x140251C."
+    }
+
+    field karma_use type="i64::str" {
+        key "20qd9shE"
+        doc "Answers TROPHY 100080 (総合カルマ使用数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setKarmaUse @0x14025C4."
+    }
+
+    field friend_p_get type="i32::str" {
+        key "Sf95jez7"
+        doc "Answers TROPHY 100090 (累計絆所持pt).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setFriendPGet @0x14025FC."
+    }
+
+    field friend_p_use type="i32::str" {
+        key "I29Qgxot"
+        doc "Answers TROPHY 100100 (総合絆使用pt).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setFriendPUse @0x1402624."
+    }
+
+    field unit_mix_cnt type="i32::str" {
+        key "WMC6rNF1"
+        doc "Answers TROPHY 100220 (合成回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setUnitMixCnt @0x140264C."
+    }
+
+    field unit_mix_elem_cnt type="i32::str" {
+        key "Z93pUQhG"
+        doc "Answers TROPHY 100230 (合成ユニット素材使用数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setUnitMixElemCnt @0x1402674."
+    }
+
+    field unit_evo_cnt type="i32::str" {
+        key "Rc6St9h1"
+        doc "Answers TROPHY 100240 (進化回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setUnitEvoCnt @0x140269C."
+    }
+
+    field unit_sum_cnt type="i32::str" {
+        key "k5Sjn9Zq"
+        doc "Answers TROPHY 100190 (総合ユニット取得数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setUnitSumCnt @0x14026C4."
+    }
+
+    field item_mix_cnt type="i32::str" {
+        key "c3Bo97kI"
+        doc "Answers TROPHY 100250 (調合回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setItemMixCnt @0x14026EC."
+    }
+
+    field item_mix_elem_cnt type="i32::str" {
+        key "Gt2msFb1"
+        doc "Answers TROPHY 100260 (調合素材使用数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setItemMixElemCnt @0x1402714."
+    }
+
+    field sphere_mix_cnt type="i32::str" {
+        key "07HgoLtC"
+        doc "Answers TROPHY 100270 (スフィア作成数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSphereMixCnt @0x140273C."
+    }
+
+    field fight_cnt type="i32::str" {
+        key "AEz43gai"
+        doc "UNREAD.  setFightCnt @0x1402764 stores it; no getter on this class reads it and getActual never asks for it."
+    }
+
+    field win_cnt type="i32::str" {
+        key "8CEu9Kcm"
+        doc "UNREAD.  setWinCnt @0x140278C stores it; no getter on this class reads it and getActual never asks for it."
+    }
+
+    field town_harvest_cnt type="i32::str" {
+        key "3DBVLY8H"
+        doc "Answers TROPHY 100280 (村採取タッチ数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setTownHarvestCnt @0x14027B4."
+    }
+
+    field quest_challenge_cnt type="i32::str" {
+        key "c4im6B2v"
+        doc "Answers TROPHY 200010 (総合クエスト挑戦数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setQuestChallengeCnt @0x14027DC."
+    }
+
+    field quest_clear_cnt type="i32::str" {
+        key "UCN04WxE"
+        doc "Answers TROPHY 200020 (総合クエスト成功数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setQuestClearCnt @0x1402804."
+    }
+
+    field quest_win_cnt type="i32::str" {
+        key "ovFJ6Hp0"
+        doc "Answers TROPHY 200030 (総合戦闘勝利数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setQuestWinCnt @0x140282C."
+    }
+
+    field quest_mimic_cnt type="i32::str" {
+        key "TW1Mrtp5"
+        doc "Answers TROPHY 200040 (総合ミミック出現数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setQuestMimicCnt @0x1402854."
+    }
+
+    field turn_max_unit_damage type="i32::str" {
+        key "e6BKoYy9"
+        doc "Answers TROPHY 100325 (ユニット単体最大ダメージ数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setTurnMaxUnitDamage @0x140287C."
+    }
+
+    field battle_turn_max_damage type="i32::str" {
+        key "5NRJQ1LU"
+        doc "Answers TROPHY 100330 (戦闘1ターン最大ダメージ数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setBattleTurnMaxDamage @0x14028A4."
+    }
+
+    field battle_turn_max_spark type="i32::str" {
+        key "XP06YWdT"
+        doc "Answers TROPHY 100340 (戦闘1ターン最大スパーク回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setBattleTurnMaxSpark @0x14028CC."
+    }
+
+    field battle_spark_cnt type="i32::str" {
+        key "U8uZLA34"
+        doc "Answers TROPHY 100350 (累計スパーク回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setBattleSparkCnt @0x14028F4."
+    }
+
+    field battle_skill_cnt type="i32::str" {
+        key "rZQJF5G9"
+        doc "Answers TROPHY 100360 (累計BB使用回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setBattleSkillCnt @0x140291C."
+    }
+
+    field b_crystal_max type="i32::str" {
+        key "0LwvAF3H"
+        doc "Answers TROPHY 100290 (最大バトルクリスタル出現数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setBCrystalMax @0x1402944."
+    }
+
+    field h_crystal_max type="i32::str" {
+        key "rQ3TAy6I"
+        doc "Answers TROPHY 100300 (最大ハートクリスタル出現数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setHCrystalMax @0x140296C."
+    }
+
+    field b_crystal type="i32::str" {
+        key "hoG2ieT5"
+        doc "Answers TROPHY 100310 (累計バトルクリスタル出現数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setBCrystal @0x1402994."
+    }
+
+    field h_crystal type="i32::str" {
+        key "6PLsn8xo"
+        doc "Answers TROPHY 100320 (累計ハートクリスタル出現数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setHCrystal @0x14029BC."
+    }
+
+    field gift_present_cnt type="i32::str" {
+        key "84BC2kXw"
+        doc "Answers TROPHY 100200 (総合ギフトプレゼント数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setGiftPresentCnt @0x14029E4."
+    }
+
+    field gift_receive_cnt type="i32::str" {
+        key "5pg7MYCQ"
+        doc "Answers TROPHY 100210 (総合ギフト受け取り数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setGiftReceiveCnt @0x1402A0C."
+    }
+
+    field arena_defeat_unit_cnt type="i32::str" {
+        key "mFID53JZ"
+        doc "UNREAD ON THIS CLASS.  setArenaDefeatUnitCnt @0x1402A34 stores it and nothing reads it here -- getActual answers trophy 300070 from the IDENTICALLY NAMED field on UserTeamArenaArchive instead.  Same key, same setter name, two classes, only one consumed (handbook 12.4)."
+    }
+
+}
+
+json UserTeamArenaArchive {
+    doc """
+    THE ARENA HALF OF THE TROPHY COUNTERS.  Same mechanism as UserTeamArchive:
+    PlayerInfoBattleResultScene::getActual @0x1791EEC answers one trophy id per
+    field.  Also never populated by the server -- the wire carries "PQ56vbkI":[].
+    Modelled here from readParam @0x1402AC8; it was a one-field `mock` stub.
+
+    Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "UNREAD.  setUserID @0x1402B8C stores it; no getter on this class reads it and getActual never asks for it."
+    }
+
+    field arena_defeat_unit_cnt type="i32::str" {
+        key "mFID53JZ"
+        doc "Answers TROPHY 300070 (総合ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setArenaDefeatUnitCnt @0x1402BC4."
+    }
+
+    field atk_series_win_cnt type="i32::str" {
+        key "7sXWfE8j"
+        doc "The live attack win STREAK -- the ONLY field on either archive class with a consumer outside getActual: ArenaTopScene::setUserArenaInfo, ArenaResultRewardScene::initSet and VortexArenaResultRewardScene::initSet. Its max sibling KuZ6k5Vp is the trophy one (300030)."
+    }
+
+    field max_atk_series_win_cnt type="i32::str" {
+        key "KuZ6k5Vp"
+        doc "Answers TROPHY 300030 (攻撃戦最大連勝数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setMaxAtkSeriesWinCnt @0x1402C14."
+    }
+
+    field max_def_series_win_cnt type="i32::str" {
+        key "72sMkn1N"
+        doc "Answers TROPHY 300050 (防衛戦最大連勝数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setMaxDefSeriesWinCnt @0x1402C3C."
+    }
+
+    field max_turn_damage type="i32::str" {
+        key "0p8BtREA"
+        doc "Answers TROPHY 300250 (戦闘1ターン最大ダメージ数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setMaxTurnDamage @0x1402C64."
+    }
+
+    field max_turn_spark type="i32::str" {
+        key "R7eJ1Tfv"
+        doc "Answers TROPHY 300260 (戦闘1ターン最大スパーク回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setMaxTurnSpark @0x1402C8C."
+    }
+
+    field sum_b_crystal_cnt type="i32::str" {
+        key "8bAdgn37"
+        doc "UNREAD.  setSumBCrystalCnt @0x1402CB4 stores it; no getter on this class reads it and getActual never asks for it."
+    }
+
+    field sum_h_crystal_cnt type="i32::str" {
+        key "I5Uin24C"
+        doc "UNREAD.  setSumHCrystalCnt @0x1402CDC stores it; no getter on this class reads it and getActual never asks for it."
+    }
+
+    field sum_defeat_fire_unit_cnt type="i32::str" {
+        key "nRms5i9J"
+        doc "Answers TROPHY 300090 (炎属性ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatFireUnitCnt @0x1402D04."
+    }
+
+    field sum_defeat_water_unit_cnt type="i32::str" {
+        key "Cvp53GKJ"
+        doc "Answers TROPHY 300100 (水属性ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatWaterUnitCnt @0x1402D2C."
+    }
+
+    field sum_defeat_tree_unit_cnt type="i32::str" {
+        key "T2qI34Rm"
+        doc "Answers TROPHY 300110 (樹属性ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatTreeUnitCnt @0x1402D54."
+    }
+
+    field sum_defeat_thunder_unit_cnt type="i32::str" {
+        key "Ff6g3CNv"
+        doc "Answers TROPHY 300120 (雷属性ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatThunderUnitCnt @0x1402D7C."
+    }
+
+    field sum_defeat_saint_unit_cnt type="i32::str" {
+        key "3EmVG6Ts"
+        doc "Answers TROPHY 300130 (光属性ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatSaintUnitCnt @0x1402DA4."
+    }
+
+    field sum_defeat_dark_unit_cnt type="i32::str" {
+        key "3uUIPEj5"
+        doc "Answers TROPHY 300140 (闇属性ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatDarkUnitCnt @0x1402DCC."
+    }
+
+    field sum_defeat_rare1_unit_cnt type="i32::str" {
+        key "uXrLT17C"
+        doc "Answers TROPHY 300150 (★1ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatRare1UnitCnt @0x1402DF4."
+    }
+
+    field sum_defeat_rare2_unit_cnt type="i32::str" {
+        key "8dzSxWA2"
+        doc "Answers TROPHY 300160 (★2ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatRare2UnitCnt @0x1402E1C."
+    }
+
+    field sum_defeat_rare3_unit_cnt type="i32::str" {
+        key "8TL5Zmuw"
+        doc "Answers TROPHY 300170 (★3ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatRare3UnitCnt @0x1402E44."
+    }
+
+    field sum_defeat_rare4_unit_cnt type="i32::str" {
+        key "0XocvSM2"
+        doc "Answers TROPHY 300180 (★4ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatRare4UnitCnt @0x1402E6C."
+    }
+
+    field sum_defeat_rare5_unit_cnt type="i32::str" {
+        key "Ivk81jQh"
+        doc "Answers TROPHY 300190 (★5ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatRare5UnitCnt @0x1402E94."
+    }
+
+    field sum_defeat_rare6_unit_cnt type="i32::str" {
+        key "7Su2qZFv"
+        doc "Answers TROPHY 300191 (★6ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatRare6UnitCnt @0x1402EBC."
+    }
+
+    field sum_defeat_rare7_unit_cnt type="i32::str" {
+        key "mCDR82iQ"
+        doc "Answers TROPHY 300192 (★7ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatRare7UnitCnt @0x1402EE4."
+    }
+
+    field sum_defeat_rare8_unit_cnt type="i32::str" {
+        key "u9d8ye9H"
+        doc "Answers TROPHY 300193 (幻創進化ユニット撃破数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDefeatRare8UnitCnt @0x1402F0C."
+    }
+
+    field sum_all_knockdown_cnt type="i32::str" {
+        key "Gj4zJIB3"
+        doc "Answers TROPHY 300200 (オールノックダウン勝利数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumAllKnockdownCnt @0x1402F34."
+    }
+
+    field sum_timeout_win_cnt type="i32::str" {
+        key "Z0X7BVdF"
+        doc "Answers TROPHY 300210 (タイムアウト勝利数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumTimeoutWinCnt @0x1402F5C."
+    }
+
+    field sum_perfect_win_cnt type="i32::str" {
+        key "J7u8prxX"
+        doc "Answers TROPHY 300220 (パーフェクト勝利).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumPerfectWinCnt @0x1402F84."
+    }
+
+    field sum_bb_knockdown_cnt type="i32::str" {
+        key "Ut8sN0oM"
+        doc "Answers TROPHY 300230 (BBノックアウト数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumBBKnockdownCnt @0x1402FAC."
+    }
+
+    field sum_arena_point type="i32::str" {
+        key "T57M1AvV"
+        doc "Answers TROPHY 300080 (累計獲得ABP).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumArenaPoint @0x1402FD4."
+    }
+
+    field sum_damage type="str" {
+        key "hI68VzHu"
+        doc "Answers TROPHY 300270 (バトル総合与ダメージ量).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumDamage @0x1403064."
+    }
+
+    field sum_heal type="str" {
+        key "F32xJzsH"
+        doc "Answers TROPHY 300280 (バトル総合回復量).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumHeal @0x1403104."
+    }
+
+    field sum_overkill_attack_cnt type="i32::str" {
+        key "Wnc6A31E"
+        doc "Answers TROPHY 300240 (オーバーキルアタック数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumOverkillAttackCnt @0x140313C."
+    }
+
+    field sum_spark type="i32::str" {
+        key "kHbYZ9w1"
+        doc "Answers TROPHY 300290 (累計スパーク回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumSpark @0x1403164."
+    }
+
+    field sum_skill_cnt type="i32::str" {
+        key "4vx39EIB"
+        doc "Answers TROPHY 300300 (累計BB使用回数).  PlayerInfoBattleResultScene::getActual @0x1791EEC returns this counter for that id; setSumSkillCnt @0x140318C."
+    }
+
+}
+
+// One Music House track the player OWNS -- response key d98mjNDc,
+// UserSoundInfoResponse::readParam @0x1401614.
+//
+// A LIST and a FULL REPLACE: readParam calls UserSoundInfoList::removeAllObjects
+// at row 0 and addObject per row.  It was modelled as a one-element wrapper,
+// which cannot express a collection of purchased tracks.
+//
+// Readers are MyTownSoundRoomScene (the jukebox: which tracks are playable, and
+// getCount for the list) and SandbagChangeSoundScene (choosing battle BGM).
+// The purchase itself is client-local -- confirmAnswerYes builds a UserSoundInfo
+// and addObject's it straight into the list, decrements Zel through
+// UserTeamInfo::getZel/setZel, and queues a TownUpdate carrying the new ids
+// under LzKDI2i7 -- so WITHOUT this block every track the player paid Zel for
+// is gone at the next launch.
+json UserSoundInfo {
+    doc "A Music House track the player owns.  See the note above: a full-replace LIST, not a singleton."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+        optional #true
+    }
+
+    field sound_id type="i32::str" {
+        key "k7Lf0jTt"
+        doc "setSoundID -- the SoundMst row this track is.  Same key SoundMst uses for its own id."
+    }
+
+}
+
+json UserBraveMedalInfo {
+    doc "TODO"
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+    }
+
+    field medal_id type="i32::str" {
+        key "8ZSQ5F2V"
+        doc "TODO"
+    }
+
+    field possession type="i32::str" {
+        key "wgV86x1q"
+        doc "TODO"
+    }
+
+    field last_receipt_day type="i32::str" {
+        key "KI42FwRt"
+        doc "TODO"
+        // NOTE: unused in last version
+    }
+}
+
+json UserAchievementInfo {
+    doc """
+    Bnc4LpM8 -> UserAchievementInfoResponse, readParam @0x13FBB58.
+
+    ⚠ readParam LAZILY CONSTRUCTS the singleton: `cbnz x20 / ctor / str x20,[x22]`
+    @0x13FBB7C-0x13FBB90.  If the block is never sent, that pointer stays NULL --
+    and UserAchievementInfo stores its three ints at +0x18, +0x1c and +0x20,
+    which are exactly the offsets the 2026-08-29 Randall Achievement crash reads
+    off a null pointer (BraveFrontier.Windows.exe +0xB87F1D).  Sending the block
+    is what makes the object exist.
+
+    All three fields are StrToInt -> a raw int store, so they are ints on the
+    wire, not strings.  Corrected 2026-08-29: this struct previously declared
+    LHQZuau1, which is absent from BOTH client binaries, and omitted HjgTfx8A,
+    which readParam actually reads.
+
+    Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    """
+
+    field id type="i32::str" {
+        key "idfCDG70"
+        doc "StrToInt -> [this+0x18] @0x13FBBB0."
+    }
+
+    field unk_HjgTfx8A type="i32::str" {
+        key "HjgTfx8A"
+        doc "StrToInt -> [this+0x1c] @0x13FBBD0.  Meaning unknown -- UserAchievementInfo exposes NO getters, so the scene reads the members directly and there is no consumer to cite.  Sent as 0 so the singleton exists."
+    }
+
+    field unk_CjaJUSrs type="i32::str" {
+        key "CjaJUSrs"
+        doc "StrToInt -> [this+0x20] @0x13FBBF0.  Meaning unknown, same reason as HjgTfx8A.  Sent as 0."
+    }
+}
+
+
+json UserTownFacilityInfo {
+    doc "TODO"
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+    }
+
+    field facility_id type="i32::str" {
+        key "y9ET7Aub"
+        doc "TODO"
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "TODO"
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "TODO"
+    }
+
+}
+
+json UserTownLocationInfo {
+    doc "TODO"
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+    }
+
+    field location_id type="i32::str" {
+        key "un80kW9Y"
+        doc "TODO"
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "TODO"
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "TODO"
+    }
+
+}
+
+json UserLoginCampaignInfo {
+    doc "TODO"
+    field id type="i32::str" {
+        key "H1Dkq93v"
+        doc "TODO"
+    }
+
+    field current_day type="i32::int" {
+        key "ad6i23pO"
+        doc "TODO"
+    }
+
+    field total_days type="i32::str" {
+        key "1adb38d5"
+        doc "TODO"
+    }
+
+    field first_for_the_day type="bool::int" {
+        key "4tswNoV9"
+        doc "TODO"
+    }
+
+}
+
+json UserSettings {
+    doc "TODO"
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+    }
+
+    field bgm_vol type="i32::str" {
+        key "Tgw5ua04"
+        doc "TODO"
+    }
+
+    field sfx_vol type="i32::str" {
+        key "Dw5hick9"
+        doc "TODO"
+    }
+}
+
+json UserTownLocationDetail {
+    doc """
+    Per-user harvest state for one town resource tile (River / Forest / Farm /
+    Mountain).  One row per TownLocationMst id; MyTownTopScene::setLocationInfo
+    skips any location with no detail row, so the tile is not drawn at all
+    without one — even while it is still mission-locked.
+
+    Field names are the binary's own setters (UserTownLocationDetail::set*,
+    libgame.so 0x12ACD30..0x12AD054); see tools/TOWN_STATE_MODEL.md.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "UNREAD.  setUserID @0x1404180 stores it; UserTownLocationDetail::getUserID @0x12ACE6C has ZERO call sites."
+    }
+
+    field location_id type="i32::str" {
+        key "un80kW9Y"
+        doc "setLocationID @0x14041BC.  The lookup key: sole consumer is UserTownLocationDetailList::getObjectWithLocationID @0x12AD320, matched against TownLocationMst::getLocationID by collectItem @0x18F248C.  Joins to TownLocationMst.id: 1 Mountain, 2 River, 3 Farm, 4 Forest."
+    }
+
+    field start_date type="datetime" {
+        key "qA7M9EjP"
+        doc "UNREAD.  setStartdate @0x1404250 stores it; UserTownLocationDetail::getStartdate @0x12ACEC0 has ZERO call sites in libgame.so, so the refresh clock is entirely server-side.  Sent because the field is part of the struct the client parses."
+    }
+
+    field tap_cnt type="i32::str" {
+        key "mDaE3t6A"
+        doc """
+        Taps REMAINING in this period, not taps taken.  setTapCnt @0x140428C.
+
+        The sparkle particle is drawn iff this is >= 1 — MyTownTopScene::setLocationInfo
+        @0x18F1730 (cmp #1 / b.lt); the plist itself comes from
+        TownLocationMst::getEffectType, NOT from this field.  collectItem guards
+        >= 1 @0x18F24A8 and calls decTapCnt(1) @0x18F2A08 per tap, then fires a
+        TownUpdateRequest @0x18F2A78.
+
+        It also INDEXES eip3MS5L (element count - tap_cnt), so the two fields
+        must be kept consistent — see that field.
+
+        Rolled from TownLocationLvMst tap_cnt_start..tap_cnt_end at the start of
+        each period.
+        """
+    }
+
+    field drop_item_info type="str" {
+        key "eip3MS5L"
+        doc """
+        setDropItemInfo — the whole period's loot, PRE-ROLLED BY THE SERVER, as
+        "<itemId>:<zel>:<karma>,..." with one comma element per tap.
+
+        getCollectItemInfo @0x18F3868 splits on "," @0x18F38B8 and picks element
+        `count - tap_cnt` @0x18F38D8, so the list is consumed front-to-back as
+        tap_cnt counts down.  collectItem @0x18F244C splits that element on ":"
+        @0x18F24D8 and applies ItemMstList::getObject(e[0]) @0x18F2668 ->
+        incWarehouseItem @0x18F2698, incZel @0x18F291C, incKarma @0x18F2990.
+        An item id ItemMst does not resolve (e.g. "0") simply grants no item
+        that tap; zel and karma are applied only when >= 1 (@0x18F290C,
+        @0x18F2980).  A full warehouse routes to WAREHOUSE_OVER_ERROR @0x18F2748.
+
+        ⚠ INVARIANT: this must carry AT LEAST mDaE3t6A comma-separated elements.
+        The index feeds a madd @0x18F38E0 with NO bounds check, so a shorter
+        list reads outside the vector and hands collectItem a garbage
+        std::string to StrToInt and look up in ItemMstList.
+
+        The client keeps no drop table of its own, which is why the tap report
+        (TownUpdate 0mRaAo39) carries only tap counts — the server already knows
+        what it handed out.
+        """
+    }
+}
+
+json UserDungeonKeyInfo {
+    doc """
+    Per-user dungeon-key inventory — one row per DungeonKeyMst id (1 Metal Key,
+    2 Jewel Key, 3 Imp Key).  Emitted inside UserInfo under eFU7Qtb0 as an
+    array; drives the Vortex parade entry and the "Receive Key" button in the
+    Akras Summoners' Hall Administration Office.
+
+    Field names come from UserDungeonKeyInfoResponse::readParam — see
+    tools/ida/audits/eFU7Qtb0_audit.txt.  6 of 8 are authoritative setters out
+    of readparam_analysis.json; 16KMNJLb and H6k1LIxC are hand-coded getValue()
+    paths and are documented per-field below.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session.  setUserID."
+    }
+
+    field dungeon_key_id type="i32::str" {
+        key "16KMNJLb"
+        doc """
+        Which key this row describes — joins to DungeonKeyMst.id
+        (1 Metal Key, 2 Jewel Key, 3 Imp Key).
+
+        // CONFIRMED as setDungeonKeyID by the readParam pseudocode
+        (tools/ida/audits/eFU7Qtb0_audit.txt).  This upgrades what was a
+        HIGH-confidence inference from the MST join — readparam_analysis.json
+        lists no setter for this hash because it is a STRING setter, and that
+        export only captured the StrToInt ones.
+
+        DELIBERATE TYPE DEVIATION: the setter takes a std::string built from
+        the raw wire value, so strictly this is `str`.  Kept as `i32::str`
+        because the wire form is identical either way (a quoted integer) and
+        the value is an id used for joins against DungeonKeyMst.id — typing it
+        as a string would force std::stoi at every use site for no change in
+        what is transmitted.
+        """
+    }
+
+    field possession type="u32::str" {
+        key "wgV86x1q"
+        doc """
+        How many of this key the player currently holds.  setPossession.
+        Capped by DungeonKeyMst.possession_limit (N7I9vYZb = 50 on all rows).
+        """
+    }
+
+    field last_receipt_day type="u32::str" {
+        key "KI42FwRt"
+        doc """
+        Day the key was last claimed.  setLastReceiptDay.  A day ordinal for
+        the once-per-day claim check, not an epoch stamp — the binary names
+        this one "...Day" and next_receipt_possible_date "...Date".
+        """
+    }
+
+    field active_type type="u32::str" {
+        key "BY8fZ7M1"
+        doc """
+        Which parade tier is currently live for this key.  setActiveType.
+        Reads against DungeonKeyMst.usage_pattern (CR6aKWg8), whose tiers are
+        spend-1 / spend-3 / spend-5 (Metal Parade / Super / Mega).
+        // UNVERIFIED: whether this indexes the tier or holds the raw key
+        count spent — both readings fit a 1/3/5 ladder.
+        """
+    }
+
+    field receipt_possible_flg type="u32::str" {
+        key "g85qMNxf"
+        doc """
+        Whether a key can be claimed right now — drives the "Receive Key"
+        button.  setReceiptPossibleFlg.
+        // REVERTED FROM bool::bool: readParam takes uint32_t, not bool.  The
+        "Flg" suffix reads boolean but the wire type is an int.
+        """
+    }
+
+    field next_receipt_possible_date type="str" {
+        key "b6QR1CH5"
+        doc """
+        When the next claim unlocks.  setNextReceiptPossibleDate.
+
+        // REVERTED FROM u32::str: readparam_analysis.json claims uint32_t, but
+        the pseudocode (tools/ida/audits/eFU7Qtb0_audit.txt) shows the handler
+        building a std::string from the raw wire value and passing it byref —
+        there is no StrToInt on this path, unlike its five int siblings.  The
+        export reports the PRE-CONVERSION type, not the setter's; trust the
+        pseudocode.  This also explains the Day/Date split noted below:
+        last_receipt_day really is an int ordinal, this really is a date.
+
+        // UNVERIFIED: the string FORMAT.  Sent as "YYYY-MM-DD hh:mm:ss" to
+        match the only other string date this server emits
+        (UserClearMissionInfo.clear_date) and the datetime strings documented
+        for FrontierGate start_date/end_date in net/frontier_gate.kdl.  Before
+        this was decoded the server sent raw epoch seconds as a quoted int,
+        which the client would have stored verbatim as the literal text
+        "1786334400".
+        """
+    }
+
+    field cnt type="u32::str" {
+        key "H6k1LIxC"
+        doc """
+        // CONFIRMED as setCnt (StrToInt, so genuinely an int) by the readParam
+        pseudocode — tools/ida/audits/eFU7Qtb0_audit.txt.  This matches the
+        cross-class reading: the same hash is setCnt in PermitRecipeResponse
+        and a remaining-count in UserAchievementTradeInfo /
+        GuildUserExchangeInfo / UnitSelectorGachaUserInfo.
+
+        // STILL UNVERIFIED: WHICH count.  The setter name is generic and the
+        handler does nothing with the value beyond storing it, so the audit
+        confirmed the type without settling the meaning.  Candidates remain:
+        claims used today, claims remaining, or a mirror of
+        DungeonKeyMst.distribute_count (khsb74Nq).  Kept optional and OMITTED
+        from the wire — a confirmed setter name is not a licence to invent a
+        value (handbook §3.4).  Settling it needs a live capture, not another
+        IDA pass.
+        // REVERTED FROM i32::int: sibling User*Info ints are all quoted
+        (UserUnitInfo.exp = i32::str) because JsonNode::addParam stringifies.
+        """
+        optional #true
+    }
+}
+
+json UserReleaseInfo {
+    doc """
+    Per-user feature-release state, keyed Dp0MjKAf (UserReleaseInfoResponse),
+    emitted inside UserInfo.  This is the server's half of the client's
+    "function release" system — the thing that draws the level_lock overlays
+    (vortex_quest_locked.png, parade_locked.png, new_feature.png).
+
+    HOW THE SYSTEM WORKS.  The conditions live CLIENT-SIDE in
+    F_FUNCTION_RELEASE_MST (12 rows, function ids 8-19), each row being
+    `function_id` + a `type:param` condition where type 2 = "mission <param>
+    cleared" (e.g. "2:20100") and type 4 was seen once as "4:4".  Function ids
+    1-7 do not appear in that table and are the client's hardcoded early gates
+    (town etc.).  That MST is NOT sendable — its decoded file is a bare list
+    with no wrapper key and the binary defines no FunctionReleaseMstResponse —
+    so the server cannot change the conditions.  This response is the only
+    lever the server has over feature locks.
+
+    // UNVERIFIED, and the reason this struct is authored but NOT yet emitted:
+    nothing here is proven to be the Vortex's lock.  The function id the client
+    uses for the Vortex is unknown (the shipped table's 8-19 all point at
+    late-game missions, so the Vortex is most likely one of the hardcoded 1-7).
+    Emitting a guessed id would lock or unlock some unrelated feature.  Resolve
+    with tools/ida/readparam_audit_dp0mjkaf.py, or by xrefing
+    vortex_quest_locked.png / parade_locked.png in the binary.
+
+    // UNVERIFIED: readparam_analysis.json reports is_array=false for this
+    class, yet the UserInfoResp field is declared `[UserReleaseInfo]` and a
+    per-function list is what the system implies.  Left as an array — the
+    single-object reading would mean one release row per user, which cannot
+    express a multi-function gate.  Confirm from the pseudocode.
+    """
+
+    field function_id type="u32::str" {
+        key "JHYubaBP"
+        doc """
+        Which client function this row is about — joins to
+        F_FUNCTION_RELEASE_MST.JHYubaBP, and to FeatureGatingInfo.e63D1BV0
+        (FeatureID).  Feature id 2 is the Parade, read straight out of
+        DungeonSPConfirmScene::initialize.
+
+        // CONFIRMED by the readParam pseudocode (tools/ida/audits/Dp0MjKAf_audit.txt):
+        the handler stores this via vtable slot +48 after StrToInt, then reads
+        it back through slot +40 and passes it to
+        `UserReleaseInfoList::getObjectWithFunctionID`.  The list is keyed on
+        this field, so it is the function id by construction — not an
+        inference from the MST join any more.
+        """
+    }
+
+    field released type="bool::str" {
+        key "g6PujUgD"
+        doc """
+        Whether the function is released to this player.  Set unconditionally
+        when merging into an existing row, so the server is authoritative.
+
+        // CONFIRMED as a BOOLEAN by the readParam pseudocode: the handler does
+        `StrToInt(...) != 0` and passes a _BOOL8 to vtable slot +64 (its getter
+        is slot +56).  Wire form is therefore a quoted int, hence bool::str.
+        // REVERTED FROM u32::str, which was inferred from
+        readparam_analysis.json's uint32_t before the pseudocode was available;
+        readparam reports the pre-conversion type, not the setter's.
+        // UNVERIFIED: the NAME. Slot +64 has no symbol, so "released" is read
+        off its role — it is the only per-function state this row carries, and
+        FeatureGatingHandler::shouldGateLocked(int) is what consumes it.
+        """
+    }
+
+    field new_flg type="bool::str" {
+        key "dJNpLc81"
+        doc """
+        The "NEW" badge on a freshly released feature — what draws
+        level_lock/new_feature.png, and what UserEnteredFeatureList (2386Diw1)
+        clears once the player opens it.
+
+        Sticky: when merging into an existing row the handler only copies this
+        across if the existing value is still false (`if (getSlot72() == 0)`),
+        so once the badge is set the server cannot clear it by resending 0.
+
+        // CAPTURED FROM: cross-class anchoring — setNewFlg (uint32_t) in both
+        RaidUserBagInfoResponse and UserUnitInfoResponse, plus six further
+        classes using it as the same new-item badge.  Corroborated by
+        new_feature.png sitting beside the lock art in content/level_lock/.
+        // CONFIRMED as a BOOLEAN by the pseudocode: `StrToInt(...) != 0` into
+        vtable slot +80 (getter +72).  Same REVERTED FROM u32::str note as
+        `released` above.
+        """
+    }
+}
+
+json UserEquipItemInfo {
+    doc "Battle item equipped for use inside missions."
+    
+    field item_id type="u32::str" {
+        key "kixHbe54"
+        doc "Battle item id."
+    }
+
+    field disp_order type="u32::str" {
+        key "XuJL4pc5"
+        doc "Display/order slot in the mission item bar."
+    }
+
+    field item_num type="u32::str" {
+        key "wgV86x1q"
+        doc "Number of this item available in the mission."
+    }
+
+}
+
+json UserEquipBoostItemInfo {
+    doc """
+    One BONUS-item slot of the quest-prep loadout (wrapper nAligJSQ).
+
+    The prep screen has two item bars: the battle items (71U5wzhI,
+    UserEquipItemInfo) and these bonus slots, which the client carries into the
+    fight as well -- MissionStartRequest::createBody @0x13AB3C4 reads the same
+    UserEquipBonusItemInfoList, and GameUtils::createUserWarehouseInfoList
+    subtracts them from the warehouse listing so an equipped item is not offered
+    twice.
+
+    Field map from UserEquipBoostItemInfoResponse::readParam @0x13FE0D8, which
+    fills UserEquipBonusItemInfoList (yes: the response class says Boost and the
+    list says Bonus) and calls removeAllObjects() first -- a FULL REPLACE.
+
+    // REVERTED FROM a single `unk1` keyed Kn51uR4Y: that is the signal-key hash
+    // and appears nowhere in this class; the real fields are the three below.
+    """
+
+    field item_id type="i32::str" {
+        key "kixHbe54"
+        doc "setItemID.  ItemMst id in this slot."
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "setDispOrder.  Slot number, stored verbatim (ItemEdit writes a second run at slot+100, the same convention as the battle-item bar)."
+    }
+
+    field item_num type="i32::str" {
+        key "wgV86x1q"
+        doc "setItemNum.  How many of it are in the slot."
+    }
+}
+
+json UserPurchaseInfo {
+    doc "TODO"
+
+    field unk type="str" {
+        key "KAD6iZj9"
+        doc "TODO"
+    }
+
+    field unk2 type="str" {
+        key "c4xbL2VW"
+        doc "TODO"
+    }
+
+    field unk3 type="str" {
+        key "2VdTuoW1"
+        doc "TODO"
+    }
+}
+
+json UserUnitDbbInfo {
+    doc """
+    One Dual Brave Burst bond: two of this player's units paired so they share
+    a DBB (wrapper `sxorQ3Mb`, UserUnitDbbInfoResponse::readParam @0x1C75104).
+
+    ⚠ REPLACE: readParam calls UserUnitDbbInfoList::removeAllObjects() before
+    its first row, and an empty array never reaches readParam at all — so a
+    player who has just UNBONDED everything still needs the key, with an empty
+    list, or the client keeps the bond it already drew.
+
+    ⚠ ONE ROW PER BOND, not two.  The list is a dictionary keyed by
+    `edy7fq3L`, but addObject @0x1CC3374 also builds a second map from the
+    BONDED id back to the main one, which is how the sub unit answers
+    `isUnitBondedToAnotherUnit` without a row of its own.  Sending the mirror
+    row as well would make each unit claim the other as its sub.
+
+    The bond LEVEL is not here: UserUnitDbbInfo::getBondLevel() @0x1CC2DDC
+    resolves both user units to their species, asks
+    DbbMstList::getDbbMstByUnitIdsCombo which DBB that pair is, and looks the
+    level up by that id in the `tR4katob` list.
+    """
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "setUserUnitId — the MAIN unit of the pair, and the dictionary key."
+    }
+
+    field bonded_user_unit_id type="str" {
+        key "hDFXueWP"
+        doc """
+        setDbbBondedUserUnitId — the unit it is bonded to.
+
+        A STRING rather than an id, because the empty one is meaningful: an
+        empty list never reaches readParam (so removeAllObjects never runs, so
+        an unbond cannot be expressed by sending nothing), and a row naming the
+        released unit with an empty partner is how the client is told.  That is
+        also the value its own constructor leaves here.
+        """
+    }
+}
+
+json UserUnitDbbLevelInfo {
+    doc """
+    How far one DBB pairing has been raised (wrapper `tR4katob`,
+    UserUnitDbbLevelInfoResponse::readParam @0x1C7535C).  REPLACE, same rule as
+    UserUnitDbbInfo.
+
+    Keyed by DBB id, not by unit: getBondLevel() finds the DbbMst row for the
+    pair and then looks up THAT id here.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "setUserId."
+    }
+
+    field dbb_id type="str" {
+        key "sp3Xi9hu"
+        doc "setDbbId — DbbMst.id, the row that pairs these two species."
+    }
+
+    field main_unit_id type="str" {
+        key "pn16CNah"
+        doc "setMainUnitId — the SPECIES id of the pair's main unit (this hash is the species id everywhere else, not a user_unit_id)."
+    }
+
+    field bond_level type="i32::str" {
+        key "M81OjLwr"
+        doc "setBondLevel — 1 on a fresh bond; DbbBondRecipeMst prices 2..6."
+    }
+}
+
+json SummonTicketV2UserInfo {
+    doc """
+    How many of one V2 summon-ticket TYPE the player holds (wrapper a3d5d12i).
+
+    Joined to SummonTicketV2Mst by id; that row says which gate the ticket
+    redeems on (target_gacha) and how many it costs per pull (required_tickets,
+    absent on every shipped row = 1).
+
+    SummonTicketV2UserInfoResponse::readParam @0x1C6EBB4 calls
+    SummonTicketV2UserInfoList::removeAllObjects() before its first row, so
+    sending this key REPLACES the whole list -- and an empty array never runs
+    readParam at all, so a type spent down to nothing has to keep reporting
+    itself at 0.
+
+    Load-bearing, not decoration: SummonsDetailScene::touchBegan @0x16A7FA8
+    sums the amounts of the types whose MST row targets the open gate and
+    refuses the pull when the total is 0, so a ticket paid into the present box
+    could not be spent while this list was absent.
+    """
+
+    field id type="i32::str" {
+        doc "setSummonTicketV2Id.  Ticket TYPE id, joins SummonTicketV2Mst.id."
+        key "b0D2iq2d"
+    }
+
+    field amount type="i32::str" {
+        doc "setAmount.  How many of this type are held; 0 is meaningful (see the struct doc)."
+        key "Rs7bCE3t"
+    }
+}
+
+json UnitSelectorGachaUserInfo {
+    doc """
+    One Unit Selector ticket the user holds, response key CGHaOZda (the same
+    hash as the UnitSelectorGachaTicket request group, a different class).
+    Decoded 2026-09-11 from UnitSelectorGachaUserInfoResponse::readParam
+    @0x1CCB500.
+
+    A FULL REPLACE: row 0 / param 0 destroys the whole
+    UnitSelectorGachaUserInfoList before the first row is read, so every send
+    must carry the complete inventory.  An empty list never reaches readParam
+    and so clears nothing -- a ticket spent down to zero has to go out with
+    count 0, which is why the server sends every catalog ticket, held or not
+    (gme::loadSelectorTickets).  No client code changes these counts locally.
+
+    Readers: SummonsScrlItem::addObject @0x16DA238 (the banner's pull count,
+    count / required_tickets summed over the selectors of that gate),
+    SummonsDetailScene::setGachaInfo @0x16A3A9C (the held count) and
+    UnitSelectorGachaUnitSelectScene::initialize @0x1D95E54.  They match the
+    row to the selector by the MST's ticket id.  required_tickets (MST
+    JRqU2bS6) defaults to 1 and readParam clamps it to at least 1, so the
+    division cannot be by zero.
+    """
+
+    field ticket_id type="str" {
+        key "XIvaD6Jp"
+        doc "setTicketId -- the UnitSelectorGachaMst ticket id (the same XIvaD6Jp the MST row is keyed by, and the target_id of a type-8005 present)."
+    }
+
+    field count type="i32::str" {
+        key "H6k1LIxC"
+        doc "setTicketCount (StrToInt).  Tickets held."
+    }
+}
+
+json UserTrophyGradeInfo {
+    doc """
+    One trophy GRADE the player has attained (wrapper H18CjPKI).
+
+    The Records screen does not work this out for itself:
+    PlayerInfoBattleResultScene::getTrophyGrade @0x1799F34 walks the trophy's
+    TrophyGradeMst rows and asks UserTrophyGradeInfoList::exist(gradeId) for
+    each, taking the highest that is present -- so an absent list means every
+    trophy shows grade 0 however high its counter has run.
+
+    Field map from UserTrophyGradeInfoResponse::readParam @0x1404870, which
+    clears the list on its first row (a FULL REPLACE) and adds one object per
+    row.  Two fields only.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "setUserID."
+    }
+
+    field grade_id type="i32::str" {
+        key "ARn3u96q"
+        doc "setTrophyGradeID -- TrophyGradeMst.id, not the grade NUMBER: that table keys (trophy_id, grade, clear_cond) by its own id."
+    }
+}
+
+json UserSummonerInfoEditNode {
+    doc """
+    The Summoner's appearance, from UserSummonerInfoEditRequest::createBody.
+
+    The wiki's Summoner Avatar article names exactly these three choices as the
+    first thing the arc asks for -- "Players will be prompted here when entering
+    the Summoner Avatar Arc the first time": Gender, Hairstyle A/B/C, and
+    Element.  Changing gender afterwards costs 1 Gem.
+    """
+
+    field accept_flag type="i32::str" {
+        key "mnZ5K4Ii"
+        doc "Confirmation flag the edit screen sends with the change."
+    }
+
+    field sex type="i32::str" {
+        key "9i2xhMaJ"
+        doc "Gender.  1 male, 2 female -- the same hash UserInfo already uses for it."
+    }
+
+    field element type="i32::str" {
+        key "iNy0ZU5M"
+        doc """
+        Chosen element, 1 Fire .. 6 Dark.  ⚠ NOT cosmetic: the wiki is explicit
+        that "the Quest you complete will merit you Summoning Arts based on the
+        element you have picked", so this selects which of the six element
+        levels a quest feeds -- the levels Randall bands 56000-61000 measure.
+        """
+    }
+
+    field hair_id type="str" {
+        key "btZizNep"
+        doc "Hairstyle A/B/C.  // UNVERIFIED: named by position in createBody and by the wiki's list of the three choices; no setter was read."
+    }
+
+    field unk_RVVgyuor type="str" {
+        key "RVVgyuor"
+        doc "// UNVERIFIED: the fifth param of the edit group; no store to it was read."
+        optional #true
+    }
+}
+
+json UserSummonerInfoEditReq {
+    doc """
+    UserSummonerInfoEdit -- GroupId `ZJYkXcHo`, AES key `lyR0us9b`, recovered
+    from getRequestID/getEncodeKey on the request class.
+
+    ⚠ UNREGISTERED UNTIL 2026-09-20, and it is the FIRST request the Summoner
+    Avatar arc makes, so entering the arc closed the session.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Caller identity."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag, echoed back."
+    }
+
+    field edit type="[UserSummonerInfoEditNode]::size(1)" {
+        key "pxjFxjDZ"
+        doc "The appearance being set."
+    }
+}
+
+json UserSummonerInfoEditResp {
+    doc "The refreshed Summoner block, so the screen redraws what was just saved."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back."
+    }
+
+    field summonerInfo type="[UserSummonerInfo]" {
+        key "n5mdIUqj"
+        doc "The one Summoner row.  A LIST -- readParam never runs on an empty array, so the client would keep its constructed defaults."
+    }
+}
+
+json SummonerMixNode {
+    doc "One unit offered to the Summoner, same node shape UnitBondBoost uses."
+
+    field user_unit_id type="i32::str" {
+        key "inU8Q4gL"
+        doc "The user_unit_id being fused in."
+    }
+
+    field slot type="i32::str" {
+        key "mnZ5K4Ii"
+        doc "Picker slot; a client concern."
+        optional #true
+    }
+
+    field kind type="i32::str" {
+        key "29MgiJIQ"
+        doc "Material kind, as on UnitBondBoost's list."
+        optional #true
+    }
+}
+
+json SummonerMixReq {
+    doc """
+    SummonerMix -- GroupId `nv4d3O7F`, AES key `vM65bAB4`.
+
+    Fusing Frog units into the Summoner to earn SP.  The wiki's Summoner
+    Parameters article gives the whole table: Burst Frog 50,000 Zel for +1 SP,
+    Burst Emperor 250,000 for +5, Sphere Frog 500,000 for +10, and SP caps at
+    99,999.  Nothing else can be fused.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Caller identity."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag, echoed back."
+    }
+
+    field materials type="[SummonerMixNode]" {
+        key "8Z2NQrx1"
+        doc "The units being fused in."
+        optional #true
+    }
+}
+
+json SummonerSkillGetReq {
+    doc """
+    SummonerSkillGet -- GroupId `qWkYyw5i`, AES key `mrXjLLJB`.
+
+    Spends SP to raise one Parameter a level.  `SummonerAbilityLevelMst.need_sp`
+    is the price, and it matches the wiki's SP cost tables exactly (Max HP lv2
+    10, lv3 40, lv4 80, lv5 130 ...), which is what confirms the MST is the
+    authority rather than the article.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Caller identity."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag, echoed back."
+    }
+
+    field ability_id type="str" {
+        key "LPx0yZhY"
+        doc "The Parameter being raised.  Sent through SummonerSkillGetRequest::setParam."
+        optional #true
+    }
+
+    field target_level type="i32::str" {
+        key "mgNdrCEe"
+        doc "The level being bought -- the CURRENT level plus one."
+        optional #true
+    }
+}

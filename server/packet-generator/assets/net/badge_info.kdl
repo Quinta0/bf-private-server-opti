@@ -1,0 +1,126 @@
+json BadgeInfo {
+    doc """
+    The badge singleton, response key h23iRjGN (BadgeInfoResponse::readParam
+    @0x13CDCB8, dispatched from getResponseObject +0x1e00).  NO RESET: readParam
+    calls one setter per key it finds, so a reply may carry only the fields it
+    means to change — see BadgeKeyCount.  Of the six, only dungeon_key_num and
+    badge_data have getter call sites in this build.
+    """
+
+    field scenario_num type="i32::str" {
+        key "u7Htm9P4"
+        doc "setScenarioNum @0x13CDD18.  No getScenarioNum call site in this build; sent 0."
+    }
+
+    field unit_dict_num type="i32::str" {
+        key "yCLEs28F"
+        doc "setUnitDictNum @0x13CDD48.  No getter call site in this build; sent 0."
+    }
+
+    field item_dict_num type="i32::str" {
+        key "iakSd6m8"
+        doc "setItemDictNum @0x13CDD78.  No getter call site in this build; sent 0."
+    }
+
+    field new_frohun type="i32::str" {
+        key "4AjsNu0m"
+        doc "setNewFrohun @0x13CDDA8.  No getter call site in this build; sent 0."
+    }
+
+    field dungeon_key_num type="i32::str" {
+        key "dD40xrsh"
+        doc """
+        CONFIRMED consumer: the "key ready" badge.  setDungeonKeyNum @0x13CDDD8
+        is its ONLY writer — nothing clears it after a claim — and
+        getDungeonKeyNum > 0 lights the Home Rewards button
+        (HomeScene2::setLayoutControl +0xe2c), the Keys tile
+        (RewardsTopScene::checkForBadgeAlert +0x170) and the Administration
+        Office in the Summoners' Hall (RandallSummonScene/2/3::setLayout).
+        gme::claimableKeyCount sends the number of key types whose receipt is
+        possible today, and every key reply re-sends it (DungeonKeyInfoResp).
+        """
+    }
+
+    field badge_data type="str" {
+        key "dUujjBBK"
+        doc """
+        THE ACHIEVEMENT BADGES, decoded 2026-09-14.  Comma-separated records of
+        three colon-separated integers, `category:subCategory:count`
+        (AchievementBadgeInfo::parseBadgeData @0x11F0284: ',' 0x2c splits
+        records, ':' 0x3a splits fields, three StrToInt, one 12-byte
+        {int,int,int} pushed per record, count CLAMPED to 99 at 0x11F0524).
+
+        A FULL REPLACE performed inline: parseBadgeData's first act is
+        `end = begin` (0x11F02B4), so an empty string is a meaningful "no
+        badges" rather than a no-op, and every send must be the complete set.
+        clearBadgeData @0x11F0690 exists but has ZERO callers.
+
+        The pair is the same two filters GetAchievementInfoRequest::createBody
+        sends — KT71m8Ae category and 3rhygS9K cond_type — both shared with
+        F_ACHIEVEMENT_SUBJECT_MST, so the badge joins onto the subject rows.
+
+        Readers: RandallAchievementRecordSelectScene::setLayout badges each row
+        with getBadgeCount(1, subCategory) (+0x790) and adds getBadgeCount(4)
+        (+0xb1c); RandallAchievementTopScene::setLayout draws
+        getBadgeCount(1)+getBadgeCount(4) and getBadgeCount(2)+getBadgeCount(5);
+        BadgeInfo::getSummonNum @0x11F4194 folds the no-arg total into the
+        Randall town Summoners' Hall count; getActiveCategoryCountExt @0x11F00F8
+        counts categories 1..8 (skipping 0 and 6) that carry any badge.
+
+        The records live in their own AchievementBadgeInfo::shared() singleton
+        (pInstance via GOT 0x287A3A0, created lazily in readParam at 0x13CDE00),
+        not in BadgeInfo, and are never saved to disk: nothing restores an
+        older copy when a scene opens.
+
+        Also the gate on the whole town badge layer: readParam calls
+        BadgeInfo::setHttpGet(true) and setInitCon(true) (0x13CDEAC/0x13CDEB8)
+        on the LAST key of any h23iRjGN object -- its bool argument is
+        ResponseData::parse's keyIndex == size-1 (0x10078B4) -- and
+        RandallTownScene::updateEvent @0x1A07E78 runs setLayoutBadge() only when
+        getHttpGet() is true, then clears it.
+
+        gme::achievementBadgeData fills it with finished-and-unclaimed counts.
+        Category 2 is the Challenges button: RandallAchievementTopScene (scene
+        1342, rebuilt on every entry) draws getBadgeCount(2)+getBadgeCount(5)
+        on tag 0, mission_btn01, which opens RandallAchievementListScene; the
+        daily Challenges send it as 2:0:N.
+        """
+    }
+}
+
+json BadgeAchievementCount {
+    doc """
+    Just the packed achievement badge string, under the same key (h23iRjGN).
+    readParam sets one field per key it finds and has no reset, so this updates
+    the achievement badges and leaves the key-ready count and the other four
+    counters exactly as they were -- the same contract as BadgeKeyCount.
+
+    Sent by every reply that can change what is claimable, because
+    parseBadgeData is the ONLY writer of AchievementBadgeInfo: without it a
+    claimed achievement keeps its badge on the Randall town tile, the
+    achievement top screen and the record row until the next login.  Its one
+    key is the object's last, so it also re-arms BadgeInfo::setHttpGet, which
+    is what lets RandallTownScene::updateEvent redraw the town badges at all.
+
+    Any reply may carry it: GameResponseParser::parse @0x13919DC hands every
+    body key to parseBodyTag, which looks it up in the global getResponseObject
+    @0x1392568 whatever the request was.  Senders: AchievementRewardReceive,
+    AchievementDeliver, and the battle ends that count daily Challenges --
+    MissionEnd, ArenaBattleEnd and RaidMissionEnd (finishing a challenge is
+    what lights it), including their resends, which compute it afresh.
+    """
+
+    field badge_data type="str" {
+        key "dUujjBBK"
+        doc "Finished-and-unclaimed counts; see BadgeInfo.badge_data for the grammar and the readers."
+    }
+}
+
+json BadgeKeyCount {
+    doc "Just BadgeInfo's key-ready count, under the same key (h23iRjGN).  readParam has no reset, so this updates the key badge and leaves the other five fields as they were."
+
+    field dungeon_key_num type="i32::str" {
+        key "dD40xrsh"
+        doc "Key types claimable today; see BadgeInfo.dungeon_key_num."
+    }
+}

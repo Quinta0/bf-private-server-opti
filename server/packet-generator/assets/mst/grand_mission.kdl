@@ -1,0 +1,526 @@
+// F_GRAND_MISSION_* — the Grand Mission (Grand Gaia / "Grand Quest")
+// subsystem MSTs.  IDA names this family "Campaign*MstResponse"; the
+// server-side Campaign handlers (CampaignStart/CampaignMissionGet/...)
+// are the runtime consumers.  10 tables ported 2026-07-19 from
+// 2-mst-decoded to deploy/mst/grand_mission_*.json; wrapper keys are each
+// struct's `hash`, sourced from response_mappings.json.
+//
+// **Every field name below is the real IDA setter**, recovered 2026-08-11
+// by a private audit that decompiled all ten `Campaign*MstResponse::readParam`
+// handlers in one pass (the classes carry no `func_addr` in the analysis
+// export, so the audit discovers them by demangled symbol).  Where an
+// earlier value-shape guess disagreed with the setter, the setter wins and
+// the old name is recorded as `// RENAMED FROM:` so the correction is
+// greppable.
+//
+// Two kinds of mismatch between readParam and the shipped data are noted
+// per field where they occur:
+//   * readParam accepts a key that no row in the ported data carries —
+//     declared `optional #true` so the struct stays faithful to the client
+//     contract without breaking the load.
+//   * the data carries a key readParam never reads — kept (the server may
+//     still use it) and flagged, because the client will ignore it.
+
+json GrandMissionMst {
+    hash "as8G75gK"
+    doc "F_GRAND_MISSION_MST — one row per Grand Mission (26 rows).  Wrapper key from response_class=CampaignMissionMstResponse (response_key=as8G75gK).  Field names from CampaignMissionMstResponse::readParam @ 0x1424E80."
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID.  Range 5000000-5200002; the FK every other grand_mission_* table joins on."
+    }
+
+    field quest_rank type="i32::str" {
+        key "24biyLHp"
+        doc "setquestRank (sic — lowercase q in the binary).  Values 1-5.  // RENAMED FROM: chapter — the value shape (small ints) fit a chapter grouping, but the setter is unambiguous.  NOTE mst/mission.kdl still names this same hash `chapter`; per handbook §6.3 a hash may legitimately differ by class, so that one is not blindly renamed here."
+    }
+
+    field map_id type="i32::str" {
+        key "H9sx5D08"
+        doc "setMapID — FK into GrandMissionMapMst.id."
+    }
+
+    field timetable_id type="i32::str" {
+        key "0u1nvMeS"
+        doc "setTimetabldID (sic — the binary's own typo for TimetableID).  Constant 99 across all 26 rows, i.e. every Grand Mission points at the same schedule entry.  // RENAMED FROM: unk1."
+    }
+
+    field description_win type=str {
+        key "e0XmDu4q"
+        doc "setDescriptionWin — the clear/objective text.  Captured: \"Find and rescue Gazia\".  // RENAMED FROM: description."
+    }
+
+    field description_loss type=str {
+        key "0xFHwMf7"
+        doc "setDescriptionLoss — the failure text.  Captured: \"Squad fell in battle\" (some rows carry a leading ・ bullet).  // RENAMED FROM: fail_condition."
+    }
+
+    field frame_img_name type=str {
+        key "yTPw0BD7"
+        doc "setFrameImgName — grand_quest_NNN.png.  // RENAMED FROM: banner_img."
+    }
+
+    field thum_img_name type=str {
+        key "M2cv6dum"
+        doc "setThumImgName — grand_quest_NNN_thum.png."
+    }
+
+    field pt_num type="i32::str" {
+        key "gFq59B6X"
+        doc "setPtNum — number of map points (spots) in this mission, 1-4.  // RENAMED FROM: unk2 (guessed difficulty tier — wrong)."
+    }
+
+    field pt_fix_set type=str {
+        key "oPsmRC18"
+        doc "setPtFixSet — fixed per-point setup, colon-joined comma quads.  Kept `str`: irregular tails (\"0,0,5,1,0\" alongside \"-1,0,3,1:-1,0,4,1:0,0,2,1\").  // RENAMED FROM: unk3."
+    }
+
+    field map_init_point type="[i32::str]::sep(comma)" {
+        key "Mw3F0V8C"
+        doc "setMapInitPoint — starting point index per map.  Captured \"1\", \"1,1\", \"1,1,8\".  // RENAMED FROM: unk4."
+    }
+
+    field cost_percent type="i32::str" {
+        key "yWiB93z0"
+        doc "setCostPercent — squad-cost allowance as a percentage; 0 = unrestricted.  Captured 0/100/120/140/160.  // RENAMED FROM: unk5 (guessed \"recommended squad cost\" — right idea, wrong units)."
+    }
+
+    field fix_cost type="i32::str" {
+        key "ziex06DY"
+        doc "setFixCost — hard squad-cost cap; 0 = uncapped, 54 on the capped rows.  Pairs with cost_percent.  // RENAMED FROM: deck_cost."
+    }
+
+    field reserve_party_flg_def type="i32::str" {
+        key "17JnyicA"
+        doc "setReservePartyFlgDef — default for \"reserve party enabled\".  0/1.  // RENAMED FROM: unk6."
+    }
+
+    field reserve_party_disp_flg_def type="i32::str" {
+        key "W1EkCyc3"
+        doc "setReservePartyDispFlgDef — default for \"reserve-party UI visible\".  Constant 0 here.  Same hash is the live (non-default) flag on CampaignMissionEventInfoResponse (RseDpY04)."
+    }
+
+    field field_bgm type=str {
+        key "2ty57Bcv"
+        doc "setFieldBgm — map BGM filename, e.g. bf021_map_wasteland.mp3.  // RENAMED FROM: bgm."
+    }
+
+    field use_action_point type="i32::str" {
+        key "A8DEK5ob"
+        doc "setUseActionPoint — energy cost.  readParam accepts it but NO row in the ported data carries it, so it is optional.  The same hash is a populated column in F_MISSION_MST (values 0/10/12/13/14) where it is the quest energy cost."
+        optional #true
+    }
+
+    field time_limit type="i32::str" {
+        key "qY49LBjw"
+        doc "setTimeLimit.  Accepted by readParam, absent from every ported row."
+        optional #true
+    }
+
+    field description type=str {
+        key "qp37xTDh"
+        doc "setDescription — generic description, distinct from the win/loss pair above.  Accepted by readParam, absent from every ported row."
+        optional #true
+    }
+}
+
+json GrandMissionMapMst {
+    hash "iyCP4N1h"
+    doc "F_GRAND_MISSION_MAP_MST — world-map canvas per map (28 rows).  response_class=CampaignMapMstResponse.  Names from CampaignMapMstResponse::readParam.  The four coordinate fields are START/END corner pairs, not position+size: each key feeds TWO setters (…X then …Y), which confirms the two-element comma array typing."
+
+    field id type="i32::str" {
+        key "H9sx5D08"
+        doc "setMapID — referenced by GrandMissionMst.map_id."
+    }
+
+    field map_name type=str {
+        key "0QyCU1dR"
+        doc "setMapName — internal name, e.g. \"Baladormap\", \"GQX4MAP\"."
+    }
+
+    field map_img type=str {
+        key "b5VveUd8"
+        doc "setMapImg — composite tile list \"<file.jpg>:<x>:<y>,...\".  Kept `str`: colon+comma mixed, not an int array."
+    }
+
+    field whole_pos_start type="[i32::str]::sep(comma)" {
+        key "d54Z3hUc"
+        doc "setWholePosStartX + setWholePosStartY — top-left of the full map rect.  Constant \"0,0\".  // RENAMED FROM: rect1_pos."
+    }
+
+    field whole_pos_end type="[i32::str]::sep(comma)" {
+        key "sdE1oku7"
+        doc "setWholePosEndX + setWholePosEndY — bottom-right of the full map rect, e.g. \"2138,3411\".  // RENAMED FROM: rect1_size (it is a corner, not a width/height)."
+    }
+
+    field display_pos_start type="[i32::str]::sep(comma)" {
+        key "U0s6Wkoq"
+        doc "setDisplayPosStartX + setDisplayPosStartY — top-left of the visible viewport.  Constant \"0,0\".  // RENAMED FROM: rect2_pos."
+    }
+
+    field display_pos_end type="[i32::str]::sep(comma)" {
+        key "W4QdZ6pE"
+        doc "setDisplayPosEndX + setDisplayPosEndY — bottom-right of the visible viewport; mirrors whole_pos_end in every captured row.  // RENAMED FROM: rect2_size."
+    }
+}
+
+json GrandMissionSpotMst {
+    hash "aqb6LS9y"
+    doc "F_GRAND_MISSION_SPOT_MST — map spots / battle points (325 rows, keyed mission_id+point_num).  response_class=CampaignMapSpotMstResponse.  Names from CampaignMapSpotMstResponse::readParam, which reads 9 of the 11 shipped columns."
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID."
+    }
+
+    field point_num type="i32::str" {
+        key "7w0inC1R"
+        doc "setPointNum — spot index within the mission (1-27).  The user's saved position (now_point_num on CampaignMissionEntry) points at one of these."
+    }
+
+    field point_name type=str {
+        key "u3HFse2a"
+        doc "setPointName — e.g. \"Abandoned Gardens\"; \"???\" for hidden spots."
+    }
+
+    field point_x type="i32::str" {
+        key "SnNtTh51"
+        doc "setPointX — map X (0-1800).  // RENAMED FROM: pos_x (the town.kdl name for the same hash)."
+    }
+
+    field point_y type="i32::str" {
+        key "M6C1aXfR"
+        doc "setPointY — map Y (100-2875).  // RENAMED FROM: pos_y."
+    }
+
+    field battle_img type=str {
+        key "L8iA9M6c"
+        doc "setBattleImg — dungeon_battle_NNNNN.jpg.  CONFIRMS the value-shape inference that also renamed this hash in mst/mission.kdl."
+    }
+
+    field battle_effect type=str {
+        key "8f4NYKxb"
+        doc "setBattleEffect — \"<idx>:<id>\" colon pairs, empty on non-battle spots.  // RENAMED FROM: battle_group_ids — mst/mission.kdl names this hash battle_group_ids, but for the spot table the setter says effect; the id-shaped values mean the two readings may still coincide."
+    }
+
+    field battle_bgm type=str {
+        key "3sRN9BPS"
+        doc "setBattleBgm — empty inherits the mission's field_bgm.  // RENAMED FROM: bgm_map."
+    }
+
+    field conditioned_flag type=str {
+        key "VhX9c8YL"
+        doc "setConditionedFlag — \"<flag_id>:<state>\" comma list gating spot visibility; flag ids are GrandMissionFlgMst.id.  // RENAMED FROM: flag_conditions."
+    }
+
+    field unread_disp_flg type="i32::str" {
+        key "0se8qAz1"
+        doc "Constant 1 across all 325 rows.  // UNVERIFIED: readParam does NOT read this key, so the client ignores whatever we send — name is a placeholder inferred from position only."
+    }
+
+    field img type=str {
+        key "b5VveUd8"
+        doc "Empty in every row, and NOT read by CampaignMapSpotMstResponse::readParam (the map tiles come from GrandMissionMapMst.map_img).  Kept so the struct round-trips the shipped data."
+    }
+}
+
+json GrandMissionRouteMst {
+    hash "Ri1S0JQX"
+    doc "F_GRAND_MISSION_ROUTE_MST — edges connecting map spots (357 rows).  response_class=CampaignMapRouteMstResponse.  Names from CampaignMapRouteMstResponse::readParam."
+
+    field id type="i32::str" {
+        key "1rcF7R6W"
+        doc "setRouteID."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID."
+    }
+
+    field point_num_start type="i32::str" {
+        key "YnVo64z1"
+        doc "setPointNumStart — spot the edge leaves from.  // RENAMED FROM: from_point; the audit resolves the direction this field's doc previously flagged UNVERIFIED."
+    }
+
+    field point_num_end type="i32::str" {
+        key "AKZ7u5iN"
+        doc "setPointNumEnd — spot the edge arrives at.  // RENAMED FROM: to_point."
+    }
+
+    field battle_group_id type="u32::str" {
+        key "ZSf8e1MG"
+        doc "setBattleGroupID — battle triggered while traversing; 0 = none."
+    }
+
+    field conditioned_flag type=str {
+        key "VhX9c8YL"
+        doc "setConditionedFlag AND setPermitDeckNum — this key feeds two setters in the route handler, so it carries both the visibility gate and a permitted-deck number.  Kept `str`: mixes comma AND @ separators (\"10000:1,10001:1\", \"100003:1@1\") — the @ segment is most likely the deck number.  // RENAMED FROM: flag_conditions."
+    }
+}
+
+json GrandMissionIconMst {
+    hash "HUo5G8gz"
+    doc "F_GRAND_MISSION_ICON_MST — decorative/enemy icons on the map (118 rows).  response_class=CampaignMapIconMstResponse.  Names from CampaignMapIconMstResponse::readParam."
+
+    field id type="i32::str" {
+        key "TMc8k5uF"
+        doc "setIconID."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID."
+    }
+
+    field point_num type="i32::str" {
+        key "7w0inC1R"
+        doc "setPointNum — anchor spot."
+    }
+
+    field icon_img_name type=str {
+        key "b5VveUd8"
+        doc "setIconImgName — GrandBossIcon.sam / GrandEnemyIcon.sam / grand_map_event.png."
+    }
+
+    field add_x type="i32::str" {
+        key "1s75aGuA"
+        doc "setAddX — X offset from the anchor spot.  // RENAMED FROM: offset_x (guess confirmed by the setter)."
+    }
+
+    field add_y type="i32::str" {
+        key "1FGjr6Jb"
+        doc "setAddY — Y offset from the anchor spot (-20..21)."
+    }
+
+    field draw_flag type=str {
+        key "VhX9c8YL"
+        doc "setDrawFlag — \"<flag_id>:<state>\" comma list gating icon visibility.  // RENAMED FROM: flag_conditions.  Note the sibling tables give this same hash three different setters (ConditionedFlag / LinkFlag / DrawFlag) — a clean example of handbook §6.3."
+    }
+}
+
+json GrandMissionTreasureMst {
+    hash "hpGBs2R1"
+    doc "F_GRAND_MISSION_TREASURE_MST — treasure chests (30 rows).  response_class=CampaignMapTreasureMstResponse.  Names from CampaignMapTreasureMstResponse::readParam."
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID."
+    }
+
+    field id type="i32::str" {
+        key "zIW1vVk2"
+        doc "setTreasureID."
+    }
+
+    field point_num type="i32::str" {
+        key "7w0inC1R"
+        doc "setPointNum — spot the chest sits on."
+    }
+
+    field rarity type="i32::str" {
+        key "7ofj5xa1"
+        doc "setRarity — 1 or 2 (silver/gold)."
+    }
+
+    field reward_id type="i32::str" {
+        key "N1b6SUW4"
+        doc "setRewardID — FK to GrandMissionRewardMst.id, the payout for opening this chest."
+    }
+
+    field add_x type="i32::str" {
+        key "1s75aGuA"
+        doc "setAddX — constant 35."
+    }
+
+    field add_y type="i32::str" {
+        key "1FGjr6Jb"
+        doc "setAddY — constant 21."
+    }
+
+    field link_flag type="i32::str" {
+        key "VhX9c8YL"
+        doc "setLinkFlag — the GrandMissionFlgMst.id tracking this chest's opened state.  A bare int here, unlike the \"id:state\" string form the same hash takes in the spot/route/icon tables.  // RENAMED FROM: flag_id."
+    }
+
+    field draw_flg type=str {
+        key "q7Nit8JW"
+        doc "setDrawFlg — \"<id>:<state>\" pair or empty, gating whether the chest renders.  // RENAMED FROM: conditions."
+    }
+}
+
+json GrandMissionFlgMst {
+    hash "27tgwCUN"
+    doc "F_GRAND_MISSION_FLG_MST — per-mission progress flags (1420 rows).  response_class=CampaignFlgMstResponse.  Names from CampaignFlgMstResponse::readParam."
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID."
+    }
+
+    field flg_type type="i32::str" {
+        key "ky1xsH0h"
+        doc "setFlgType — 1 or 2."
+    }
+
+    field id type="i32::str" {
+        key "NML08EGS"
+        doc "setFlgID — unique across all 1420 rows; referenced by the conditioned_flag / link_flag / draw_flag fields of the sibling tables."
+    }
+
+    field percents type="i32::str" {
+        key "ug9xV4Fz"
+        doc "setPercents — completion percentage this flag contributes (0-80).  All shipped values are whole ints.  // RENAMED FROM: percent."
+    }
+
+    field description type=str {
+        key "qp37xTDh"
+        doc "setDescription — shown in the completion checklist; placeholder rows use \" \", \"-\" or \"-0\"."
+    }
+
+    field icon_type type="i32::str" {
+        key "97yTNbfr"
+        doc "setIconType — which checklist icon to draw (0-3).  // RENAMED FROM: difficulty_level, which was borrowed from mst/item.kdl's name for the same hash and is wrong for this table."
+    }
+
+    field disp_flg type="i32::str" {
+        key "Ufm6c7RA"
+        doc "setDispFlg — whether the flag is listed in the UI (0/1); the 0 rows are the hidden/secret objectives.  // RENAMED FROM: unk1."
+    }
+}
+
+json GrandMissionEndCndMst {
+    hash "0sT4d2zV"
+    doc "F_GRAND_MISSION_END_CND_MST — mission end/clear conditions (46 rows).  response_class=CampaignMissionEndCndMstResponse.  Names from CampaignMissionEndCndMstResponse::readParam."
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID."
+    }
+
+    field end_type type="i32::str" {
+        key "3rqe6W5V"
+        doc "setEndType — how the mission ends; constant 1 across all 46 rows.  // RENAMED FROM: unk1."
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "setDisporder (sic — lowercase o)."
+    }
+
+    field target_type type="i32::str" {
+        key "29MgiJIQ"
+        doc "setTargetType — what the condition targets; constant 1 here, 1-3 in GrandMissionEventMst under the same setter.  // RENAMED FROM: cnd_type."
+    }
+
+    field target_param type="i32::str" {
+        key "37moriMq"
+        doc "setTargetParam — every shipped value is a GrandMissionFlgMst.id, i.e. \"clear when flag N is set\".  // RENAMED FROM: param."
+    }
+}
+
+json GrandMissionEventMst {
+    hash "x3kCNR4Y"
+    doc "F_GRAND_MISSION_EVENT_MST — scripted map events (965 rows).  response_class=CampaignEventMstResponse.  Names from CampaignEventMstResponse::readParam."
+
+    field id type="i32::str" {
+        key "Wmr4xDa8"
+        doc "setCampaignEventID."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID."
+    }
+
+    field priority type="i32::str" {
+        key "yu18xScw"
+        doc "setPriority — evaluation order (10-30)."
+    }
+
+    field target_type type="i32::str" {
+        key "29MgiJIQ"
+        doc "setTargetType — 1-3.  // RENAMED FROM: event_type."
+    }
+
+    field target_id type="i32::str" {
+        key "TdDHf59J"
+        doc "setTargetID — the entity the event acts on (0-8731)."
+    }
+
+    field conditioned type=str {
+        key "duN7tx0R"
+        doc "setConditioned — trigger condition list, comma+colon groups.  Kept `str`.  Captured: \"1,0:501,100003,0\".  // RENAMED FROM: event_params."
+    }
+
+    field params type=str {
+        key "85HpkjZW"
+        doc "setParams — the event payload; @-separated groups referencing scenario .txt scripts.  Captured: \"1,GQX1_1.txt@501,801000,1\".  // RENAMED FROM: event_script."
+    }
+}
+
+json GrandMissionRewardMst {
+    hash "Q83eyrJM"
+    doc "F_GRAND_MISSION_REWARD_MST — reward definitions (371 rows).  response_class=CampaignRewardBonusMstResponse.  Names from CampaignRewardBonusMstResponse::readParam.  Six of these fields are re-emitted to the client verbatim as CampaignRewardBonusEntry (p04iC2wr) — same hashes, same setters."
+
+    field id type="i32::str" {
+        key "N1b6SUW4"
+        doc "setRewardID — referenced by GrandMissionTreasureMst.reward_id."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID.  27 distinct values vs 26 GrandMissionMst rows — one reward row points at a mission id absent from the mst table."
+    }
+
+    field init_flag type="i32::str" {
+        key "64hAvkZX"
+        doc "setInitFlag — 0/1.  // RENAMED FROM: unk1."
+    }
+
+    field reward_type type="i32::str" {
+        key "IkmC8gG2"
+        doc "setRewardType — 1 = completion-percentage bonus, 2 = treasure/flag reward, 4 = first-clear bonus."
+    }
+
+    field present_type type="i32::str" {
+        key "30Kw4WBa"
+        doc "setPresentType — 3=zel, 6=unit, 8=gem, 4/5/7=item domains; 9/11/12 still unhandled server-side."
+    }
+
+    field target_id type="i32::str" {
+        key "TdDHf59J"
+        doc "setTargetID — rewarded entity, interpreted per present_type."
+    }
+
+    field target_cnt type="i32::str" {
+        key "wJsB35iH"
+        doc "setTargetCnt — quantity (1-10000)."
+    }
+
+    field target_param type=str {
+        key "37moriMq"
+        doc "setTargetParam.  Kept `str` NOT an int list: captured values include \"1:00\" and \"1:01\", whose leading zeros an int codec would destroy.  // RENAMED FROM: param."
+    }
+
+    field message type=str {
+        key "I0ZNnm4b"
+        doc "setMessage — the short reward label, e.g. \"100% Completion Bonus\".  // RENAMED FROM: name."
+    }
+
+    field txt_cnd type=str {
+        key "zwwtHlMM"
+        doc "setTxtCnd — the condition text shown beside the reward (135 distinct values vs message's 76).  // RENAMED FROM: description."
+    }
+
+    field conditions type=str {
+        key "q7Nit8JW"
+        doc "The completion-percentage threshold this reward unlocks at (\"30\", \"70\", \"100\"), or empty.  **readParam does NOT read this key** — the client never sees it, so the threshold is purely server-side state and CampaignReceipt owns the comparison.  Kept `str` because many rows are empty and an int codec cannot represent that."
+    }
+
+    field reward_flg type="i32::str" {
+        key "8NfU7eBw"
+        doc "setRewardFlg.  Accepted by readParam but absent from every ported row."
+        optional #true
+    }
+}

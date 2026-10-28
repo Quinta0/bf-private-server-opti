@@ -1,0 +1,117 @@
+// F_DBB_* — the Dual Brave Burst subsystem: the DBB pair catalog and the
+// bond-recipe table that lists what a pairing costs to forge.  Both tables
+// ported 2026-07-19 from 2-mst-decoded to deploy/system/dbb_*.json; wrapper
+// keys are each struct's `hash`, sourced from response_mappings.json
+// (mst_responses, response_class noted per struct).
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (141/105 rows).
+//
+// Separator caution: DbbBondRecipeMst's three material columns are
+// COLON-separated parallel lists (type / id / count at the same index) —
+// unlike the comma lists most other MSTs use for material sets.
+
+json DbbMst {
+    doc "Dual Brave Burst pair catalog (wrapper hash fTV3A0By, DbbMstResponse).  141 rows — each row binds two units to a shared DBB skill."
+    hash "fTV3A0By"
+
+    field id type="i32::str" {
+        key "XIvaD6Jp"
+        doc "DBB id (190501..211103).  Same hash banner.kdl uses for its row ids."
+    }
+
+    field atk_cgs_file type="str" {
+        key "0QxL2is7"
+        doc "Attack CGS animation table — \"unit_atk_cgs_3810838.csv\".  Empty on all but 2 rows."
+    }
+
+    field cgg_file type="str" {
+        key "QqfI9mM4"
+        doc "CGG sprite-sheet table — \"unit_cgg_3810838.csv\".  Empty on all but 2 rows."
+    }
+
+    field anime_img type="str" {
+        key "2EF0d6ue"
+        doc "Animation sheet — \"unit_anime_3810838.png\".  Empty on all but 2 rows."
+    }
+
+    field unit_id_1 type="i32::str" {
+        key "3gZAK2vU"
+        doc "// UNVERIFIED (named from value): first unit of the pair (720167..860998 — the unit_mst id space)."
+    }
+
+    field unit_id_2 type="i32::str" {
+        key "zY9XKiSV"
+        doc "// UNVERIFIED (named from value): second unit of the pair (730227..861008)."
+    }
+
+    field unit3_id type="str" {
+        key "preOM2FT"
+        doc "CONFIRMED setUnit3Id (readParam).  empty string in all 141 rows."
+    }
+
+    field unit4_id type="str" {
+        key "72R7Jsij"
+        doc "CONFIRMED setUnit4Id (readParam).  empty string in all 141 rows."
+    }
+
+    field unit5_id type="str" {
+        key "uDHaNnu6"
+        doc "CONFIRMED setUnit5Id (readParam).  empty string in all 141 rows."
+    }
+
+    field unit6_id type="str" {
+        key "k0ajkcu0"
+        doc "CONFIRMED setUnit6Id (readParam).  empty string in all 141 rows."
+    }
+
+    field skill_id type="i32::str" {
+        key "nj9Lw7mV"
+        doc "DBB skill granted by the pairing (3720167..7860958 — a 3..7 rank prefix on a unit id).  Same hash/name as unit.kdl."
+    }
+}
+
+json DbbBondRecipeMst {
+    doc "Dual Brave Burst bond recipes (wrapper hash keTrog0p, DbbBondRecipeMstResponse).  105 rows — the cost to raise a bond to a given rank, keyed by the element pair."
+    hash "keTrog0p"
+
+    field id type="i32::str" {
+        key "XIvaD6Jp"
+        doc "Recipe row id (2..206).  Same hash DbbMst uses for its ids."
+    }
+
+    field element_pair type="i32::str" {
+        key "iNy0ZU5M"
+        doc "// UNVERIFIED (named from value): two-digit element pair, 11..66 — each digit is a 1..6 element id, matching this hash's `element` meaning in unit.kdl/skill.kdl."
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "Bond rank this recipe produces (2..6).  Same hash/name as unit.kdl/town.kdl."
+    }
+
+    field zel type="i32::str" {
+        key "Najhr8m6"
+        doc "Zel cost (1500000..3500000).  Same hash mission.kdl/raid.kdl use for zel amounts."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "Karma cost (500000..1500000).  Same hash/name as mission.kdl/raid.kdl."
+    }
+
+    field material_type type="[str]::sep(colon)" {
+        key "48sldkcm"
+        doc "Material kinds — colon list of tokens, \"UNIT\", \"UNIT:UNIT\", \"UNIT:ITEM:ELE_SHARD\".  Positionally paired with `material_id` and `material_count`."
+    }
+
+    field material_id type="[u32::str]::sep(colon)" {
+        key "0dk4sldr"
+        doc "Material ids — colon list, one per `material_type` entry (\"87602603:800908:800901\")."
+    }
+
+    field material_count type="[u32::str]::sep(colon)" {
+        key "H6k1LIxC"
+        doc "Material counts — colon list, one per `material_type` entry (\"1:25:300\").  This hash is a plain int in raid.kdl/receipe.kdl."
+    }
+}

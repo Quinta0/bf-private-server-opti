@@ -1,0 +1,56 @@
+json VersionInfo {
+    doc """
+    One row of the server's MST version declaration -- response key KeC10fuL on
+    InitializeResp, read by VersionInfoResponse::readParam @0x140649C.
+
+    THIS IS THE VERSION/DOWNLOAD CHANNEL.  For every table whose declared
+    version is NEWER than the one the client reports in its own KeC10fuL
+    manifest, readParam builds a DownloadMstFile and GameScene::requestMstFiles
+    @0x1610F04 fetches it; DataMstManager caches it under LocalState and reloads
+    it at every boot, so a table sent this way stays without being resent.
+
+    The client supplies the filename and the decryption key ITSELF -- readParam
+    is a 102 KB strcmp chain that ends in
+    DownloadMstFileList::add(target, fileName, encodeKey, version, fileCnt),
+    where fileName and encodeKey are per-table constants.  Recover them with
+    tools/mst_download_map.py; build the files with tools/gen_mst_download.py.
+
+    ⚠ DECLARING A VERSION THE SERVER CANNOT SERVE MAKES THE CLIENT CHASE A
+    MISSING FILE DURING BOOT.  gme::mstVersions only emits rows for tables whose
+    files are actually present on disk, which is what keeps that impossible.
+    """
+
+    field id type="str" {
+        key "moWQ30GH"
+        doc "The table name, e.g. F_FIRST_DESC_MST.  Also the directory the client fetches its files from (requestMstFiles passes the target name plus \"/\" to BaseScene::requestFile)."
+    }
+
+    field description type="str" {
+        key "e3QNsuZ8"
+        doc "Not read by readParam -- only moWQ30GH, d2RFtP8T, H6k1LIxC and 5kbnkTp0 are. Left empty."
+    }
+
+    field version type="i32::str" {
+        key "d2RFtP8T"
+        doc "The version this server offers.  readParam stores it at VersionInfo+0x28; a download is triggered only when it EXCEEDS what the client reported."
+    }
+
+    field file_count type="i32::str" {
+        key "H6k1LIxC"
+        doc """
+        setFileCnt (VersionInfo vtable +0x30, resolved from _ZTV11VersionInfo's
+        relocations).  How many parts the table is split into.
+
+        1 means the client asks for `Ver<version>_<fileKey>.dat`; more than 1
+        means `Ver<version>_<fileKey>_<n>.dat` with n from 1.  This is what makes
+        a 20 MB table deliverable -- the largest shipped table in the client's
+        own cache is 23.7 MB across 9 parts.
+        """
+    }
+
+    field record_num type="i32::str" {
+        key "5kbnkTp0"
+        doc "setRecordNum (vtable +0x40).  The row count of the table."
+    }
+
+}

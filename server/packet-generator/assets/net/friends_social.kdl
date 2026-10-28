@@ -1,0 +1,97 @@
+// Friend requests between REAL players (docs/features/FRIENDS_SPEC.md).
+//
+// Every reply here is FriendSocialResp: the client's FriendInfoList is a full
+// replace (FriendInfoResponse::readParam @0x13D93C0 clears it on row 0), so
+// each of these screens has to receive the whole social list, never a delta.
+
+json FriendTargetNode {
+    doc "One Summoner named by FriendAgree / FriendRefuse / FriendFavorite (BPz1e5tU rows)."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "The other Summoner's internal user id (UserState::getSelectUserID), as the server emitted it in tojMy68W."
+    }
+
+    field user_ids_csv type="str" {
+        key "7f3WL6Mx"
+        doc "FriendRefuse only: reject-all list, comma separated (UserState::getRejectReqFriendInfoList, @0x13A43C4).  May be empty or stale; ids that are not pending are ignored."
+    }
+
+    field favorite type="i32::str" {
+        key "5JbjC3Pp"
+        doc "FriendFavorite only: 1 to mark favorite, 0 to clear (FriendFavoriteRequest::createBody @0x13A3FDC)."
+    }
+}
+
+json FriendTargetReq {
+    doc "FriendAgree (NYKBH4V6), FriendRefuse (N5SQd7oA) and FriendFavorite (ps6Vgx4R) all send this body."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[FriendTargetNode]" {
+        key "BPz1e5tU"
+        doc "The Summoner(s) acted on."
+    }
+}
+
+json FriendSearchNode {
+    doc "FriendSearch (umNt8M7i) body row, FriendSearchRequest::createBody @0x13A4698."
+
+    field friend_id type="str" {
+        key "98WfKiyA"
+        doc "The PUBLIC friend ID the player typed (decimal edit box), not an internal user id."
+    }
+}
+
+json FriendSearchReq {
+    doc "Request for FriendSearch (umNt8M7i)."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[FriendSearchNode]" {
+        key "BPz1e5tU"
+        doc "The typed ID; one row."
+    }
+}
+
+json FriendGetAgreeReq {
+    doc "Request for FriendGetAgree (aVqJrR08): nothing beyond the standard tags (@0x13A4114)."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json FriendRandomSearchReq {
+    doc "Request for FriendRandomSearch (mE5gUQOp).  Its 3fTYzqT6 offset/limit literals (\"0\"/\"100\") and StQIyohe mode are ignored: the server caps the result itself."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json FriendSocialResp {
+    doc """
+    The one reply shape for every Social-menu request.  tojMy68W is the COMPLETE
+    list: friends (type 1), requests sent (2) and received (3), plus any
+    transient search rows (4).  A partial list would silently erase the rest.
+    """
+
+    field friend_info type="[FriendInfo]" {
+        key "tojMy68W"
+        doc "Full replace of FriendInfoList."
+    }
+
+    field friend_point_info type="[FriendPointInfo]" {
+        key "6e4b7sQt"
+        doc "Honor rates; the singleton's ctor defaults to \"0\" so every reply that redraws friend cards resends it."
+    }
+}

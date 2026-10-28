@@ -1,0 +1,233 @@
+// Account transfer codes (Options -> Transfer, Title -> Info -> Transfer).
+//
+// Three requests, all built by BaseRequest::createSignalKeyTag @0x13A0E94 +
+// createVersionTag @0x13A1028 (KeC10fuL) + one IKqx1Cn9 node -- NOT
+// createUserInfoTag, so the node is NOT LoginInfoReq: it carries only the keys
+// listed in TransferLoginInfoReq.  Spec and evidence:
+// re/notes/https_transfer_re.json, entry "transfer".
+//
+//   TransferCodeIssue  LK9e0WyX / B6siV3AT  OptionTransferCodeIssueRequestScene (865)
+//   TransferCodeCheck  Fn1UzTo3 / A6QiFT7D  Title/OptionTransferCodeConfirmScene (32 / 867)
+//   Transfer           I9DyF2aU / 2hp90fZ1  Title/OptionTransferCodeRequestScene (33 / 868)
+//
+// Requests are read with error_on_unknown_keys=false: KeC10fuL, K29dp2Q,
+// 236dItKo (sometimes twice) and uJP4aeg9 are sent but deliberately not
+// declared here.
+
+json TransferLoginInfoReq {
+    doc """
+    The IKqx1Cn9 node of all three transfer requests.  Each request writes a
+    subset; a key a request does not send reads as its default.
+    createBody: TransferCodeCheckRequest @0x13AD73C, TransferCodeIssueRequest
+    @0x13AD940, TransferRequest @0x13ADB40.  The gumi pair comes from
+    BaseRequest::addGumiliveParams @0x13A02CC.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "UserInfo::getUserID.  Check/Issue: the requester's own id (possibly '').  Transfer: the TARGET id -- Confirm OK already swapped it in."
+    }
+
+    field transfer_code type="str" {
+        key "LZ2PfNm4"
+        doc "UserInfo::getAccountID -- the Transfer ID the player typed (Check @0x13AD7BC, Transfer @0x13ADC44).  Issue does not send it."
+    }
+
+    field password type="str" {
+        key "4WSu1irc"
+        doc "UserInfo::getPassword.  Issue: the new password, already checked by TextInputUtils::checkPassword @0x11D521C.  Check/Transfer: what the player typed."
+    }
+
+    field model_change_count type="i32::str" {
+        key "nrg19RGe"
+        doc "UserInfo::getModelChangeCnt, sent through JsonNode::addParam(const char*, int) @0xFDB82C, which stringifies it."
+    }
+
+    field device_name type="str" {
+        key "iN7buP0j"
+        doc "CommonUtils::getDeviceName.  Issue and Transfer only."
+    }
+
+    field target_os type="str" {
+        key "DFY3k6qp"
+        doc "IntToString(getTargetOs) -- '2' on Android."
+    }
+
+    field device_id type="str" {
+        key "Ma5GnU0H"
+        doc "Check/Issue: UserState::getPushDeviceToken.  Transfer: CommonUtils::getDeviceID @0xFB9374, a tail call to getDeviceAdvertisingID -- the same advertising id guest login sends as vid."
+    }
+
+    field push_token type="str" {
+        key "dzhBs92A"
+        doc "UserState::getPushDeviceToken.  Transfer only."
+    }
+
+    field advertising_id type="str" {
+        key "6K7LToCD"
+        doc "CommonUtils::getDeviceAdvertisingID.  Transfer only; the one device identifier a no-session claim can be keyed on."
+    }
+
+    field gumi_live_userid type="str" {
+        key "iN7buP2h"
+        doc "UserInfo::getGumiLiveUserId (addGumiliveParams @0x13A03C4).  May be empty on a fresh install that has not tapped the title yet."
+    }
+
+    field gumi_live_token type="str" {
+        key "iN7buP1i"
+        doc "UserInfo::getGumiLiveToken (@0x13A03F0)."
+    }
+}
+
+json TransferOldUserReq {
+    doc "TransferRequest's u3JU7LzQ node: ModelChangeUserInfo::getOldUserID (@0x13ADD44), set on Confirm OK."
+
+    field old_user_id type="str" {
+        key "h7eY3sAK"
+        doc "The id this device used before Confirm OK swapped in the target ('' on a fresh install)."
+    }
+}
+
+json TransferCodeIssueReq {
+    doc "TransferCodeIssue (LK9e0WyX, key B6siV3AT) -- OptionTransferCodeIssueRequestScene::initConnect @0x178D54C."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key; echoed."
+    }
+
+    field loginInfo type="[TransferLoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Requester and the new password."
+    }
+}
+
+json TransferCodeIssuedInfo {
+    doc """
+    The issued code, read by UserInfoResponse::readParam @0x13FED80.  That
+    reader handles every UserInfo key independently, so ONLY these three may be
+    sent: any other key (h7eY3sAK, B5JQyV8j, ...) would overwrite live client
+    state.  The issue-done layout shows UserInfo.AccountID, which nothing but
+    this reply sets.
+    """
+
+    field transfer_code type="str" {
+        key "LZ2PfNm4"
+        doc "setAccountID -- the 10-digit Transfer ID.  The only place the plaintext ever leaves the server."
+    }
+
+    field password type="str" {
+        key "4WSu1irc"
+        doc "setPassword -- an echo of the request's password (the client already holds it)."
+    }
+
+    field code_expire_date type="i64::str" {
+        key "iyJH5k6p"
+        doc "setCodeExpireDate: unix seconds, '0' for never.  Stored and never displayed (getCodeExpireDate @0x1295DB8 has no callers)."
+    }
+}
+
+json TransferCodeIssueResp {
+    doc "TransferCodeIssue success reply."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key; echoed."
+    }
+
+    field issued type="[TransferCodeIssuedInfo]::size(1)" {
+        key "IKqx1Cn9"
+        doc "The issued code."
+    }
+}
+
+json TransferCodeCheckReq {
+    doc "TransferCodeCheck (Fn1UzTo3, key A6QiFT7D) -- Title/OptionTransferCodeConfirmScene::initConnect (@0x1B89BC4 / @0x178A674)."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key; echoed."
+    }
+
+    field loginInfo type="[TransferLoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Typed Transfer ID and password, plus the requester's gumi pair."
+    }
+}
+
+json ModelChangeUserInfoResp {
+    doc """
+    The account a Transfer ID belongs to, read by ModelChangeUserInfoResponse::
+    readParam @0x13E49E8.  The Confirm scene shows its name and level, and
+    Confirm OK copies id, count, name and contact id into UserInfo.  The reader
+    also accepts LZ2PfNm4/4WSu1irc; they are deliberately not declared, so the
+    code and password never travel back.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "setUserID -- the target user_info.id."
+    }
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "setHandleName."
+    }
+
+    field level type="i32::str" {
+        key "D9wXQI2V"
+        doc "StrToInt -> setLevel."
+    }
+
+    field model_change_count type="i32::str" {
+        key "nrg19RGe"
+        doc "StrToInt -> setModelChangeCnt.  Cosmetic: no client logic branches on it."
+    }
+
+    field contact_id type="str" {
+        key "90LWtVUN"
+        doc "setContactID.  This server keeps no contact id, so ''."
+    }
+}
+
+json TransferCodeCheckResp {
+    doc "TransferCodeCheck success reply.  No IKqx1Cn9: the client's UserInfo must stay untouched until Confirm OK."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key; echoed."
+    }
+
+    field target type="[ModelChangeUserInfoResp]::size(1)" {
+        key "u3JU7LzQ"
+        doc "The account the code belongs to."
+    }
+}
+
+json TransferReq {
+    doc "Transfer (I9DyF2aU, key 2hp90fZ1) -- Title/OptionTransferCodeRequestScene::initConnect (@0x1B8D010 / @0x1790388)."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key; echoed."
+    }
+
+    field loginInfo type="[TransferLoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Target id, code, password, gumi pair and advertising id."
+    }
+
+    field oldUser type="[TransferOldUserReq]::size(1)" {
+        key "u3JU7LzQ"
+        doc "The id the device used before the swap."
+    }
+}
+
+json TransferResp {
+    doc "Transfer success reply.  The Request scene reads no field; success alone leads to the done screen and appExit."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key; echoed."
+    }
+}

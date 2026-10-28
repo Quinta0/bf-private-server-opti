@@ -1,0 +1,785 @@
+#include "PermitPlace.hpp"
+#include "App.hpp"
+#include "Common.hpp"
+#include "ResearchLab.hpp"
+#include "GameDay.hpp"
+#include "Sandbox.hpp"
+#include "archive/MissionArchiver.hpp"
+#include "forge/Rules.hpp"
+
+#include <algorithm>
+#include <ctime>
+#include <functional>
+#include <map>
+#include <vector>
+#include <set>
+#include <stdexcept>
+
+namespace gme
+{
+namespace
+{
+// WHICH PERMIT CHANNEL A ROW BELONGS ON.
+//
+// PermitPlaceInfoList holds three disjoint partitions and each permit response
+// clears only its own at row 0:
+//
+//   yXNM8kL3 PermitPlace   -> removeNormalObjects  @0x126C9B0
+//   Y73tHKS8 PermitPlaceSp -> removeSpecialObjects @0x126C744
+//   Y73mHKS8 PermitPlaceML -> removeMLObjects
+//
+// Each remover resolves a row to its AreaMst -- directly for an area row,
+// through DungeonMst or MissionMst for the others -- and asks
+// AreaMst::isSpecial (type 1 or 3) or isML (type 10).  Send a special area's
+// permits on yXNM8kL3 and removeNormalObjects deliberately SKIPS them, so they
+// are appended on every refresh and can never be withdrawn.
+//
+// That is not a corner case in this data: 340 areas are type 1, 3 are type 3
+// and 35 are type 10, leaving 33 of 411 "normal".  A snapshot measured on
+// 2026-09-13 was 659 rows, of which 443 resolved to special areas -- rows this
+// server had been re-appending at every login and every MissionEnd while
+// believing it was sending a replacement.
+//
+// A row whose area does not resolve (a land or a gate, or an area the client
+// was never sent) is skipped by all three removers and cannot be withdrawn by
+// anyone; those stay on the normal channel, which is where they have always
+// been.
+enum class PermitChannel { Normal, Special, ML };
+
+PermitChannel channelForArea(const int32_t areaId)
+{
+    if (areaId <= 0)
+        return PermitChannel::Normal;
+    for (const auto& area : theServer()->cache().areaMst())
+    {
+        if (area.area_id != areaId)
+            continue;
+        if (area.area_type == 10)
+            return PermitChannel::ML;
+        // isSpecial: (type | 2) == 3, i.e. 1 or 3.
+        if ((area.area_type | 2) == 3)
+            return PermitChannel::Special;
+        return PermitChannel::Normal;
+    }
+    return PermitChannel::Normal;
+}
+
+PermitChannel channelForDungeon(const int32_t dungeonId)
+{
+    for (const auto& dungeon : theServer()->cache().dungeonMst())
+    {
+        if (dungeon.dungeon_id == dungeonId)
+            return channelForArea(dungeon.area_id);
+    }
+    return PermitChannel::Normal;
+}
+
+PermitChannel channelForMission(const int32_t missionId)
+{
+    const auto& byDungeon = theServer()->cache().missionsByDungeon();
+    for (const auto& [dungeonId, missions] : byDungeon)
+    {
+        for (const auto id : missions)
+        {
+            if (id == missionId)
+                return channelForDungeon(dungeonId);
+        }
+    }
+    return PermitChannel::Normal;
+}
+
+// Route by the row's entity key, which is also what selects its type.
+PermitChannel channelForRow(const std::string_view key, const int64_t id)
+{
+    if (key == "VjCY7rX4") return channelForArea(static_cast<int32_t>(id));
+    if (key == "MHx05sXt") return channelForDungeon(static_cast<int32_t>(id));
+    if (key == "j28VNcUW") return channelForMission(static_cast<int32_t>(id));
+    // Lands (9C64Qwe0) and gates (0Cq2AlXW) resolve to no area, so no remover
+    // touches them whichever channel they ride.  Keep them where they were.
+    return PermitChannel::Normal;
+}
+}
+
+namespace
+{
+// Story (Grand Gaia) ids sit below this; Vortex, Frontier Gate, trials and the
+// other special modes are numbered above it and gated by their own collectors.
+constexpr int32_t kSpecialIdFloor = 100000;
+
+int32_t parentAreaOf(const AreaMst& area)
+{
+    if (!area.parent_area_id || area.parent_area_id->empty())
+        return 0;
+    try { return std::stoi(*area.parent_area_id); }
+    catch (const std::exception&) { return 0; }
+}
+
+// THE VORTEX AREA TILES THAT LEAD SOMEWHERE.
+//
+// vortexPermits() opens every curated Vortex area unconditionally so that a
+// rotating dungeon's tile stays put -- but on 2026-10-16 only 2 of its 46
+// areas held a single mission with an authored battle.  The other 44 drew a
+// tile (e.g. the "Travellers" character quests) that opened onto an empty
+// list, which players read as "the Vortex quests don't work".
+//
+// A leaf area keeps its tile only when one of its dungeons can be served on
+// some day (rotation, key and need gates are judged per request; this only
+// asks whether a battle exists at all).  A category keeps its tile while one
+// of its children does: a Vortex child by this same rule, any other child
+// only when another collector permits it (`elsewhere`; Trial of the Gods sits
+// under "Travellers").  The Vortex children of a category include the ones
+// numbered above the Vortex id range (Vortex Trials, Seasons Past; see
+// ServerCache's nestedVortexAreas), so those categories keep their tiles.
+std::set<int32_t> servableVortexAreas(
+    const std::set<int32_t>& candidates,
+    const std::set<int32_t>& elsewhere,
+    const std::function<bool(int32_t)>& servableDungeon)
+{
+    const auto& cache = theServer()->cache();
+
+    std::set<int32_t> withBattle;
+    for (const auto& dungeon : cache.dungeonMst())
+        if (servableDungeon(dungeon.dungeon_id))
+            withBattle.insert(dungeon.area_id);
+
+    std::map<int32_t, std::vector<int32_t>> children;
+    for (const auto& area : cache.areaMst())
+        if (const auto parent = parentAreaOf(area); parent != 0)
+            children[parent].push_back(area.area_id);
+
+    std::map<int32_t, bool> memo;
+    std::function<bool(int32_t, int)> keep = [&](const int32_t areaId, const int depth) {
+        if (const auto it = memo.find(areaId); it != memo.end())
+            return it->second;
+        bool result = withBattle.contains(areaId);
+        if (const auto kids = children.find(areaId); !result && kids != children.end() && depth < 8)
+            for (const auto child : kids->second)
+                if (elsewhere.contains(child) || (candidates.contains(child) && keep(child, depth + 1)))
+                {
+                    result = true;
+                    break;
+                }
+        memo[areaId] = result;
+        return result;
+    };
+
+    std::set<int32_t> out;
+    for (const auto areaId : candidates)
+        if (keep(areaId, 0))
+            out.insert(areaId);
+    return out;
+}
+}
+
+bool storyLandUnlocked(const int32_t landId, const std::set<int32_t>& cleared)
+{
+    // Lizeria: Grantos (Cordelica) AND Cardes (Palmyna). Both the area 700
+    // and dungeon 700 MST rows carry "666,20067". Source:
+    // https://bravefrontierglobal.fandom.com/wiki/Lizeria (2026-09-29).
+    return landId != 4 || (cleared.contains(666) && cleared.contains(20067));
+}
+
+bool storyMissionUnlocked(const int32_t missionId, const std::set<int32_t>& cleared)
+{
+    // Special modes keep their own entry rules.
+    if (missionId <= 0 || missionId >= kSpecialIdFloor)
+        return true;
+
+    // All-of, exactly as the map (buildPermitPlace) decides: the dungeon's and
+    // its area's lists, and the mission's own unless it is the dungeon's first.
+    const auto allOf = [&cleared](const auto& list) {
+        for (const auto need : list)
+            if (need != 0 && !cleared.contains(need))
+                return false;
+        return true;
+    };
+    const auto& cache = theServer()->cache();
+    for (const auto& [dungeonId, missions] : cache.missionsByDungeon())
+    {
+        const auto at = std::find(missions.begin(), missions.end(), missionId);
+        if (at == missions.end())
+            continue;
+        const auto dungeon = std::find_if(cache.dungeonMst().begin(), cache.dungeonMst().end(),
+            [dungeonId](const auto& d) { return d.dungeon_id == dungeonId; });
+        if (dungeon != cache.dungeonMst().end())
+        {
+            if (!storyLandUnlocked(dungeon->land_id, cleared) || !allOf(dungeon->need_mission_id))
+                return false;
+            const auto area = std::find_if(cache.areaMst().begin(), cache.areaMst().end(),
+                [&](const auto& a) { return a.area_id == dungeon->area_id; });
+            if (area != cache.areaMst().end() && !allOf(area->need_mission_id))
+                return false;
+        }
+        if (at != missions.begin())
+        {
+            const auto need = cache.missionNeeds().find(missionId);
+            if (need != cache.missionNeeds().end() && !allOf(need->second))
+                return false;
+        }
+        return true;
+    }
+    return true;
+}
+
+bool storyAreaOpenedBy(const int32_t missionId, const std::set<int32_t>& cleared)
+{
+    if (missionId <= 0 || missionId >= kSpecialIdFloor || !cleared.contains(missionId))
+        return false;
+    for (const auto& area : theServer()->cache().areaMst())
+    {
+        if (area.area_id <= 0 || area.area_id >= kSpecialIdFloor)
+            continue;
+        const auto& needs = area.need_mission_id;
+        if (std::find(needs.begin(), needs.end(), missionId) == needs.end())
+            continue;
+        // The map's own rule (buildPermitPlace): the land's gate, then every
+        // listed need.  Lizeria's "666,20067" opens on whichever is cleared last.
+        if (!storyLandUnlocked(area.land_id, cleared))
+            continue;
+        if (std::all_of(needs.begin(), needs.end(),
+                [&cleared](const int32_t need) { return need == 0 || cleared.contains(need); }))
+            return true;
+    }
+    return false;
+}
+
+drogon::Task<std::string> buildPermitPlace(const db::Database db, const UserIdentity identity)
+{
+    // Grand Gaia progression uses the low ID space (below kSpecialIdFloor);
+    // special modes have their own topology collectors.
+    std::set<int32_t> clearedMissions;
+    for (const auto& done : co_await getClearedMissions(db, identity))
+        clearedMissions.insert(done.mission_id);
+    // A Sandbox account (Sandbox.hpp) has every gate below open: every quest
+    // reads as cleared, and the Vortex lists every day's dungeons.
+    const bool sandboxed = co_await sandbox::isOn(db, identity.userId);
+
+    // The three partitions, each filling the channel that can clear it.
+    struct Buckets
+    {
+        std::string normal, special, ml;
+
+        void raw(const PermitChannel channel, const std::string& row)
+        {
+            std::string& out = channel == PermitChannel::Special ? special
+                             : channel == PermitChannel::ML      ? ml
+                                                                 : normal;
+            if (!out.empty()) out += ',';
+            out += row;
+        }
+
+        void add(const std::string_view key, const int64_t id)
+        {
+            std::string row = "{\"";
+            row += key;
+            row += "\":\"";
+            row += std::to_string(id);
+            row += "\"}";
+            raw(channelForRow(key, id), row);
+        }
+    };
+
+    static const Buckets kPermitBase = []() {
+        Buckets s;
+        s.normal.reserve(32'000);
+        s.special.reserve(32'000);
+        auto add = [&](std::string_view key, int64_t id) { s.add(key, id); };
+
+        for (int i = 1; i <= 100; ++i) add("0Cq2AlXW", i); // gates, incl. 99 (Vortex)
+
+        const auto& fg = theServer()->cache().frontierGatePermits();
+        for (const auto id : fg.lands)    add("9C64Qwe0", id);
+        for (const auto id : fg.areas)    add("VjCY7rX4", id);
+        for (const auto id : fg.dungeons) add("MHx05sXt", id);
+        for (const auto id : fg.missions) add("j28VNcUW", id);
+
+        // Grand Quest: without its dungeon here the mode's icon never appears
+        // on the quest screen (GameUtils::checkGrandPermit).  Grand ids are
+        // above kSpecialIdFloor, so the progression gate below skips them.
+        const auto& gq = theServer()->cache().grandQuestPermits();
+        for (const auto id : gq.lands)    add("9C64Qwe0", id);
+        for (const auto id : gq.areas)    add("VjCY7rX4", id);
+        for (const auto id : gq.dungeons) add("MHx05sXt", id);
+        for (const auto id : gq.missions) add("j28VNcUW", id);
+
+        // Frontier Hunter.  The Survey Office's Enter goes to the ordinary
+        // quest-select screen, so the mode is reachable the moment its topology
+        // is permitted -- see ServerCache's collector.  Its area is AreaMst
+        // type 1, so these rows ride Y73tHKS8 and can actually be withdrawn
+        // when the event changes.
+        const auto& fh = theServer()->cache().challengePermits();
+        for (const auto id : fh.lands)    add("9C64Qwe0", id);
+        for (const auto id : fh.areas)    add("VjCY7rX4", id);
+        for (const auto id : fh.missions) add("j28VNcUW", id);
+        // Its DUNGEON row is built per request further down -- it needs a live
+        // countdown, which a static block computed once could not carry.
+
+        // Trial of the Gods.  Above kSpecialIdFloor, so the progression gate
+        // below never sees it; without this the six Trials have no tile.
+        const auto& tr = theServer()->cache().trialPermits();
+        for (const auto id : tr.lands)    add("9C64Qwe0", id);
+        for (const auto id : tr.areas)    add("VjCY7rX4", id);
+        for (const auto id : tr.dungeons) add("MHx05sXt", id);
+        for (const auto id : tr.missions)
+        {
+            // Same rule as the campaign below: never advertise a tile whose
+            // battle does not exist.  Checked HERE rather than in the cache's
+            // collector because MissionArchiver::setup runs after
+            // ServerCache::Setup, and this block is built on first request.
+            //
+            // The Research Lab's missions unlock in order, which depends on
+            // the player, so they are added per request below.
+            if (MissionArchiver::instance().archived(id) && !isResearchLabMission(id))
+                add("j28VNcUW", id);
+        }
+
+        // THE TRAINING GROUNDS NEED THEIR MISSION PERMITTED -- AND ONLY THAT.
+        //
+        // Randall's Battle Simulator is entered from ChallengeSelectScene's
+        // button, which checks nothing but the sandbag_op intro.  Its squad
+        // screen then finds the battle itself: SandbagCheckScene::initialize
+        // @0x159A6D0 scans DungeonMstList for dungeon_type 6 and keeps
+        // MissionMstList::getMissionListWithDungeonID(..)[0], a list that holds
+        // only missions PermitPlaceInfoList::isPermitMission accepts (@0x1332350
+        // -> @0x126C824).  With no permit it stores null, and Begin's
+        // setPreparation @0x159CE40 calls getMissionID on it unchecked -- the
+        // Windows client faulted reading 0x24 at +0xDE25E (2026-10-02 dump),
+        // before MissionStart was ever sent.
+        //
+        // Mission rows only.  Permitting the area (6000000: AreaMst type 1,
+        // land 99) would add a Training Ground tile to the Vortex list through
+        // AreaMstList::getActiveList, and isPermitMission is the one check the
+        // scene makes.  The row resolves to that special area, so it rides
+        // Y73tHKS8 and can be withdrawn like any other special permit.
+        {
+            const auto& byDungeon = theServer()->cache().missionsByDungeon();
+            for (const auto& dungeon : theServer()->cache().dungeonMst())
+            {
+                if (dungeon.dungeon_type != 6)
+                    continue;
+                const auto it = byDungeon.find(dungeon.dungeon_id);
+                if (it == byDungeon.end())
+                    continue;
+                for (const auto id : it->second)
+                    if (MissionArchiver::instance().archived(id))
+                        add("j28VNcUW", id);
+            }
+        }
+
+        // THE VORTEX GETS THE SAME ARCHIVE GUARD AS THE CAMPAIGN AND THE TRIALS.
+        //
+        // ServerCache curates the Vortex list by hiding a tile that is empty,
+        // has an untranslated name, or duplicates another's banner art.  All
+        // three are PROXIES for "this tile is not ready", and the middle one
+        // stopped being true on 2026-09-19: repairing 88 dungeon names that a
+        // lossy transcode had reduced to "?????E??" made 18 areas readable, and
+        // with them 33 dungeons and 50 mission tiles that have no authored
+        // battle.  Every one of those would have served mission 10's waves
+        // relabelled, for free, under a Vortex name.
+        //
+        // So the condition is stated outright here instead of being inferred
+        // from the name: a mission tile is advertised only when its battle
+        // exists, and a dungeon only when at least one of its missions does --
+        // an empty Vortex dungeon was the original bug this whole file fixed.
+        // It cannot live in the cache's collector, which runs before
+        // MissionArchiver::setup (see the Trial block above).
+        const auto& vx = theServer()->cache().vortexPermits();
+        const auto& byDungeon = theServer()->cache().missionsByDungeon();
+        const auto servable = [&byDungeon](const int32_t dungeonId) {
+            const auto it = byDungeon.find(dungeonId);
+            if (it == byDungeon.end())
+                return false;
+            return std::any_of(it->second.begin(), it->second.end(),
+                [](const int32_t id) { return MissionArchiver::instance().archived(id); });
+        };
+
+        std::set<int32_t> elsewhere;
+        for (const auto* other : { &fg, &gq, &fh, &tr })
+            elsewhere.insert(other->areas.begin(), other->areas.end());
+        const auto areas = servableVortexAreas(vx.areas, elsewhere, servable);
+        LOG_INFO << "PermitPlace: Vortex — " << areas.size() << " of " << vx.areas.size()
+                 << " area tile(s) lead to a mission with an authored battle";
+        for (const auto id : vx.lands) add("9C64Qwe0", id);
+        for (const auto id : areas) add("VjCY7rX4", id);
+        for (const auto id : vx.dungeons)
+            if (servable(id))
+                add("MHx05sXt", id);
+        for (const auto id : vx.missions)
+            if (MissionArchiver::instance().archived(id))
+                add("j28VNcUW", id);
+
+        return s;
+    }();
+
+    const auto now = std::time(nullptr);
+    std::tm local{};
+#ifdef _WIN32
+    localtime_s(&local, &now);
+#else
+    localtime_r(&now, &local);
+#endif
+    const size_t weekdayIndex = static_cast<size_t>((local.tm_wday + 6) % 7);
+
+
+    std::vector<const ServerCache::TopologyPermits*> days{ &theServer()->cache().vortexDayPermits(weekdayIndex) };
+    if (sandboxed)
+    {
+        days.clear();
+        for (size_t day = 0; day < 7; ++day)
+            days.push_back(&theServer()->cache().vortexDayPermits(day));
+    }
+    Buckets buckets = kPermitBase;
+    {
+        const auto append = [&buckets](std::string&, bool&, std::string_view key, int64_t id) {
+            buckets.add(key, id);
+        };
+        std::string permitPlace;   // unused shim so the call sites below read unchanged
+        bool first = false;
+
+        const auto& cleared = sandbox::forGates(clearedMissions, sandboxed);
+
+        const auto& cache = theServer()->cache();
+        const auto& needs = cache.missionNeeds();
+
+        // STORY PREREQUISITES ARE ALL-OF (#30).  A comma list names every
+        // mission the entry needs, and the client says so itself: its locked
+        // tile popup reads LOCK_DUNGEON_NOTICE "The dungeon will open when the
+        // requirements below have been met." and then lists EACH need as
+        // `Quest "<name>" Cleared` (MissionSelectScene2::touchEnded @0x18A2964).
+        // Lizeria (area/dungeon/mission 700, "666,20067") needs Cordelica AND
+        // Palmyna (Global wiki, Lizeria); land 20 (area 11000 / dungeon 10900)
+        // needs all nine chapter finals.  Read any-of, one clear opened them.
+        const auto satisfiedAll = [&cleared](const auto& list) {
+            for (const auto need : list)
+                if (need != 0 && !cleared.count(need))
+                    return false;
+            return true;
+        };
+
+        // Special modes (Vortex rotation, gated event missions) keep the rule
+        // they shipped with -- any listed prerequisite suffices -- until their
+        // compound lists are audited one by one.
+        const auto satisfied = [&cleared](const auto& list) {
+            if (list.empty())
+                return true;
+            bool anyReal = false;
+            for (const auto need : list)
+            {
+                if (need == 0)
+                    return true;         // 0 = no prerequisite
+                anyReal = true;
+                if (cleared.count(need))
+                    return true;
+            }
+            return !anyReal;
+        };
+
+        size_t gatedAreas = 0, gatedDungeons = 0, gatedMissions = 0;
+        size_t unarchivedMissions = 0;
+
+        std::set<int32_t> permittedLands;
+
+        for (const auto& area : cache.areaMst())
+        {
+            if (area.area_id <= 0 || area.area_id >= kSpecialIdFloor)
+                continue;
+            if (!storyLandUnlocked(area.land_id, cleared))
+                continue;
+            if (!satisfiedAll(area.need_mission_id))
+                continue;
+            append(permitPlace, first, "VjCY7rX4", area.area_id);
+            ++gatedAreas;
+            if (area.land_id > 0)
+                permittedLands.insert(area.land_id);
+        }
+
+        for (const auto landId : permittedLands)
+            append(permitPlace, first, "9C64Qwe0", landId);
+
+        for (const auto& dungeon : cache.dungeonMst())
+        {
+            if (dungeon.dungeon_id <= 0 || dungeon.dungeon_id >= kSpecialIdFloor)
+                continue;
+            if (!storyLandUnlocked(dungeon.land_id, cleared))
+                continue;
+            if (!satisfiedAll(dungeon.need_mission_id))
+                continue;
+            append(permitPlace, first, "MHx05sXt", dungeon.dungeon_id);
+            ++gatedDungeons;
+
+            const auto it = cache.missionsByDungeon().find(dungeon.dungeon_id);
+            if (it == cache.missionsByDungeon().end())
+                continue;
+
+            // The first mission stays available once its parent dungeon opens.
+            const auto entryMission = it->second.empty() ? 0 : it->second.front();
+
+            for (const auto missionId : it->second)
+            {
+                if (missionId <= 0 || missionId >= kSpecialIdFloor)
+                    continue;
+                // NEVER ADVERTISE A TILE WE CANNOT SERVE.  missionsByDungeon is
+                // indexed from mission_mst (3433 rows); the archive holds 942.
+                // 386 of the difference sit inside this id space, so without
+                // this the quest map offers them, MissionStart's lookup fails,
+                // the handler throws and the session closes — indistinguishable
+                // from a crash.  Mission 20100 (Vectus) reached a live save
+                // that way: its need_mission_id is 0, so no gate hid it.
+                //
+                // Deliberately ONLY here.  Frontier Gate, Grand Quest, Frontier
+                // Hunter and the Vortex build their permits from the same MST
+                // index but are working features with their own entry paths, so
+                // they keep whatever they advertise today.
+                if (!MissionArchiver::instance().archived(missionId))
+                {
+                    ++unarchivedMissions;
+                    continue;
+                }
+                if (missionId != entryMission)
+                {
+                    const auto need = needs.find(missionId);
+                    if (need != needs.end() && !satisfiedAll(need->second))
+                        continue;
+                }
+                append(permitPlace, first, "j28VNcUW", missionId);
+                ++gatedMissions;
+            }
+        }
+
+        std::string landList;
+        for (const auto landId : permittedLands)
+        {
+            if (!landList.empty())
+                landList += ',';
+            landList += std::to_string(landId);
+        }
+
+        // THE RESEARCH LAB UNLOCKS IN ORDER.  Its dungeon, area and land stay
+        // in the static block -- the lab itself has no requirement -- but
+        // each trial waits for its prerequisites; see researchLabUnlocked.
+        size_t labMissions = 0;
+        for (const auto missionId : researchLabMissions())
+        {
+            if (!MissionArchiver::instance().archived(missionId)
+                || !researchLabUnlocked(missionId, cleared))
+                continue;
+            append(permitPlace, first, "j28VNcUW", missionId);
+            ++labMissions;
+        }
+        LOG_INFO << "PermitPlace: Research Lab — permitting " << labMissions << " trial(s)";
+
+        LOG_INFO << "PermitPlace: progression gate — " << cleared.size()
+                 << " mission(s) cleared, permitting " << gatedAreas << " area(s), "
+                 << gatedDungeons << " dungeon(s), " << gatedMissions << " mission(s)"
+                 << ", land(s) [" << landList << "]"
+                 << "; withheld " << unarchivedMissions
+                 << " mission(s) with no archive record";
+
+        // The same archive guard the static Vortex block above applies, for the
+        // rotating half of the list: today's dungeons and the ladder tiers held
+        // back behind a need_mission_id.
+        const auto& byDungeon = cache.missionsByDungeon();
+        const auto servable = [&byDungeon](const int32_t dungeonId) {
+            const auto it = byDungeon.find(dungeonId);
+            if (it == byDungeon.end())
+                return false;
+            return std::any_of(it->second.begin(), it->second.end(),
+                [](const int32_t id) { return MissionArchiver::instance().archived(id); });
+        };
+
+        // A dungeon on several days (Sandbox lists them all) goes out once.
+        std::set<int32_t> dayDungeons, dayMissions;
+        for (const auto* today : days)
+        {
+            for (const auto id : today->dungeons)
+                if (servable(id) && dayDungeons.insert(id).second)
+                    append(permitPlace, first, "MHx05sXt", id);
+            for (const auto id : today->missions)
+                if (MissionArchiver::instance().archived(id) && dayMissions.insert(id).second)
+                    append(permitPlace, first, "j28VNcUW", id);
+        }
+
+        int32_t gatedVortex = 0;
+        const auto permitGated = [&](const ServerCache::TopologyPermits& permits) {
+            for (const auto& [missionId, need] : permits.gatedMissions)
+            {
+                if (!satisfied(need) || !MissionArchiver::instance().archived(missionId)
+                    || !dayMissions.insert(missionId).second)
+                    continue;
+                append(permitPlace, first, "j28VNcUW", missionId);
+                ++gatedVortex;
+            }
+            for (const auto& [dungeonId, missions] : permits.gatedDungeons)
+            {
+                const bool open = std::any_of(missions.begin(), missions.end(), [&](const int32_t id) {
+                    const auto need = permits.gatedMissions.find(id);
+                    return need != permits.gatedMissions.end() && satisfied(need->second)
+                        && MissionArchiver::instance().archived(id);
+                });
+                if (open && dayDungeons.insert(dungeonId).second)
+                    append(permitPlace, first, "MHx05sXt", dungeonId);
+            }
+        };
+        permitGated(theServer()->cache().vortexPermits());
+        for (const auto* today : days)
+            permitGated(*today);
+
+        const auto nowEpoch = static_cast<int64_t>(now);
+
+        // THE CHALLENGE DUNGEON NEEDS A COUNTDOWN, and a bare id row is not
+        // enough.  MissionCheckScene::touchBegan @0x18851D0 looks the dungeon up
+        // with PermitPlaceInfoList::getObjectDungeon and refuses with
+        // CHALLENG_CHECK_TIME -- "No events currently being held." -- when
+        // getRemainingTime() is <= 0.  Emitting the id alone left it at 0, so
+        // the prep screen turned the player away at the Challenge button even
+        // though the lobby had let them in.
+        //
+        // This is the PARADE RULE INVERTED and worth keeping straight: for a
+        // parade, enterable-with-no-countdown IS the closed state and the key
+        // prompt is what should be reachable; for a challenge, no countdown
+        // means no event.
+        //
+        // The window is the one ServerCache already advertises for the active
+        // event -- open until 2038 -- so the countdown agrees with the dates the
+        // client was told rather than inventing a second answer.
+        {
+            constexpr int64_t kAdvertisedChallengeEnd = 2145916800;   // 2038-01-01
+            const auto left = kAdvertisedChallengeEnd - static_cast<int64_t>(now);
+            for (const auto id : theServer()->cache().challengePermits().dungeons)
+            {
+                std::string row = R"({"MHx05sXt":")" + std::to_string(id) + R"(","C1vG0iKh":"1")";
+                if (left > 0)
+                    row += R"(,"qY49LBjw":")" + std::to_string(left) + R"(")";
+                row += '}';
+                buckets.raw(channelForDungeon(id), row);
+            }
+        }
+
+        // Rebuild every parade from persisted state, including expired windows.
+        // Never merge old tier missions into this replacement snapshot.
+        int32_t keyTierMissions = 0;
+        for (const auto& key : theServer()->cache().dungeonKeyMst())
+        {
+            const auto st = co_await db->execSqlCoro(
+                "SELECT active_tier, active_until FROM user_dungeon_keys"
+                " WHERE user_id = $1 AND dungeon_key_id = $2;",
+                identity.userId, static_cast<int32_t>(key.id));
+            if (st.size() == 0)
+                continue;
+
+            const auto tier = st[0]["active_tier"].as<int32_t>();
+            const auto until = st[0]["active_until"].as<int64_t>();
+            const bool live = tier > 0 && nowEpoch < until;
+
+            // A parade is ENTERABLE whether or not a key window is open; the
+            // countdown is what says "open".  AreaSPSelectScene::touchEnded
+            // checks isEnterable (+0x5b4) BEFORE its key branch and sends a
+            // locked dungeon to MissionFlgConfirmScene — "Opening Conditions",
+            // which lists only need_mission_id quests, so it drew a blank page
+            // for a parade.  The key branch (+0xa1c) reads getRemainingTime
+            // (+0xa68): 1 or more enters the parade; below 1 (-1 when there is
+            // no countdown) opens the key prompt at +0xce8 — possession, the
+            // usage-pattern tiers, or USE_KEY_CONFIRMATION_DONOTHAVE2.  So
+            // "enterable, no time left" IS the closed state.  Sending "0" here
+            // hid the key prompt behind that blank page.
+            // A parade row carries its enterable flag and countdown alongside the
+            // dungeon id, so it is built by hand rather than through add() --
+            // but it still has to ride the channel that can clear it, or an
+            // expired tier could never be withdrawn.  Parade areas are special
+            // in this data, which is exactly the case that motivated the split.
+            std::string paradeRow =
+                R"({"MHx05sXt":")" + std::to_string(key.dungeon_id) + R"(","C1vG0iKh":"1")";
+            if (live)
+                paradeRow += R"(,"qY49LBjw":")" + std::to_string(until - nowEpoch) + R"(")";
+            paradeRow += '}';
+            buckets.raw(channelForDungeon(key.dungeon_id), paradeRow);
+
+            if (!live)
+                continue;   // never bought, or the window has lapsed
+
+            for (const auto& rung : gme::parseUsagePatternTiers(key.usage_pattern))
+            {
+                if (rung.keysRequired != tier)
+                    continue;
+                for (const auto missionId : rung.missionIds)
+                {
+                    append(permitPlace, first, "j28VNcUW", missionId);
+                    ++keyTierMissions;
+                }
+
+            }
+        }
+        if (keyTierMissions)
+            LOG_INFO << "PermitPlace: parade tier — permitting " << keyTierMissions
+                     << " mission(s) from active dungeon keys";
+
+        LOG_INFO << "PermitPlace: Vortex tier gate — permitting " << gatedVortex
+                 << " gated mission(s)";
+
+        // BALANCE FORGE RULES (rules.json; forge/Rules.hpp): quests, dungeons and
+        // areas a schedule closes or an unlock still locks leave the map, after
+        // every addition above (the static base included).  Only schedules and
+        // unlocks ever hide anything; they never add a tile.
+        if (const auto forgeRules = forge::rules(); forgeRules->hidesTiles())
+        {
+            const auto hidden = forgeRules->hiddenFor(cleared, unixNow());
+            if (!hidden.empty())
+            {
+                for (auto* rows : { &buckets.normal, &buckets.special, &buckets.ml })
+                    forge::dropHiddenPermitRows(*rows, hidden);
+                LOG_INFO << "PermitPlace: Forge rules hide " << hidden.areas.size() << " area(s), "
+                         << hidden.dungeons.size() << " dungeon(s), " << hidden.missions.size() << " mission(s)";
+            }
+        }
+
+        LOG_INFO << "PermitPlace: channels — " << std::count(buckets.normal.begin(), buckets.normal.end(), '{')
+                 << " normal row(s), " << std::count(buckets.special.begin(), buckets.special.end(), '{')
+                 << " special, " << std::count(buckets.ml.begin(), buckets.ml.end(), '{') << " ML";
+    }
+
+    // All three keys, always — an empty array never reaches readParam, so a
+    // partition with nothing in it simply is not cleared, which is correct.
+    std::string out;
+    out.reserve(buckets.normal.size() + buckets.special.size() + buckets.ml.size() + 64);
+    out += R"("yXNM8kL3":[)";  out += buckets.normal;  out += ']';
+    out += R"(,"Y73tHKS8":[)"; out += buckets.special; out += ']';
+    out += R"(,"Y73mHKS8":[)"; out += buckets.ml;      out += ']';
+    co_return out;
+}
+
+void injectPermitPlace(std::string& body, const std::string_view permit)
+{
+    // THREE keys, not one.  PermitPlaceResponse::readParam @0x13E8E28 clears
+    // removeNormalObjects, PermitPlaceSpResponse removeSpecialObjects and
+    // PermitPlaceMLResponse removeMLObjects -- three disjoint partitions of one
+    // client list, so a snapshot that only sends the first can only ever
+    // replace the third of the rows that happens to be normal.  The ctor
+    // @0x126B3BC defaults enterable to true.  Keep exactly one entity ID per
+    // row and explicit closed parades.
+    //
+    // The two extra keys are spliced by REMOVING the response's own empty
+    // placeholders first, so a body that never had them (older response types)
+    // still works and no key is ever emitted twice.
+    static constexpr std::string_view normalEmpty  = R"("yXNM8kL3":[])";
+    static constexpr std::string_view specialEmpty = R"(,"Y73tHKS8":[])";
+    static constexpr std::string_view mlEmpty      = R"(,"Y73mHKS8":[])";
+
+    if (!permit.starts_with(R"("yXNM8kL3":[)") || !permit.ends_with(']'))
+        throw std::runtime_error("Invalid PermitPlace snapshot");
+
+    // Drop the serialiser's empty SP/ML fields wherever they appear; the
+    // snapshot carries its own copies of both.
+    for (const auto placeholder : { specialEmpty, mlEmpty })
+    {
+        const auto at = body.find(placeholder);
+        if (at != std::string::npos)
+            body.erase(at, placeholder.size());
+    }
+
+    const auto pos = body.find(normalEmpty);
+    if (pos == std::string::npos
+        || body.find(normalEmpty, pos + normalEmpty.size()) != std::string::npos)
+        throw std::runtime_error("Invalid PermitPlace response placeholder");
+    body.replace(pos, normalEmpty.size(), permit);
+}
+}

@@ -1,0 +1,9 @@
+json ExcludedDungeonMissionMst {
+    doc TODO
+
+    field id type="i32::str" {
+        key "j28VNcUW"
+        doc "TODO"
+    }
+
+}

@@ -1,0 +1,183 @@
+json BannerClickEntry {
+    doc "The banner that was tapped -- the Pk5F1vhx group of BannerClickRequest::createBody @0x1C787B8, one node carrying one id through the std::string addParam overload.  The group key is the same hash BannerInfoMst travels under, so the two join directly."
+
+    field banner_id type="str" {
+        key "oL71Fz3a"
+        doc "BannerInfoMst id of the banner the player tapped."
+    }
+}
+
+json BannerClickReq {
+    doc """
+    BannerClick (GroupId a5k36D28, AES key a63Ghbi2) -- sent by
+    BannerLinkTopScene::sendBannerClickRequest @0x1E87D5C when a banner on the
+    link screen is tapped.
+
+    It is a TELEMETRY ping: the scene does not wait on anything in the reply, it
+    opens the banner's link itself.  Registering it costs nothing and stops an
+    unhandled GroupId from closing the session mid-tap.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field banners type="[BannerClickEntry]" {
+        key "Pk5F1vhx"
+        doc "The banner tapped."
+    }
+}
+
+json BannerClickResp {
+    doc "Acknowledgement only.  The scene reads nothing back; see BannerClickReq."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+}
+
+json NoticeListReq {
+    doc """
+    NoticeList (GroupId 5s4aVWfc, AES key miMBpUZ3) -- the in-game notice board.
+    NoticeListRequest::createBody adds nothing past the identity envelope.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json NoticeEntry {
+    doc """
+    One notice (wrapper Nq12W9wY, NoticeListMstResponse, readParam @0x13E69FC --
+    a REPLACE list).  Every field here has a surviving setter, so the map is
+    exact rather than inferred.
+
+    No notice data was ever dumped, so this fork sends none; the struct exists so
+    that authoring a board later is a data job rather than a decode job.
+    """
+
+    field notice_id type="i32::str" {
+        key "xJNom6i0"
+        doc "setNoticeID."
+    }
+
+    field notice_type type="i32::str" {
+        key "Hl7S4ldK"
+        doc "setNoticeType."
+    }
+
+    field new_flag type="i32::str" {
+        key "nZbx2gSs"
+        doc "setNewFlag -- the NEW badge on the row."
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "setDispOrder.  Same hash/name as every other ordered list."
+    }
+
+    field title type="str" {
+        key "yEi6I3nF"
+        doc "setTitle."
+    }
+
+    field summary type="str" {
+        key "VqvBaR9c"
+        doc "setSummary -- the line under the title."
+    }
+
+    field template_name type="str" {
+        key "siJO7S1H"
+        doc "setTemplateName -- which layout renders the body."
+    }
+
+    field display_date type="str" {
+        key "vGM4sH3T"
+        doc "setDisplayDate."
+    }
+
+    field special_flag type="i32::str" {
+        key "Accu0uPe"
+        doc "setSpecialFlag."
+    }
+
+    field contents_id type="i32::str" {
+        key "8kdHvj5F"
+        doc "setContentsID -- the body the template pulls in."
+    }
+}
+
+json NoticeReadEntry {
+    doc "Which notices this player has read (wrapper CihCiL05, NoticeUserNoticeInfoResponse, readParam @0x13E7A48 -- a MERGE list, every setter inlined)."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "ID of the user for this session."
+    }
+
+    field notice_id type="i32::str" {
+        key "I986MdjX"
+        doc "The notice.  // UNVERIFIED (named from position): no setter name survives."
+    }
+
+    field read_flag type="i32::str" {
+        key "T134tP4K"
+        doc "Read state.  The same key NoticeReadUpdateRequest sends back, which is what identifies it."
+    }
+}
+
+json NoticeListResp {
+    doc """
+    The notice board.  Both lists go out empty: no notice data was ever dumped
+    for this fork, and an empty array never reaches readParam, so the client
+    keeps its own (empty) list rather than being told something false.
+
+    Registering the handler is the point -- an unhandled GroupId closes the
+    session, which on the notice screen looks like a crash.
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field notices type="[NoticeEntry]" {
+        key "Nq12W9wY"
+        doc "The board.  Empty here."
+        optional #true
+    }
+
+    field read_state type="[NoticeReadEntry]" {
+        key "CihCiL05"
+        doc "Which of them this player has read.  Empty here."
+        optional #true
+    }
+}
+
+json NoticeReadUpdateReq {
+    doc "NoticeReadUpdate (GroupId cuKwx5rF, AES key o2rhxCmg) -- the player opened a notice.  createBody sends the OnWEVMLa group with T134tP4K."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field read type="[NoticeReadEntry]" {
+        key "OnWEVMLa"
+        doc "The notice being marked read."
+        optional #true
+    }
+}
+
+json NoticeReadUpdateResp {
+    doc "Acknowledgement.  Nothing is stored: with no board there is nothing to mark."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+}

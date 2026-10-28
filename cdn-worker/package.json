@@ -1,0 +1,19 @@
+{
+  "name": "cdn-worker",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jpeg-js": "0.4.4",
+    "miniflare": "5.20261012.0-beta",
+    "pngjs": "7.0.0",
+    "wrangler": "^4.151.0"
+  }
+}

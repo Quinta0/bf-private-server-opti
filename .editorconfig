@@ -1,0 +1,51 @@
+# EditorConfig: https://editorconfig.org
+# Matches the conventions already used in the tree. Files inside the
+# vendored server/packet-generator directory follow that project's own settings.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# C++ game server (tabs, as upstream decompfrontier/server)
+[*.{c,cc,cpp,cxx,h,hh,hpp,hxx,inl}]
+indent_style = tab
+tab_width = 4
+
+# Python (tools, server scripts)
+[*.py]
+indent_size = 4
+
+# Web: Workers, static site
+[*.{js,mjs,cjs,css,html}]
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+# JSON indentation varies by file (2 or 4); npm manifests use 2
+[{package.json,package-lock.json,*.jsonc}]
+indent_size = 2
+
+# Shell, PowerShell, CMake
+[*.{sh,ps1,cmake}]
+indent_size = 4
+
+[CMakeLists.txt]
+indent_size = 4
+
+[{Makefile,*.mk}]
+indent_style = tab
+
+# Markdown uses trailing double spaces for hard line breaks
+[*.{md,MD}]
+trim_trailing_whitespace = false
+
+# Tab-separated data must keep its tabs
+[*.tsv]
+indent_style = tab
+trim_trailing_whitespace = false

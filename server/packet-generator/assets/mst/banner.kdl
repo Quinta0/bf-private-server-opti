@@ -1,0 +1,97 @@
+str-enum BannerOperativeSystem {
+    doc "Types of operative systems"
+
+    // TODO: discover the others
+    variant Android {
+        doc "Android System"
+        value "2"
+    }
+}
+
+json BannerInfoMst {
+    doc "Banner configuration in the links page"
+
+    field id type="i32::str" {
+        doc "ID of the banner"
+        key "oL71Fz3a"
+    }
+
+    field page_type type="str" {
+        key "LM34kfVC"
+        doc "This parameter seems unused in the last version of the game"
+        optional #true
+    }
+
+    field name type="str" {
+        key "NyYKc1A5"
+        doc "Internal name of the banner"
+     }
+
+    field target_os type="[BannerOperativeSystem]::sep(comma)" {
+        key "aL70hVYQ"
+        doc "List of operative systems allowed"
+    }
+
+    field display_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Order which to display the banner"
+    }
+
+    field url type="str" {
+        key "jsRoN50z"
+        doc "TODO"
+    }
+
+    field image type="str" {
+        key "1gDkL6XR"
+        doc "URL of the image to display"
+    }
+
+    field param type="str" {
+        key "t5R47iwj"
+        doc "TODO"
+    }
+
+    field read_count type="i32::int" {
+        key "d36D1g8T"
+        doc "Number of times the page was read"
+    }
+}
+
+json InteractiveBannerInfoMst {
+    doc "TODO"
+
+    field id type="i32::str" {
+        key "XIvaD6Jp"
+        doc "TODO"
+    }
+
+    field name type="str" {
+        key "s35idar9"
+        doc "TODO"
+    }
+
+    field banner_image type="str" {
+        key "b38adb8i"
+        doc "TODO"
+    }
+
+    field param type="str" {
+        key "t5R47iwj"
+        doc """
+        Click routing parameter.
+        For summon routing, use `1,<gacha_category_id>,<gacha_id>`.
+        Example: `1,1,11960` opens gacha id 11960 through category id 1.
+        """
+    }
+
+    field start_date type="datetime" {
+        key "qA7M9EjP"
+        doc "TODO"
+    }
+
+    field end_date type="datetime" {
+        key "SzV0Nps7"
+        doc "TODO"
+    }
+}

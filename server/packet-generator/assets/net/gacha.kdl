@@ -1,0 +1,37 @@
+json GachaActionInfo {
+    doc "Summon action payload sent when the player pulls on a summon gate."
+
+    field gacha_id type="u32::str" {
+        key "7Ffmi96v"
+        doc "Selected summon gate id."
+    }
+
+    field request_count type="u32::str" {
+        key "a329kbl8"
+        doc "Number of summon pulls requested by the client."
+    }
+
+    field using_gacha_ticket type="u32::str" {
+        key "324b023k"
+        doc "What pays for the pull, UserState::usingGachaTicket: 0 = the gate's currency, 1 = the plain summon-ticket counter, 2 = the gate's own SummonTicketV2Mst tickets.  SummonsDetailScene::touchBegan @0x16A7F08-0x16A812C sends 2 on a gate that has V2 types and 1 on any other, so this is not a bool: \"2\" failed bool::str."
+    }
+}
+
+json OpeUserUnitInfo {
+    doc "Summon result metadata consumed by the summon animation scene."
+
+    field user_unit_id type="u32::str" {
+        key "edy7fq3L"
+        doc "Owned unit id selected for the summon result animation."
+    }
+
+    field change_rate_info type="str" {
+        key "g30VnzQh"
+        doc "Gacha change-rate info string. Leave empty until understood."
+    }
+
+    field gacha_effect_id type="u32::str" {
+        key "u0vkt9yH"
+        doc "Summon animation effect id selected from GachaEffectMst."
+    }
+}

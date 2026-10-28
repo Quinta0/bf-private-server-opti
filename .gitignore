@@ -1,0 +1,93 @@
+# Root ignore rules. server/, cdn-worker/ and site/ carry their own
+# .gitignore files for component-specific build output.
+
+# ---------------------------------------------------------------------------
+# Secrets: never commit keys, certificates, tokens or local env files
+# ---------------------------------------------------------------------------
+# APK signing keystore, private root CA and server certificate keys
+/signing/
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+# Worker / deploy tokens and local env files
+.upload-token
+.mst-publish-token
+.dev.vars
+.dev.vars.*
+*.env
+.env
+.env.*
+# Example files are documentation and stay tracked
+!.env.example
+!*.env.example
+!.dev.vars.example
+
+# ---------------------------------------------------------------------------
+# Game binaries, data and art: not ours to redistribute (this repo is code only)
+# ---------------------------------------------------------------------------
+*.apk
+/re/lib/
+/re/full.s
+/re/work/
+/re/notes/libgame.strings
+/server/deploy/mst/
+/server/deploy/archive/
+/server/deploy/balance-overlays/
+/server/deploy/balance-content/
+/site/public/assets/
+
+# ---------------------------------------------------------------------------
+# Runtime data: save databases, logs, backups
+# ---------------------------------------------------------------------------
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3
+*.sqlite.gz
+/logs/
+/backups/
+/server/deploy/log/
+/server/deploy/game_content/
+/server/deploy/gme.sqlite*
+
+# ---------------------------------------------------------------------------
+# Build output and caches
+# ---------------------------------------------------------------------------
+/build/
+/wt/
+out/
+dist/
+/.vcpkg-downloads/
+/server/packet-generator/target/
+
+# Node / Cloudflare Workers
+node_modules/
+.wrangler/
+npm-debug.log*
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Editors and operating systems
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini

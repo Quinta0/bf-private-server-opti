@@ -1,0 +1,95 @@
+{
+    // The TEST game server (compose service game-test): prod/config.json
+    // with its own host name, save file, one IO thread and its own balance folder. Keep every
+    // other setting as in config.json, so the test server behaves like live.
+    // Server listener for Docker: bind all interfaces inside the container (host port mapping decides exposure)
+    "listeners": [
+        {
+            "address": "0.0.0.0",
+            "port": 9960,
+            "https": false,
+            "use_old_tls": true,
+            "key": "bf.pem",
+            "cert": "bf.crt"
+        }
+    ],
+    // Drogon app configuration
+    "app": {
+        // One IO thread: a handful of testers, and compose caps this container at one CPU
+        // (prod runs 4, ticket #71).
+        "number_of_threads": 1,
+        "log": {
+            "log_level": "INFO"
+        },
+        // session
+        "enable_session": true,
+        "session_timeout": 1200,
+        // document root
+        "document_root": "./game_content",
+        // game_content is mounted read-only; keep drogon's upload scratch dir elsewhere
+        "upload_path": "/tmp/bf-uploads"
+    },
+    // Configure sqlite database
+    "db_clients": [
+        {
+            "name": "default", // DO NOT CHANGE THIS NAME OR THE CODE MIGHT NOT WORK!!
+            "rdbms": "sqlite3", // you can use pgsql or mysql if you want a complex deploy
+            "host": "127.0.0.1",
+            "port": 0,
+            "dbname": "gme",
+            "user": "",
+            "passwd": "",
+            "is_fast": false, // use DbClient
+            "connection_numbr": 1,
+            // In the test volume prod_bf-test-data; bf-test-refresh replaces it with a copy of live.
+            "filename": "/data/gme-test.sqlite"
+        }
+    ],
+    "plugins": [
+        {
+            // main plugin: the game server (do not remove this one)
+            "name": "GimuServer",
+            "dependencies": [],
+            "config": {
+                "extra_log": { 
+                    "enable": false, // per-request dump files are for local debugging only
+                    "directory": "/data/log", // inside the test volume
+                    "http_log_prefix": "http_log",
+					"http_log_suffix": ".log",
+                    "dlc_error_log_name": "dlc_404.log"
+                },
+                "server": {
+                    "wallpaper_banner": "/wallpaper/title_logo20151028.jpg", // login wallpaper
+                    "game_version": 21900, // game version (must be this one or it might cry about an update)
+                    // Host[:port] the client is told to use in /dls (Android: via adb reverse, or the Mac's LAN IP)
+                    // The test APK's host (patch_apk.py --host test.example.com --https): Caddy's
+                    // https://test.example.com site, whose certificate names this host.
+                    "public_host": "test.example.com",
+                    // Assets and table parts come from the same CDN as live: the test server has no art,
+                    // and its own table versions sit 500000 above live's, so they never collide in R2.
+                    "resource_host": "cdn.example.com",
+                    "notice_url": "http://ios21900.bfww.gumi.sg/pages/versioninfo", // notice url (this points to a drogon orm page)
+                    "mst_root": "./mst", // Decoded MST tables (read-only reference data)
+                    "system_root": "./system", // Server config + response fixtures that are NOT MSTs
+                    "archive_root": "./archive", // Server-owned curated archive data directory
+                    // The test server's own overlay folder: host /opt/bf/test/balance mounted
+                    // read-only at /app/balance. Never point it at live's /opt/bf/prod/balance.
+                    "balance_root": "./balance",
+					"initial_level": 1,
+					"initial_free_gems": 5,
+					"initial_zel": 10000000,
+					"initial_karma": 10000000,
+					"initial_bcoins": 0,
+					// Client render-loop cap delivered to the offline-proxy via
+					// GET /offline_mod/fps_cap. 0 disables the client-side cap.
+					"fps_cap": 60,
+					// Vortex weekday rotation: when true, Sat/Sun open every
+					// weekday dungeon instead of only 100300 "Garden of God".
+					// The shipped MST only describes the latter, so this is off
+					// by default -- flip it for the remembered live behaviour.
+					"vortex_weekend_opens_all": false
+                }
+            }
+        }
+    ]
+}

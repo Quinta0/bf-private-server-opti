@@ -1,0 +1,127 @@
+json DailySpinSpace {
+    doc """
+    One space on the Daily Spin wheel.
+
+    Stored in the Global wiki's column order
+    (https://bravefrontierglobal.fandom.com/wiki/Daily_Spin), which the wiki
+    labels red/blue/green/yellow/gray/purple.
+
+    ⚠ THOSE COLOUR NAMES ARE THE WIKI'S, NOT THE CLIENT'S WEDGE POSITIONS.
+    setupSpinWheelRewards @0xE52B40 assigns each row an angle by its index
+    within the group, from a 5-entry table at 0x230FDE4 - 60/120/180/240/300
+    degrees - and index 0 skips the load entirely, keeping the pre-zeroed 0
+    degrees.  So group index 0 is drawn at the POINTER (the top, which the
+    artwork colours blue), not at the wiki's red column.  What matters is that
+    this array is in the same ORDER as the client's group rows; the colours are
+    only a naming convention carried over from the source table.
+
+    This table exists ONLY so the server can award the prize.  What the player
+    SEES is drawn from the client's own F_SG_DAILYLOGIN_REWARDS_MST.
+
+    ⚠ IT IS NO LONGER TRANSCRIBED FROM THE WIKI, AND MUST NOT BE AGAIN.  The
+    client caches that very table under LocalState as Ver14_ni16xAsw.dat, and
+    tools/gen_daily_spin_archive.py decrypts it and regenerates this file from
+    it - so the two tables are now the SAME data rather than two readings of
+    one page.  The wiki version was wrong in three ways at once, each of which
+    reached a player: the ids are 1-based not 0-based, there are 32 groups not
+    29, and every space carries a rate the uniform draw was ignoring.
+    """
+
+    field kind type=str {
+        key "kind"
+        doc """
+        How to award this space: gem, karma, zel, ticket, item or unit.
+
+        These route onto the primitives the server already has rather than
+        introducing another reward switch (handbook 7.13): gem/karma/zel/ticket
+        are userinfo columns, item is gme::addUserItem and unit is
+        gme::addUserUnit.
+        """
+    }
+
+    field name type=str {
+        key "name"
+        doc "Human-readable prize name, straight from the wiki table.  Used in logs so a mis-set space is legible without resolving ids."
+    }
+
+    field id type="u32::int" {
+        key "id"
+        doc "item_mst or unit_mst id for kind=item / kind=unit.  Zero and ignored for the currency kinds, which carry their amount in count."
+    }
+
+    field count type="u32::int" {
+        key "count"
+        doc "Quantity awarded."
+    }
+
+    field rate_x100 type="u32::int" {
+        key "rate_x100"
+        doc """
+        Chance of this space in HUNDREDTHS OF A PERCENT, so 32.00% is 3200 and
+        a group's six sum to 10000.  From `ug9xV4Fz` in the client's table.
+
+        Stored scaled rather than as a float on purpose.  The client gives the
+        rate to exactly two decimal places, so hundredths are exact and the
+        weighted draw is integer arithmetic end to end - no rounding to argue
+        about, and no dependence on which floating-point type the generator's
+        `pkg::float64` resolves to (it degrades to `long double` on MSVC, which
+        glaze refuses to parse).
+
+        ⚠ THE DRAW IS WEIGHTED, NOT UNIFORM.  The server picked a space with a
+        flat RandomUInt(0, 5) until 2026-09-20, which handed out the 1-percent
+        Gem as often as the 32-percent Karma - a sixfold inflation of the
+        rarest prize on the wheel, on the one reward that gates summoning.
+        """
+    }
+
+    field available type="bool::bool" {
+        key "available"
+        doc """
+        False when the prize has no id in the MST tables we hold.
+
+        Now always true: reading the table out of the client resolved the nine
+        rewards the wiki transcription could not place (the Mecha Gods, Burst
+        Emperor, Almighty Imp Arton and Crescent Dew), because the client names
+        them by id rather than by English name.  The field stays because the
+        grant path must still refuse to award id 0 if a future table drifts.
+        """
+    }
+}
+
+json DailySpinDay {
+    doc """
+    One group of the Daily Spin table, which for groups 1-31 is one cycle day.
+
+    The client's table holds 32 groups.  Days 1-28 climb; groups 29, 30 and 31
+    are byte-identical and are the wiki's "Day 29+" resting row; group 32 is six
+    Gems and is the GUARANTEED-GEM wheel, not a 32nd day - see GEM_GROUP in
+    tools/gen_daily_spin_archive.py for the evidence and for what would
+    disprove it.
+    """
+
+    field day type="u32::int" {
+        key "day"
+        doc "Group number, 1-based.  For 1-31 this is also the cycle day."
+    }
+
+    field guaranteed_gem_on_first_spin type="bool::bool" {
+        key "guaranteed_gem_on_first_spin"
+        doc """
+        True on days 7, 14, 21 and 28, where the live game guaranteed 1 Gem on
+        the first spin of the day regardless of where the wheel stopped.
+
+        A rule layered on top of the six spaces, not a seventh space - and on
+        those days the server points the client at group 32, whose every space
+        is a Gem, so the wheel it draws agrees with the prize it pays.
+        """
+    }
+
+    field spaces type="[DailySpinSpace]" {
+        key "spaces"
+        doc """
+        The six spaces, in the client's group-row order - which is the wiki's
+        column order, and NOT its colour layout.  Index 0 is whatever the wheel
+        draws under the pointer.  See DailySpinSpace for why the two differ.
+        """
+    }
+}

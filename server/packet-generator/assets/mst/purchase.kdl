@@ -1,0 +1,29 @@
+// F_PURCHASE_AGE_LIMIT_MST — the age-banded spending cap applied to real-money
+// purchases (a Japanese-market compliance table).  Ported 2026-07-19 from
+// 2-mst-decoded to deploy/system/purchase_age_limit_mst.json; the wrapper key
+// is the struct's `hash`, sourced from response_mappings.json (mst_responses,
+// PurchaseAgeLimitMstResponse).
+//
+// Note the third column ships as the literal friendly key "P_AMOUNT_LIMIT"
+// rather than an 8-char wire hash — the only un-hashed column in the whole
+// port pass, so it is NOT a mis-decode; the client sends it verbatim.
+
+json PurchaseAgeLimitMst {
+    doc "Monthly purchase cap by age band (wrapper hash UVz5cuZ4, PurchaseAgeLimitMstResponse).  3 rows: 0-13, 14-17, 18-19."
+    hash "UVz5cuZ4"
+
+    field age_from type="i32::str" {
+        key "zXckdA51"
+        doc "Lower bound of the age band (0/14/18), inclusive."
+    }
+
+    field age_to type="i32::str" {
+        key "N8Yet5kA"
+        doc "Upper bound of the age band (13/17/19), inclusive."
+    }
+
+    field amount_limit type="i32::str" {
+        key "P_AMOUNT_LIMIT"
+        doc "Spend cap for the band (3000/10000/50000, presumably yen per month).  Literal friendly key, not a wire hash — see the file header."
+    }
+}

@@ -1,0 +1,31 @@
+
+// NpcMessageOverwriteInfo — mapped 2026-09-15 with tools/readparam_map.py.
+//
+// NpcMessageOverwriteInfoResponse::readParam @0x13E8034 accepts all three keys
+// below.  Nothing on this server fills this struct.
+//
+// A first pass of this file claimed two of the three were NOT accepted.  That
+// was wrong, and the cause is worth keeping: readParam has two dispatch shapes
+// -- `cbz w0,<handler>` (jump to the handler on match) and `cbnz w0,<skip>`
+// (fall THROUGH into it on match) -- and the tool only knew the first, so a
+// class built the second way reported only its last key.  A silent
+// under-report is the worst kind, because the missing keys never appear to be
+// questioned.
+json NpcMessageOverwriteInfo {
+    doc "NPC message override — name, message and an expiry.  Read by the client; nothing fills it server-side yet."
+
+    field name type="str" {
+        key "s35idar9"
+        doc "setName — vtable +0x30.  Named 2026-09-15 from readParam @0x13E8034."
+    }
+
+    field message type="str" {
+        key "ZC0msu2L"
+        doc "setMessage — vtable +0x40.  The override text itself.  Note this key doubles as the envelope's error-message field in a GmeError block; same key, different context."
+    }
+
+    field limit_time type="i32::int" {
+        key "VDKB0Y5h"
+        doc "setLimitTime(long).  When the override expires.  // UNVERIFIED: epoch seconds vs a duration — the setter takes a long and nothing fills it yet to compare against."
+    }
+}

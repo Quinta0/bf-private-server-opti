@@ -1,0 +1,94 @@
+bf-private-server
+=================
+
+An unofficial, non-commercial Brave Frontier (client v2.19.6) private-server
+revival. Except where noted below, the code in this repository is released
+under the GNU Affero General Public License, version 3 or (at your option) any
+later version. See LICENSE (repository root) and server/LICENSE.
+
+
+Disclaimer
+----------
+
+This is an unofficial fan project. It is not affiliated with, endorsed by,
+sponsored by or associated with gumi Inc., Alim Co., Ltd. or any of their
+affiliates. "Brave Frontier" and all related names, characters, artwork and
+marks are trademarks or registered trademarks of their respective owners. They
+are used here only to identify the game this software interoperates with.
+
+This repository contains source code only. It does not contain or distribute
+the game client, game data tables, archives, art, audio or any other game
+assets. Obtain the game data separately. The project exists for preservation,
+interoperability and educational purposes.
+
+
+Upstream projects
+-----------------
+
+The game server in server/ is a fork of a fork:
+
+  decompfrontier/server
+    The original "Decompfrontier Server" C++ game-server emulator for Brave
+    Frontier v2.19.6, part of the Brave Frontier Offline Mod effort, itself
+    inspired by the earlier GimuFrontier C# proof of concept.
+    License: AGPL-3.0-or-later.
+    Contributors to the upstream history include Arves100, Evan Martine,
+    Si Yuan He and Tom2096.
+    https://decompfrontier.github.io/
+
+  Seltraeh/server
+    Fork of decompfrontier/server that this repository's server/ tree is
+    based on, maintained by Seltraeh.
+    License: AGPL-3.0-or-later.
+    https://github.com/Seltraeh/server
+
+  Seltraeh/packet-generator
+    Rust build-time packet/schema code generator by Seltraeh and the
+    upstream packet-generator authors. Vendored in this repository as
+    server/packet-generator: a fork with project-specific schema changes.
+    License: Mozilla Public License 2.0, which applies to the files in that
+    directory (see server/packet-generator/LICENSE).
+    https://github.com/Seltraeh/packet-generator
+
+All changes made in this repository on top of those projects are released
+under the same AGPL-3.0-or-later terms, except changes to files in
+server/packet-generator, which remain under MPL-2.0.
+
+
+Third-party libraries
+---------------------
+
+The following libraries are not vendored in this repository. They are fetched
+at build or install time by their package managers (vcpkg for the server, pip
+for the Python tools, npm for the Workers' development tooling) and remain under
+their own licenses:
+
+  Server (server/vcpkg.json)
+    Drogon (with Trantor) ........ MIT License
+    Crypto++ ..................... Boost Software License 1.0
+    SQLite ....................... Public domain
+    glaze ........................ MIT License
+
+  Server release package
+    Howard Hinnant's date library  MIT License; its notice is kept in
+                                   server/packaging/date-LICENSE.txt and is
+                                   installed into the portable release ZIP
+                                   together with the vcpkg dependency notices
+                                   (server/packaging/Install.cmake).
+
+  Python tools (installed by the user)
+    PyCryptodome ................. BSD 2-Clause / public domain (see project)
+
+  Cloudflare Workers tooling (cdn-worker/package.json, devDependencies only)
+    wrangler, miniflare, pngjs, jpeg-js: see each package's license.
+
+
+Community data sources
+----------------------
+
+Some tools read publicly available community data at run time. That data is
+not included in this repository and is subject to its own terms:
+
+  - BluuArc's Brave Frontier archive (game content served by the server).
+
+Thanks to everyone who preserved the game's data and documented its behaviour.

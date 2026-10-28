@@ -1,0 +1,161 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 4,
+        "minor": 0,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "default-base",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "displayName": "Default basic config",
+            "description": "General basic configuration to inherit",
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "hidden": true
+        },
+        {
+            "name": "default-debug",
+            "displayName": "Config Debug",
+            "description": "General default debug configuration (single-config generators only)",
+            "inherits": "default-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "hidden": true
+        },
+        {
+            "name": "default-release",
+            "displayName": "Config Release",
+            "description": "General default release configuration (single-config generators only)",
+            "inherits": "default-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            },
+            "hidden": true
+        },
+        {
+            "name": "debug-win64",
+            "displayName": "Development config for Windows (Ninja Multi-Config)",
+            "description": "Multi-config (Debug + Release) build for Windows x64. Must be run from an x64 Native Tools environment (VsDevCmd.bat -arch=amd64 -host_arch=amd64) so the x64-hosted cl.exe is on PATH. Do NOT set CMAKE_C/CXX_COMPILER here \u2014 let CMake find the compiler from the environment so it inherits the correct host/target architecture.",
+            "inherits": "default-base",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "GIMUSRV_FRONTEND": {
+                    "type": "STRING",
+                    "value": "STANDALONE"
+                },
+                "VCPKG_TARGET_TRIPLET": {
+                    "type": "STRING",
+                    "value": "x64-windows"
+                }
+            }
+        },
+        {
+            "name": "debug-lnx64",
+            "displayName": "Development config for Linux (64-bit)",
+            "inherits": "default-debug",
+            "generator": "Ninja",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "GIMUSRV_FRONTEND": {
+                    "type": "STRING",
+                    "value": "STANDALONE"
+                },
+                "VCPKG_TARGET_TRIPLET": {
+                    "type": "STRING",
+                    "value": "x64-linux"
+                }
+            }
+        },
+        {
+            "name": "release-win32",
+            "displayName": "Deployment for Brave Frontier for Windows (APPX)",
+            "description": "Multi-config build producing the APPX-embedded server. Requires running from a Developer Command Prompt for Visual Studio.",
+            "inherits": "default-base",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "GIMUSRV_FRONTEND": {
+                    "type": "STRING",
+                    "value": "PROXYAPPX"
+                },
+                "VCPKG_TARGET_TRIPLET": {
+                    "type": "STRING",
+                    "value": "x86-windows-static"
+                }
+            }
+        },
+        {
+            "name": "standalone-release-win64",
+            "displayName": "Portable Windows x64 standalone release",
+            "inherits": "default-base",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "GIMUSRV_FRONTEND": "STANDALONE",
+                "VCPKG_TARGET_TRIPLET": "x64-windows",
+                "GIMU_ENABLE_DEBUG_CLI": false
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug-win64-debug",
+            "configurePreset": "debug-win64",
+            "configuration": "Debug"
+        },
+        {
+            "name": "debug-win64-release",
+            "configurePreset": "debug-win64",
+            "configuration": "Release"
+        },
+        {
+            "name": "release-win32-debug",
+            "configurePreset": "release-win32",
+            "configuration": "Debug"
+        },
+        {
+            "name": "release-win32-release",
+            "configurePreset": "release-win32",
+            "configuration": "Release"
+        },
+        {
+            "name": "debug-lnx64",
+            "configurePreset": "debug-lnx64"
+        },
+        {
+            "name": "standalone-release-win64",
+            "configurePreset": "standalone-release-win64",
+            "configuration": "Release",
+            "targets": [
+                "gimuserverw"
+            ]
+        }
+    ]
+}

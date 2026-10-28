@@ -1,0 +1,195 @@
+// F_FROGATE_* — the Frontier Gate subsystem: the gate/floor catalog and the
+// support-effect table.  2 of the cluster's 4 tables ported 2026-07-19 from
+// 2-mst-decoded to deploy/system/frontier_gate*.json; wrapper keys are each
+// struct's `hash`, sourced from response_mappings.json (mst_responses,
+// response_class noted per struct).  F_FROGATE_REWARD_MST and
+// F_FRONTIER_GATE_AREA_MST remain unported — neither has a response class in
+// the export (see tools/MST_PORTING_BACKLOG.md).
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (94/61 rows).  This cluster mixes localised English rows with
+// untranslated Japanese ones — both appear in `name`/`description`.
+//
+// Separator caution: `qA7M9EjP`/`SzV0Nps7` are RAW UNIX SECONDS here, and
+// they carry -62169984000 (year 1, the "no date" sentinel) on 30 rows.  That
+// rules out the `datetime-unix` type, whose helper parses into a uint64 and
+// would reject the negative — so these stay i64.  The same hashes are
+// datetime STRINGS in mst/guild.kdl.
+
+json FrontierGateMst {
+    doc "Frontier Gate catalog (wrapper hash olzMKWSZ, FrontierGateSgMstResponse — the only FrontierGate*Mst class; the \"Sg\" qualifier is undeciphered, // UNVERIFIED: confirm via IDA before an FG handler consumes it).  94 rows."
+    hash "olzMKWSZ"
+
+    field id type="i32::str" {
+        key "hBNPQAU0"
+        doc "Gate id — 1..3 for the original halls, then 200001..200015 for the later sectors."
+    }
+
+    field name type="str" {
+        key "BilJmqI0"
+        doc "Gate name — \"Hall of Challengers\", \"Breaching the Nebula\", or untranslated (\"力の証明\")."
+    }
+
+    field start_date type="i64::str" {
+        key "qA7M9EjP"
+        doc "Availability start, unix seconds (1465200000..1646208000).  -62169984000 on 30 rows = the year-1 \"no date\" sentinel, so this cannot use datetime-unix.  Same hash/name as banner.kdl (a datetime string in mst/guild.kdl)."
+    }
+
+    field end_date type="i64::str" {
+        key "SzV0Nps7"
+        doc "Availability end, unix seconds (1470031199..1880870399), same -62169984000 sentinel.  Same hash/name as banner.kdl."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Gate blurb with client markup — \"<anchor=center>Floor 41\", or a full mission briefing.  Free text; contains commas.  Same hash/name as item.kdl/gacha.kdl."
+    }
+
+    field unk1 type="i32::str" {
+        key "4N25Z87R"
+        doc "// UNVERIFIED: constant 3 across all 94 rows."
+    }
+
+    field entry_termt type="str" {
+        key "c6fVJ9qR"
+        doc "// UNVERIFIED shape: entry conditions — \"@0\" on most rows, \"3:1:6,@0\" on gated ones.  Comma list of at/colon-packed terms; kept packed because the trailing element is a bare \"@0\".  Reuses frontier_hunter.kdl's name for this hash (its typo included)."
+    }
+
+    field unk2 type="[str]::sep(comma)" {
+        key "Q1z2IFjZ"
+        doc "// UNVERIFIED: 19-element comma list of battle parameters — mostly ints, but element 14/15 are colon pairs (\"100:1000\") and the last two are decimals (\"0.1\"), so the elements stay strings."
+    }
+
+    field unk3 type="[i32::str]::sep(comma)" {
+        key "gNEbgjmh"
+        doc "// UNVERIFIED: comma pair — \"-1,-1\" on most rows, also \"0,0\" and \"50000,50000\"."
+    }
+
+    field unk4 type="[str]::sep(colon)" {
+        key "59b1eE6N"
+        doc "// UNVERIFIED: colon-separated groups, each itself a trailing-comma list (\"2,100,5000,200,10000,600,30000,1000,80000,\") — a per-floor reward/score ladder.  Empty on 45 rows; up to 638 chars."
+    }
+
+    field need_mission_id type="i32::str" {
+        key "HSRhkf70"
+        doc "Prerequisite mission (0 = none; 80000001..100016020 otherwise).  Same hash/name as sound.kdl/town.kdl (a comma list in raid.kdl)."
+    }
+
+    field unk5 type="str" {
+        key "RlFWcCqN"
+        doc "// UNVERIFIED: empty string in all 94 rows."
+    }
+
+    field unk6 type="i32::str" {
+        key "J3bZkWUt"
+        doc "// UNVERIFIED: 0/1 flag."
+    }
+
+    field dungeon_id type="i32::str" {
+        key "MHx05sXt"
+        doc "Dungeon backing this gate (0 on 16 rows; 3000001..800000015 otherwise).  Same hash/name as dungeon_key.kdl/mission.kdl."
+    }
+}
+
+json FrontierGateSupportMst {
+    doc "Frontier Gate support effects (wrapper hash uxpnA5rF, FrontierSupportMstResponse).  61 rows.  Same column layout as ColosseumSupportMst — see mst/colosseum.kdl."
+    hash "uxpnA5rF"
+
+    field id type="i32::str" {
+        key "NungTq5g"
+        doc "Support id — 100..123 for the original set, 2xxxxx for the later ones."
+    }
+
+    field name type="str" {
+        key "U7LJCqT1"
+        doc "Support name — \"Sanctioned Supplies 3\", or untranslated (\"バイタルブースト\")."
+    }
+
+    field support_type type="i32::str" {
+        key "esz3O04i"
+        doc "CONFIRMED setSupportType (readParam).  1 or 2 — splits the 1xx ids from the 2xxxxx ids, so likely a category/era flag."
+    }
+
+    field process_id type="[i32::str]::sep(at)" {
+        key "hjAy9St3"
+        doc "Effect processor ids — at-separated list, one per chained effect (\"1@33@17\", or a bare \"3\").  Same hash/name as passive_skill.kdl."
+    }
+
+    field process_param type="[str]::sep(at)" {
+        key "2Smu5Mtq"
+        doc "Effect parameters — at-separated, positionally paired with `process_id`; each element is itself a comma list (\"0,0,30,0,30@1500,2000,0@5,10,100\").  Empty on some rows.  Kept as strings because the inner list is comma-separated."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Support blurb — Japanese only, e.g. \"回復力・最大ＨＰを２０％アップ\"."
+    }
+}
+
+json FrontierGateRewardMst {
+    doc """
+    F_FROGATE_REWARD_MST — one reward a Frontier Gate pays, and what earns it.
+    1452 rows, ported 2026-09-11 to deploy/mst/frontier_gate_reward_mst.json
+    from F_FROGATE_REWARD_MST_Ver315.
+
+    NO WIRE KEY.  FrontierGateRewardMstResponse is absent from
+    GameResponseParser::getResponseObject: the client loads the table from its
+    own MST store (DataMstManager::loadFrogateRewardMst) and never receives it,
+    so the file's wrapper, "F_FROGATE_REWARD_MST", is server-side only.
+
+    Setter names from FrontierGateRewardMstResponse::readParam @0x1430C24,
+    whose setters are virtual (vtable +0x30..+0xA0 in key order) and match the
+    class's own set* symbols one for one.
+
+    ONE-TIME PER GATE.  FrontierGateRewardScene::setList @0x15F5A54 draws the
+    "obtained" mark (challeng_get.png) on a row whose getRewardID is in the
+    user's FrontierGateInfo.reward_info_list (JQ23rIvk), and hides the
+    cond_type 8001 rows, which belong to FG+.
+    """
+
+    field frogate_id type="i32::str" {
+        key "hBNPQAU0"
+        doc "setFrogateID — the gate (FrontierGateMst.id).  84 gates carry rows."
+    }
+
+    field reward_id type="i32::str" {
+        key "N1b6SUW4"
+        doc "setRewardID — kept as a string on the client and listed in reward_info_list once obtained.  Unique per gate (1..9017 on the halls, 105113.. on the event gates)."
+    }
+
+    field cond_type type="i32::str" {
+        key "Ga6qSJr0"
+        doc """
+        setCondType.  1 = floor clear: FrontierGateResultScene::rewardLabel
+        @0x15F41A8 prints CHALLENGE_FLOOR_CLEAR "Stage<floor> Cleared!!" for it.
+        2 = score: the same function prints CHALLENGE_EVALUATION_BONUS
+        "Esteem Reward".  8001 = FG+ only (filtered out of the normal gate's
+        list).  660 / 240 / 552 rows.
+        """
+    }
+
+    field cond_param type="i32::str" {
+        key "q7Nit8JW"
+        doc "setCondParam — the floor for cond_type 1 (a gate's floor rewards stop at the total of its missions' battleCount: gate 1 = 6 missions x 5 = 30), the score for cond_type 2 (100000 .. 35000000)."
+    }
+
+    field present_type type="i32::str" {
+        key "30Kw4WBa"
+        doc "setPresentType — the shared present vocabulary.  Floor and score rows use 6 unit, 4 item, 8004 event token, 3 zel, 7 sphere, 8 gem, 5 material, 8000/8001 summon tickets, 9 dungeon key."
+    }
+
+    field target_id type="str" {
+        key "TdDHf59J"
+        doc "setTargetID."
+    }
+
+    field target_cnt type="i32::str" {
+        key "wJsB35iH"
+        doc "setTargetCnt."
+    }
+
+    field target_param type="str" {
+        key "37moriMq"
+        doc "setTargetParam (StrToInt on the client).  Kept a string: the data holds \"0\", \"1:0\", \"1:0:0\", \"1:1:1029000\", the same packed form a present's target_param carries."
+    }
+}

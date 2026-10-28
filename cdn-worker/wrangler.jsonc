@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "bf-cdn",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "r2_buckets": [
+    { "binding": "ASSETS", "bucket_name": "bf-assets" }
+  ],
+  // Archive files verified identical to R2 (tools/build_cdn_static.py builds static/,
+  // not in git). Cloudflare answers these without running the Worker: static asset
+  // requests are free, Worker requests are billed per request. Anything else (later
+  // R2 uploads, aliases, placeholders, /diag) still reaches src/index.js.
+  "assets": { "directory": "./static", "html_handling": "none" },
+  "preview_urls": true,
+  "routes": [
+    { "pattern": "cdn.example.com", "custom_domain": true }
+  ],
+  "observability": { "enabled": true }
+}

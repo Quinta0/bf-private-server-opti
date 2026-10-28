@@ -1,0 +1,2282 @@
+#pragma once
+
+#include <gimuserver/archive/UnitArchiver.hpp>
+#include <gimuserver/db/PacketInterface.hpp>
+#include <gimuserver/gme/common/Energy.hpp>
+#include <gimuserver/gme/common/ExtraSkills.hpp>
+#include <gimuserver/gme/common/Town.hpp>
+#include <gimuserver/utils/AccountSecurity.hpp>
+#include <gimuserver/utils/Random.hpp>
+
+#include <drogon/orm/DbClient.h>
+
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <mutex>
+#include <optional>
+#include <random>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <charconv>
+#include <string_view>
+#include <map>
+#include <vector>
+
+namespace gme
+{
+
+/*!
+* Local user identity resolved from a Gumi Live login.
+*/
+struct UserIdentity
+{
+	std::string gumiUserId;
+	std::string userId;
+};
+
+/*!
+* Sphere capacity sentinel for user_units.eqip_item_frame_id2.
+*
+* A unit is born with ONE sphere slot.  The second is granted only by fusing a
+* Sphere Frog (unit 20302), and the client carries that capacity in the SECOND
+* SLOT'S FRAME ID rather than in any count field:
+*
+*     -1     no second slot -- the slot is not drawn at all
+*      0     slot exists, empty
+*     >0     slot exists, holding the copy in that warehouse row
+*
+* The >0 case is the worn copy's user_warehouse_rows.instance_id, for BOTH
+* slots -- the client keys "which unit wears this row" on it
+* (UserUnitInfoList::updateSphereEquipList @0x12BA7F8) and names an unchanged
+* slot's copy by it in its next ItemSphereEqp.  It was documented, and stored,
+* as the ItemMst.sphere_type until 2026-10-02; gme::syncWarehouse repairs such
+* saves.  The -1/0 sentinel below was never in question.
+*
+* CONFIRMED IN-CLIENT 2026-09-05.  UnitMixMainScene::mixUnitDoubleSphereCheck
+* @0x1C118F8 walks the material list, calls UserUnitInfoBase::getEquipItemFrameID2
+* (vtable+0x1f0) and compares the result against the literal string "-1"
+* (mov w22, #0x312d); a material that is NOT "-1" raises UNIT_MIX_CONFIRM_SPHERE,
+* "A Unit with max Sphere capacity has been selected as an Ingredient."  The
+* unit-detail scene tests the same sentinel in 14 places.  Probing one unit at
+* -1 against another left at 0 drew exactly one slot on the first, two on the
+* second.
+*
+* // WE STORED 0 FOR EVERY UNIT, so every unit read as owning both slots.  An
+* // earlier pass concluded this build had dropped sphere capacity altogether.
+* // That was wrong, and wrong in a way worth keeping: it went looking for a
+* // slot COUNT -- a capacity column, a "SphereSlot" symbol, a unit_mst field --
+* // and found none, because the capacity is not a count.  It also leaned on
+* // so_xref reporting no callers, which proves NOTHING for the virtual getters
+* // this path uses: they are reached by blr through a vtable, and no xref
+* // exists to find.  The thread that actually solved it was the in-game fusion
+* // warning above, which named the check.
+*
+* sphere_ext (UserUnitInfo::ext_count) remains the boolean record of "a frog was
+* fused"; this sentinel is what the client reads.  Every write site must keep
+* the two agreed:
+*
+*     eqip_item_frame_id2 == -1   <=>   sphere_ext == 0
+*/
+static constexpr int32_t kNoSecondSphereSlot = -1;
+
+/*!
+* One rung of DungeonKeyMst.usage_pattern.
+*
+* The pattern is '/'-separated rungs, each ':'-separated as
+*   keys_required : active_type : display_name : mission_ids : unknown
+* with mission_ids comma-separated.  Buying a rung opens exactly its missions
+* for DungeonKeyMst.limit_sec.
+*
+* keys_required is the rung's identity, not active_type: the Metal ladder gives
+* tiers 1 and 3 the SAME active_type (1), so only the spend count distinguishes
+* "Metal Parade" from "Super Metal Parade".
+*/
+struct UsagePatternTier
+{
+	int32_t keysRequired = 0;
+	int32_t activeType = 0;
+	std::vector<int32_t> missionIds;
+};
+
+/*!
+* Parses DungeonKeyMst.usage_pattern into its rungs.
+*
+* Malformed rungs are skipped rather than throwing — this is MST data we did
+* not author, and one bad rung should cost that rung, not the request.
+*/
+inline std::vector<UsagePatternTier> parseUsagePatternTiers(std::string_view pattern)
+{
+	const auto toInt = [](std::string_view text, int32_t& out) {
+		const auto* begin = text.data();
+		const auto* end = text.data() + text.size();
+		const auto result = std::from_chars(begin, end, out);
+		return result.ec == std::errc{} && result.ptr == end;
+	};
+
+	std::vector<UsagePatternTier> tiers;
+	size_t rungStart = 0;
+	while (rungStart <= pattern.size())
+	{
+		const auto slash = pattern.find('/', rungStart);
+		const auto rung = pattern.substr(
+			rungStart, slash == std::string_view::npos ? std::string_view::npos : slash - rungStart);
+		rungStart = slash == std::string_view::npos ? pattern.size() + 1 : slash + 1;
+		if (rung.empty())
+			continue;
+
+		// Split into at most five fields; the name may not contain ':'.
+		std::vector<std::string_view> parts;
+		size_t fieldStart = 0;
+		while (fieldStart <= rung.size() && parts.size() < 5)
+		{
+			const auto colon = rung.find(':', fieldStart);
+			const auto last = parts.size() == 4 || colon == std::string_view::npos;
+			parts.push_back(rung.substr(
+				fieldStart, last ? std::string_view::npos : colon - fieldStart));
+			if (last)
+				break;
+			fieldStart = colon + 1;
+		}
+		if (parts.size() < 4)
+			continue;
+
+		UsagePatternTier tier;
+		if (!toInt(parts[0], tier.keysRequired) || !toInt(parts[1], tier.activeType))
+			continue;
+
+		size_t idStart = 0;
+		const auto ids = parts[3];
+		while (idStart <= ids.size())
+		{
+			const auto comma = ids.find(',', idStart);
+			const auto text = ids.substr(
+				idStart, comma == std::string_view::npos ? std::string_view::npos : comma - idStart);
+			idStart = comma == std::string_view::npos ? ids.size() + 1 : comma + 1;
+			int32_t id = 0;
+			if (!text.empty() && toInt(text, id) && id > 0)
+				tier.missionIds.push_back(id);
+		}
+		tiers.push_back(std::move(tier));
+	}
+	return tiers;
+}
+
+/*!
+* Builds a user-unit packet from curated unit archive data.
+*
+* @param unit_id Unit id to look up in the archive.
+* @param unit_type_id Unit type to use when populating stats.
+* @return Populated packet, or std::nullopt when archive data is missing or
+* unsupported.
+*/
+inline std::optional<UserUnitInfo> fromArchivedUnit(uint32_t unit_id, uint32_t unit_type_id)
+{
+	const auto unitRecord = UnitArchiver::instance().lookup(unit_id);
+	if (!unitRecord)
+	{
+		return std::nullopt;
+	}
+
+	UserUnitInfo unit{};
+	if (!UnitArchiver::populatePacket(*unitRecord, unit_type_id, unit))
+	{
+		return std::nullopt;
+	}
+
+	return unit;
+}
+
+/*!
+* A unit form and every lower form of its evolution line (the forms that
+* evolve into it, and theirs), from UnitEvoMst.
+*
+* @param unitId Unit MST id of the form.
+* @return The form first, then its lower forms; just the form when nothing
+*         evolves into it.
+*/
+inline std::vector<uint32_t> unitFormWithLowerForms(const uint32_t unitId)
+{
+	std::vector<uint32_t> line{ unitId };
+	const auto& evo = theServer()->cache().unitEvoMst();
+	// Breadth-first down the line; the cap only guards a malformed table.
+	for (size_t i = 0; i < line.size() && line.size() < 64; ++i)
+		for (const auto& row : evo)
+			if (static_cast<uint32_t>(row.evo_unit_id) == line[i]
+				&& std::find(line.begin(), line.end(), static_cast<uint32_t>(row.unit_id)) == line.end())
+				line.push_back(static_cast<uint32_t>(row.unit_id));
+	return line;
+}
+
+/*!
+* Records a unit form in the Unit Guide (user_unit_dictionary) together with
+* every lower form of its evolution line, so a 7* reveals its 5* and 6* too
+* however it was obtained (ticket #118).
+*
+* OR IGNORE: the dictionary is one row per SPECIES, keyed (user_id, unit_id),
+* so a form already seen collides on the primary key.  A plain insert would
+* throw and take the whole grant down with it -- the dictionary is a record of
+* what you have seen, and failing to re-record it must never cost the unit.
+* The ids come from our own table, so they go into the statement as literals.
+*
+* @param database Database client or transaction to use.
+* @param userId User whose guide to update.
+* @param unitId Unit MST id of the form obtained.
+*/
+inline drogon::Task<void> recordUnitDictionary(
+	const db::Database database,
+	const std::string userId,
+	const uint32_t unitId)
+{
+	std::string values;
+	for (const auto form : unitFormWithLowerForms(unitId))
+	{
+		if (!values.empty()) values += ',';
+		values += '(' + std::to_string(form) + ')';
+	}
+	co_await database->execSqlCoro(
+		"INSERT OR IGNORE INTO user_unit_dictionary (user_id, unit_id)"
+		" SELECT $1, column1 FROM (VALUES " + values + ");",
+		userId);
+}
+
+/*!
+* Adds a user-owned unit row and updates the packet with database-owned fields.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity that owns the unit.
+* @param unit Unit packet to persist.
+* @param isNew Whether the inserted unit should be marked new for the client.
+* @return Persisted unit packet populated with database-owned fields.
+*/
+inline drogon::Task<db::InterfaceResult<UserUnitInfo>> addUserUnit(
+	const db::Database database,
+	const UserIdentity identity,
+	const UserUnitInfo unit,
+	const bool isNew = true)
+{
+	auto packet = unit;
+	packet.user_id = identity.userId;
+	packet.is_new = isNew;
+
+	// A unit arrives with ONE sphere slot unless it was handed to us already
+	// carrying the frog bit (evolution copies, archive grants).  Without this
+	// the field default-initialises to 0, which the client reads as "second
+	// slot present" -- see kNoSecondSphereSlot.
+	if (packet.ext_count == 0)
+		packet.equipitem_frame_id2 = kNoSecondSphereSlot;
+	// An Elgif whose source named no skill (a monster drop) still carries one
+	// (#38, gme/common/ExtraSkills.hpp).
+	if (packet.unit_id == static_cast<uint32_t>(kElgifUnitId) && packet.add_extra_passive_skill_id <= 0)
+		packet.add_extra_passive_skill_id = randomElgifSkill();
+	const auto result = co_await db::PacketInterfaceFor<UserUnitInfo>::insert(
+		database,
+		"user_units",
+		packet);
+
+	packet.user_unit_id = result.front<uint32_t>("user_unit_id");
+	packet.received_order = packet.user_unit_id;
+
+	// The Unit Guide: this form and every lower form of its line.
+	co_await recordUnitDictionary(database, identity.userId, static_cast<uint32_t>(packet.unit_id));
+
+	// TROPHY 100190 (total units acquired).  Every copy counts, unlike the
+	// dictionary above which is one row per species -- that is the difference
+	// between 100190 and the 100110 "units found" the dictionary answers.
+	// Inlined rather than via bumpArchiveCounters because that helper is
+	// declared further down this header.
+	try
+	{
+		co_await database->execSqlCoro(
+			"INSERT INTO user_team_archive (user_id, unit_sum_cnt) VALUES ($1, 1)"
+			" ON CONFLICT(user_id) DO UPDATE SET unit_sum_cnt = unit_sum_cnt + 1;",
+			identity.userId);
+	}
+	catch (const drogon::orm::DrogonDbException& ex)
+	{
+		// Never lose a unit over a trophy tick.
+		LOG_WARN << "addUserUnit: unit_sum_cnt: " << ex.base().what();
+	}
+
+	// The reply carries the unit as a read would (its own Extra Skill, #38):
+	// summons and drops reach the client through this packet, not a reload.
+	db::PacketReadHook<UserUnitInfo>::apply(packet);
+
+	co_return db::InterfaceResult<UserUnitInfo>{
+		.data = std::move(packet),
+		.affected = result.affected,
+	};
+}
+
+/*!
+* Queues a present in the user's present box.
+*
+* Presents are the deferred half of the reward system: the grant is recorded
+* now and the payout happens when the player claims it in the present box
+* (PresentReceipt), which is what lets the client say "Gifts have been awarded
+* to you.  Visit your presents box to receive them."
+*
+* presentType follows the same vocabulary CampaignReceipt dispatches on (wire
+* hash 30Kw4WBa): 3 = zel, 8 = gem, 6 = unit, 4/5/7 = item/material/sphere.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to grant to.
+* @param presentType What the present pays out.
+* @param targetId Rewarded entity id, interpreted per presentType ("" for currency).
+* @param targetCnt Quantity, or the currency amount.
+* @param receiptType Claim-processing selector echoed back by PresentReceipt.
+*/
+inline drogon::Task<void> addUserPresent(
+	const db::Database database,
+	const UserIdentity identity,
+	const int32_t presentType,
+	const std::string targetId,
+	const int32_t targetCnt,
+	const int32_t receiptType = 0,
+	const std::string description = {},
+	const int32_t unitExtraSkill = 0)
+{
+	const auto now = static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+		std::chrono::system_clock::now().time_since_epoch()).count());
+
+	// unitExtraSkill: the skill a unit present (an Elgif) carries, handed to the
+	// unit when the present is claimed (#38).  Not on the wire.
+	co_await database->execSqlCoro(
+		"INSERT INTO user_presents"
+		" (user_id, present_type, target_id, target_cnt, receipt_type, description, present_date,"
+		" unit_extra_skill)"
+		" VALUES ($1, $2, $3, $4, $5, $6, $7, $8);",
+		identity.userId, presentType, targetId, targetCnt, receiptType, description, now,
+		unitExtraSkill);
+
+	co_return;
+}
+
+/*!
+* Provisions this user's town: one base-level row per town facility and location.
+*
+* The town is NOT created lazily anywhere else.  UserInfo reports
+* town_facility_info / town_location_info / town_location_detail straight from
+* these two tables, and the three arrays must travel together with matching
+* cardinality or the town scene loader null-derefs (handbook §6.8).  Before this
+* existed the only writers were TownFacilityUpdate — which needs a working town
+* already — and the debug CLI's `unlocktown`, so a natural playthrough reached
+* the town with zero rows and the client crashed on entry with no server-side
+* error.  That also blocks the summon tutorial: tuto15.txt routes through
+* `change_town_top_scene` on its way to the summon gate.
+*
+* EVERY facility and location is seeded, including the ones the player has not
+* unlocked yet.  The mission gate is enforced client-side against
+* need_mission_id (MyTownTopScene::isOpen / setLocationInfo), and a location
+* with no row is skipped by the render loop outright — so withholding rows
+* hides those tiles permanently instead of locking them.  Town::locationState
+* is what keeps a locked tile inert.
+*
+* The base level is per-facility, not a flat 1: facilities 1 and 2 (sphere and
+* item synthesis) have level rows from 1, but 3-6 only ever have a lv 0 row, and
+* seeding those at 1 makes TownFacilityLvMstList::getObjectWithKey miss so the
+* upgrade screen draws an empty detail panel.
+*
+* Facilities with id >= 1000 are Event Bazaar entries the client has no bundled
+* sprites for — seeding them crashes the town scene on load (handbook §3.3), so
+* they are skipped here exactly as the CLI skips them.
+*
+* Idempotent: INSERT OR IGNORE against (user_id, facility_id) /
+* (user_id, location_id), so re-running never disturbs upgrades already made.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to provision.
+*/
+inline drogon::Task<void> provisionTown(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	const auto& init = theServer()->cache().initializeResp();
+
+	// Batched: one statement each rather than one await per row, so a fresh
+	// account does not make eleven sequential round trips on the
+	// single-connection SQLite pool (handbook §6.14).  Every value is MST data
+	// or a server-minted id, so there is no injection surface.
+	std::string facilitySql;
+	for (const auto& facility : init.town_facility)
+	{
+		if (facility.id >= 1000)
+			continue;
+
+		facilitySql += facilitySql.empty()
+			? "INSERT OR IGNORE INTO user_town_facilities (user_id, facility_id, lv) VALUES "
+			: ",";
+		facilitySql += "('" + identity.userId + "'," + std::to_string(facility.id) + ","
+			+ std::to_string(Town::facilityBaseLevel(facility.id)) + ")";
+	}
+
+	if (!facilitySql.empty())
+	{
+		co_await database->execSqlCoro(facilitySql + ";");
+	}
+
+	std::string locationSql;
+	for (const auto& location : init.town_location)
+	{
+		locationSql += locationSql.empty()
+			? "INSERT OR IGNORE INTO user_town_locations (user_id, location_id, lv) VALUES "
+			: ",";
+		locationSql += "('" + identity.userId + "'," + std::to_string(location.id) + ","
+			+ std::to_string(Town::locationBaseLevel(location.id)) + ")";
+	}
+
+	if (!locationSql.empty())
+	{
+		co_await database->execSqlCoro(locationSql + ";");
+	}
+
+	co_return;
+}
+
+/*!
+* Credits an item stack to the owning user's warehouse.
+*
+* Stacks are keyed by (user_id, item_id): a repeat drop increments item_num
+* rather than creating a second row.  Returns the resulting quantity.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity that owns the item.
+* @param itemId Item master id to credit.
+* @param quantity Amount to add (default 1).
+* @return Number of affected rows.
+*/
+inline drogon::Task<db::InterfaceResult<>> addUserItem(
+	const db::Database database,
+	const UserIdentity identity,
+	const uint32_t itemId,
+	const uint32_t quantity = 1)
+{
+	if (!database || identity.userId.empty() || itemId == 0)
+	{
+		LOG_ERROR << "Invalid addUserItem call: "
+			<< "db=" << static_cast<bool>(database)
+			<< ", user_id_empty=" << identity.userId.empty()
+			<< ", item_id=" << itemId;
+		throw std::invalid_argument("Invalid addUserItem call");
+	}
+
+	// Bump the stack if it exists, else insert a new one.  item_num accumulates
+	// rather than being replaced, so repeated grants stack.
+	co_return co_await db::DatabaseInterface::upsert(
+		database,
+		"user_items",
+		{
+			db::Data("user_id", identity.userId),
+			db::Data("item_id", itemId),
+			db::Data("item_num", quantity),
+		},
+		{ "user_id", "item_id" },
+		{ "item_num" });
+}
+
+// Call with the existing transaction during inventory mutations.
+drogon::Task<void> syncWarehouse(db::Database database, UserIdentity identity);
+drogon::Task<void> releaseWarehouseSphere(db::Database database, UserIdentity identity,
+    uint32_t unitId, int32_t slot);
+
+/*!
+* The item a request's warehouse id stands for when it is one of the client's
+* own placeholders, else nullopt.
+*
+* A row the client adds locally -- a craft (ItemMixScene::mixItem and the town,
+* Randall and accessory variants), a claimed present, a battle item taken off
+* the bar -- is named INT_MAX - itemId by GameUtils::incWarehouseItem
+* @0x118A304 (Windows build: helper at RVA 0x6E5580, inline at 0x6E5450), and
+* keeps that name until a reply carrying 9wjrh74P replaces the list.  ItemMix
+* answers {}, so a sphere crafted and then sold, locked or equipped before the
+* next such reply arrives under that name, not under its real row id.
+*
+* Only the exact INT_MAX - <an ItemMst id> form qualifies; a persistent row id
+* always wins over it (callers look the id up as a real row first).
+*/
+std::optional<int64_t> warehousePlaceholderItem(uint32_t wireId);
+
+/// A warehouse row the client has not been sent yet (see unseenWarehouseRows).
+struct UnseenWarehouseRow
+{
+    int64_t instanceId = 0;
+    int64_t count = 0;
+    bool favorite = false;
+    int64_t equipUnitId = 0;
+};
+
+/*!
+* One species' rows created since the last warehouse list the client was sent
+* (user_info.warehouse_seen_id, advanced by loadWarehouseSnapshot), oldest
+* first.  These are the copies the client still knows only by its placeholder,
+* so a placeholder is resolved among them and never to a row the client is
+* showing under its real id.
+*/
+drogon::Task<std::vector<UnseenWarehouseRow>> unseenWarehouseRows(
+    db::Database database, UserIdentity identity, int64_t itemId);
+
+/*!
+* Returns any spheres equipped on soon-to-be-consumed units to the owner's
+* warehouse.
+*
+* UnitSell / UnitMix / UnitEvo delete user_units rows (sold units, fusion
+* fodder, evo materials).  Spheres equipped on those units are owned items —
+* deleting the row without this call would destroy them silently.  Call BEFORE
+* the DELETE, with the same pre-validated integer id list its IN clause uses.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity that owns the units.
+* @param userUnitIdList Comma-joined user_unit_id list (validated integers).
+* @return How many spheres went back, so the caller knows whether the client's
+*         warehouse needs refreshing (loadWarehouseSnapshot).
+*/
+inline drogon::Task<uint32_t> returnEquippedSpheres(
+	const db::Database database,
+	const UserIdentity identity,
+	const std::string& userUnitIdList)
+{
+	if (!database || identity.userId.empty() || userUnitIdList.empty())
+		co_return 0;
+
+	// Callers hand us the same comma-joined id string their DELETE uses, so
+	// split it back into bound values rather than splicing it into SQL.  When
+	// those DELETEs move onto the typed interface this should take the id
+	// vector directly and the round trip disappears.
+	db::Values userUnitIds;
+	for (size_t start = 0; start <= userUnitIdList.size();)
+	{
+		const auto end = userUnitIdList.find(',', start);
+		const auto token = userUnitIdList.substr(
+			start, end == std::string::npos ? std::string::npos : end - start);
+		if (!token.empty())
+		{
+			userUnitIds.emplace_back(
+				static_cast<uint64_t>(std::stoull(token)));
+		}
+
+		if (end == std::string::npos)
+		{
+			break;
+		}
+
+		start = end + 1;
+	}
+
+	if (userUnitIds.empty())
+		co_return 0;
+
+	const auto result = co_await db::DatabaseInterface::read(
+		database,
+		"user_units",
+		{
+			db::Data("eqip_item_id"),
+			db::Data("eqip_item_id2"),
+			db::Data("user_unit_id"),
+			db::Lookup("user_id", identity.userId),
+			db::LookupIn("user_unit_id", userUnitIds),
+		});
+	co_await syncWarehouse(database, identity);
+	uint32_t returned = 0;
+	for (const auto& row : result.data)
+	{
+		for (const auto col : { "eqip_item_id", "eqip_item_id2" })
+		{
+			const auto itemId = row[col].as<uint32_t>();
+			if (itemId != 0)
+			{
+				co_await releaseWarehouseSphere(database, identity,
+					row["user_unit_id"].as<uint32_t>(), std::string_view(col) == "eqip_item_id" ? 1 : 2);
+				co_await addUserItem(database, identity, itemId, 1);
+				++returned;
+			}
+		}
+	}
+
+	co_return returned;
+}
+
+/*!
+* What a reward payout changed, so its reply can refresh exactly the client
+* caches that are now stale — a successful SQL update is not a UI refresh
+* (handbook §5).  Filled by the payout helpers, then put on the reply by
+* emitGrantedRewards.
+*/
+struct GrantedRewards
+{
+	/// user_unit_id of every unit row the payout created.
+	std::vector<uint32_t> userUnitIds;
+
+	/// Whether any user_items stack changed.
+	bool items = false;
+};
+
+/*!
+* The warehouse as the client holds it: the 9wjrh74P stacks, plus the item
+* dictionary and favorites that travel with them.
+*/
+struct WarehouseSnapshot
+{
+	std::vector<UserWarehouseInfo> warehouse;
+	std::vector<UserItemDictionaryInfo> dictionary;
+	std::vector<::ItemFavorite> favorites;
+};
+
+// Persistent wire rows are reconciled with the aggregate item quantities by
+// Warehouse.cpp. No arithmetic aliases: ids and per-row favorites survive
+// refreshes, quantity changes and restarts.
+drogon::Task<WarehouseSnapshot> loadWarehouseSnapshot(db::Database database, UserIdentity identity);
+
+/*!
+* Reads the user's complete unit dictionary (GV81ctzR).
+*
+* ALWAYS send all of it.  UserUnitDictionaryResponse::readParam @0x1404ABC
+* merges each row into UserUnitDictionaryList, but at row 0 it also clears
+* UserUnitDictionaryReferenceList and refills it from this response alone —
+* and that list is what the summon lineup asks, unit by unit, whether the
+* player knows it (SummonsListScene ctor, existUnitID @0x16D4200).  Sending
+* only the newly obtained species left the lineup knowing just those until
+* the next UserInfo.  See UserUnitDictionary in net/user.kdl.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return One row per species the user has ever owned.
+*/
+inline drogon::Task<std::vector<UserUnitDictionary>> loadUnitDictionary(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	auto rows = (co_await db::PacketInterfaceFor<UserUnitDictionary>::read(
+		database,
+		"user_unit_dictionary",
+		{ db::Lookup("user_id", identity.userId) })).data;
+
+	// Alternate art.  `2pAyFjmZ` is the whole unlock: the art ships with the
+	// client as unit_ills_*_<id>_2.png, and UserUnitDictionaryList::
+	// isUnitImgType @0x12B1D80 -- which is what puts the swap arrow on the
+	// unit page, the guide and the summon lineup -- is nothing but
+	// `getImgTypeFlg() == 1`, a member readParam writes from this key alone.
+	// Which variant the GUIDE shows is the client's own saved preference
+	// (unitImgTypeSave/Load).  Which one an owned UNIT shows is per unit and
+	// does travel: UnitFavorite stores it, user_units.unit_img_type.
+	//
+	// Derived here rather than stored on the row: see the migration note on
+	// user_unit_alt_art for why a purchase must not fabricate a dictionary
+	// entry.
+	std::set<uint32_t> unlocked;
+	for (const auto& row : co_await database->execSqlCoro(
+		"SELECT unit_id FROM user_unit_alt_art WHERE user_id = $1;", identity.userId))
+	{
+		unlocked.insert(row["unit_id"].as<uint32_t>());
+	}
+	if (!unlocked.empty())
+	{
+		for (auto& row : rows)
+			if (unlocked.contains(row.unit_id))
+				row.img_type_flag = 1;
+	}
+
+	co_return rows;
+}
+
+/*!
+* Reads specific units back in the exact shape login sends them.
+*
+* Use this rather than assembling UserUnitInfo by hand: the login read is the
+* one shape the client provably accepts, and hand assembly has silently sent
+* fields as 0 before (received_order).
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity that owns the units.
+* @param userUnitIds Units to read; an id that does not exist is just absent.
+* @return The matching units.
+*/
+inline drogon::Task<std::vector<UserUnitInfo>> readUserUnits(
+	const db::Database database,
+	const UserIdentity identity,
+	const std::vector<uint32_t> userUnitIds)
+{
+	if (userUnitIds.empty())
+		co_return std::vector<UserUnitInfo>{};
+
+	db::Values ids;
+	for (const auto id : userUnitIds)
+		ids.emplace_back(static_cast<uint64_t>(id));
+
+	co_return (co_await db::PacketInterfaceFor<UserUnitInfo>::read(
+		database,
+		"user_units",
+		{
+			db::Lookup("user_id", identity.userId),
+			db::LookupIn("user_unit_id", ids),
+		})).data;
+}
+
+/*!
+* Reads every Summoner Arm the user owns (dhMmbm5p).
+*
+* A full replacement — UserSummonerArmsInfoResponse::readParam @0x144E824
+* calls removeAllObjects before adding — so always the whole list.  Arms
+* arrive by being granted, except the equipped one, which is seeded here.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return One row per owned arm.
+*/
+inline drogon::Task<std::vector<UserSummonerArmsInfo>> loadSummonerArms(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	// THE EQUIPPED WEAPON IS ALWAYS HELD.  Every Summoner starts with the
+	// Brave Sword (user_summoner.arm_id defaults to '10'), but nothing ever
+	// granted the row, and SummonerPartyEditTopScene's ctor (Summoner's Home >
+	// Unit > Manage Squad) reads the equipped arm's level through
+	// GameUtils::getMyselfInfo @0x119C9FC -> UserSummonerArmsInfo::getLevel on
+	// a null lookup: the game closed (ticket #135).
+	co_await database->execSqlCoro(
+		"INSERT INTO user_summoner_arms (user_id, summoner_arm_id, exp, level)"
+		" SELECT $1, COALESCE((SELECT arm_id FROM user_summoner WHERE user_id = $1), '10'), 0, 1"
+		" WHERE true ON CONFLICT(user_id, summoner_arm_id) DO NOTHING;",
+		identity.userId);
+	const auto rows = co_await database->execSqlCoro(
+		"SELECT summoner_arm_id, exp, level FROM user_summoner_arms"
+		" WHERE user_id = $1 ORDER BY summoner_arm_id;",
+		identity.userId);
+
+	std::vector<UserSummonerArmsInfo> arms;
+	arms.reserve(rows.size());
+	for (const auto& row : rows)
+	{
+		arms.push_back({
+			.user_id         = identity.userId,
+			.summoner_arm_id = row["summoner_arm_id"].as<std::string>(),
+			.exp             = row["exp"].as<int32_t>(),
+			.level           = row["level"].as<int32_t>(),
+		});
+	}
+
+	co_return arms;
+}
+
+/*!
+* Reads the Unit Selector ticket inventory (CGHaOZda): EVERY ticket in the
+* selector catalog with the count this user holds, 0 included.
+*
+* UnitSelectorGachaUserInfoResponse::readParam @0x1CCB500 wipes the client's
+* list on row 0 and an empty list never reaches it, so a ticket spent down to
+* nothing would keep its old count if it were left out.  Sending the whole
+* catalog makes every send a clean replace.  Tickets are keyed by the selector
+* MST's ticket id (XIvaD6Jp); two catalog rows could share one, so each id goes
+* out once.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return One row per catalog ticket id, in catalog order.
+*/
+inline drogon::Task<std::vector<UnitSelectorGachaUserInfo>> loadSelectorTickets(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	const auto rows = co_await database->execSqlCoro(
+		"SELECT ticket_id, count FROM user_selector_tickets WHERE user_id = $1;",
+		identity.userId);
+
+	std::map<std::string, int32_t> held;
+	for (const auto& row : rows)
+		held[row["ticket_id"].as<std::string>()] = row["count"].as<int32_t>();
+
+	std::vector<UnitSelectorGachaUserInfo> tickets;
+	std::set<std::string> seen;
+	for (const auto& selector : theServer()->cache().unitSelectorGacha())
+	{
+		auto ticketId = std::to_string(selector.selector_id);
+		if (!seen.insert(ticketId).second)
+			continue;
+		const auto it = held.find(ticketId);
+		tickets.push_back({
+			.ticket_id = std::move(ticketId),
+			.count     = it == held.end() ? 0 : std::max(it->second, 0),
+		});
+	}
+
+	co_return tickets;
+}
+
+/*!
+* Builds the Summoner singleton (n5mdIUqj) — exactly one row.
+*
+* UserSummonerInfoResponse::readParam @0x144EAD0 calls
+* UserSummonerInfo::shared()->init() before its first strcmp, so an empty
+* array never runs readParam and the client keeps its constructed defaults.
+* That is why summoner SP had nowhere to appear.
+*
+* ⚠ THIS USED TO SEND CONSTANTS.  Only `sp` came from the database and the
+* other 31 fields were init() @0x127E9E8's defaults, so the whole Summoner arc
+* was frozen and 94 Randall achievements read 0 forever.  The note that said
+* the subsystem "cannot draw and is not worth building" was wrong on both
+* counts: 33 layout_summoner_*.csv files ship in _dlcbundle, and this block was
+* already modelled and already on the wire.
+*
+* Every field is now persisted in user_summoner, in the shape the wiki's
+* Summoner Avatar article describes — gender, hairstyle, element, level, EXP,
+* SP, weapon, Leader Skill and the six per-element Summoning Arts levels.
+* The defaults in the schema are init()'s values, so a save that has never
+* touched the arc still sends exactly what it sent before.
+*
+* hp/atk/def/hel are the one deliberate departure: init() leaves 1/1/1/1,
+* which is a placeholder for the server to fill, so we send SummonerLevelMst's
+* row for the level we send.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return The one summoner row.
+*/
+inline drogon::Task<UserSummonerInfo> loadSummonerInfo(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	const auto rows = co_await database->execSqlCoro(
+		"SELECT sp, sex, element, hair_id, level, exp,"
+		" level1, exp1, level2, exp2, level3, exp3,"
+		" level4, exp4, level5, exp5, level6, exp6,"
+		" friend_point, summon_limit, ability_info, arm_id, eqp_item_id,"
+		" extra_passive_skill_id, extra_passive_skill_id2"
+		" FROM user_summoner WHERE user_id = $1;", identity.userId);
+	const auto has = !rows.empty();
+	const auto num = [&](const char* col, const int32_t fallback) {
+		return has && !rows[0][col].isNull() ? rows[0][col].as<int32_t>() : fallback;
+	};
+	const auto str = [&](const char* col, const char* fallback) {
+		return has && !rows[0][col].isNull() ? rows[0][col].as<std::string>() : std::string(fallback);
+	};
+
+	const auto sp = num("sp", 0);
+	const auto kSummonerLevel = num("level", 1);
+
+	// Fall back to init()'s placeholder if the level has no MST row, so a
+	// truncated MST cannot make the summoner screen read as 0 ATK.
+	int32_t hp = 1, atk = 1, def = 1, hel = 1;
+	const auto& levels = theServer()->cache().summonerLevelMst();
+	const auto lv = std::find_if(levels.begin(), levels.end(),
+		[kSummonerLevel](const SummonerLevelMst& l) { return l.lv == kSummonerLevel; });
+	if (lv != levels.end())
+	{
+		hp  = lv->base_hp;
+		atk = lv->base_atk;
+		def = lv->base_def;
+		hel = lv->base_rec;
+	}
+
+	UserSummonerInfo summoner{};
+	summoner.user_id = identity.userId;
+	summoner.sex = num("sex", 1);
+	summoner.element = num("element", 1);
+	summoner.summoner_arm_id = str("arm_id", "10");
+	// A Summoner that never visited the appearance screen has hair_id ''.
+	// SummonerImageMst keys its 828 rows by (element, sex, hair 1-3), and
+	// BattleUnit::initializeSummonerStatus @0x10F2ECC dereferences the lookup
+	// unchecked, so '' closed Summoner's Home > Manage Squad (#135): send the
+	// first hairstyle instead.
+	const auto hair = str("hair_id", "");
+	summoner.summoner_hair_id = hair.empty() ? "1" : hair;
+	summoner.exp = num("exp", 0);
+	summoner.level = kSummonerLevel;
+	// The six Summoning Arts levels, Fire through Dark.
+	summoner.exp1 = num("exp1", 0); summoner.level1 = num("level1", 1);
+	summoner.exp2 = num("exp2", 0); summoner.level2 = num("level2", 1);
+	summoner.exp3 = num("exp3", 0); summoner.level3 = num("level3", 1);
+	summoner.exp4 = num("exp4", 0); summoner.level4 = num("level4", 1);
+	summoner.exp5 = num("exp5", 0); summoner.level5 = num("level5", 1);
+	summoner.exp6 = num("exp6", 0); summoner.level6 = num("level6", 1);
+	summoner.sp = sp;
+	summoner.summoner_friend_point = num("friend_point", 0);
+	summoner.hp = hp;
+	summoner.atk = atk;
+	summoner.def = def;
+	summoner.hel = hel;
+	summoner.summon_limit = num("summon_limit", 1);
+	summoner.ep3_current_deck_no = 0;
+	summoner.summoner_ability_info = str("ability_info", "");
+	summoner.eqp_item_frame_id = "";
+	summoner.eqp_item_id = str("eqp_item_id", "");
+	summoner.extra_passive_skill_id = str("extra_passive_skill_id", "");
+	summoner.extra_passive_skill_id2 = str("extra_passive_skill_id2", "");
+
+	co_return summoner;
+}
+
+/*!
+* Puts a reward payout's unit and item changes on its reply.
+*
+* For reward screens with no local apply path — the present box, Mystery
+* Chest, Brave Slots and Daily Spin call no roster or warehouse mutator, and
+* HomeInfo rebuilds only the header and the roster.  Each block is sent only
+* when the payout changed that state, and always as the complete list:
+*
+*   unit_info             qC2tJs4E, the new units (insert-if-absent, which is
+*                         right for brand-new user_unit_ids)
+*   unit_dictionary       GV81ctzR, all of it — see loadUnitDictionary
+*   warehouse_info        9wjrh74P, all of it — see loadWarehouseSnapshot
+*   item_dictionary_info  bd5Rj6pN, every species ever stacked
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity the payout went to.
+* @param granted What the payout recorded.
+* @param resp Reply to fill; it must declare the four fields above.
+*/
+template <typename Resp>
+drogon::Task<void> emitGrantedRewards(
+	const db::Database database,
+	const UserIdentity identity,
+	const GrantedRewards granted,
+	Resp& resp)
+{
+	if (!granted.userUnitIds.empty())
+	{
+		resp.unit_info = co_await readUserUnits(database, identity, granted.userUnitIds);
+		resp.unit_dictionary = co_await loadUnitDictionary(database, identity);
+	}
+
+	if (granted.items)
+	{
+		auto warehouse = co_await loadWarehouseSnapshot(database, identity);
+		resp.warehouse_info = std::move(warehouse.warehouse);
+		resp.item_dictionary_info = std::move(warehouse.dictionary);
+		// The lock set rides with the warehouse (VSRPkdId; see its KDL doc):
+		// the client re-derives row locks from it whenever 9wjrh74P replaces
+		// the list, so a copy locked under a placeholder keeps its lock.
+		if constexpr (requires { resp.item_favorite; })
+			resp.item_favorite = std::move(warehouse.favorites);
+	}
+}
+
+/*!
+* Maps a numeric element id (UnitMst.element) to the string form stored in
+* user_units.element.
+*
+* @param id Element id 1-6.
+* @return Element name; "fire" for out-of-range ids.
+*/
+inline std::string_view elementIdToString(const int32_t id)
+{
+	switch (id)
+	{
+	case 2: return "water";
+	case 3: return "earth";
+	case 4: return "thunder";
+	case 5: return "light";
+	case 6: return "dark";
+	default: return "fire";
+	}
+}
+
+/*!
+* Grants a fresh level-1 unit to the user from its UnitMst row.
+*
+* Column mapping mirrors the debug CLI's InsertUnitFromMst (the proven insert
+* shape for this schema): base stats from the MST minimums, skill levels 10
+* when the unit has the skill, and a random unit type (1-6) — types are rolled
+* on acquisition, matching live behaviour.  Reward flows (CampaignReceipt) use
+* this for present_type=6 unit rewards.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity that receives the unit.
+* @param unit Unit master row to instantiate.
+* @return The new row's user_unit_id, so a reply can read the unit back in the
+*         shape login sends it (readUserUnits).
+*/
+inline drogon::Task<uint32_t> addUserUnit(
+	const db::Database database,
+	const UserIdentity identity,
+	const UnitMst& unit)
+{
+	if (!database || identity.userId.empty())
+	{
+		LOG_ERROR << "Invalid addUserUnit call: "
+			<< "db=" << static_cast<bool>(database)
+			<< ", user_id_empty=" << identity.userId.empty();
+		throw std::invalid_argument("Invalid addUserUnit call");
+	}
+
+	const int32_t skillLv      = unit.skill_id       > 0 ? 10 : 0;
+	const int32_t extraSkillLv = unit.extra_skill_id > 0 ? 10 : 0;
+
+	int32_t unitType = 1;
+	{
+		std::lock_guard lock(RandomMutex());
+		unitType = std::uniform_int_distribution<int32_t>(1, 6)(RandomEngine());
+	}
+
+	const auto inserted = co_await database->execSqlCoro(
+		"INSERT INTO user_units "
+		"(user_id, unit_id, unit_lvl,"
+		" base_hp,  add_hp,  ext_hp,  limit_over_hp,"
+		" base_atk, add_atk, ext_atk, limit_over_atk,"
+		" base_def, add_def, ext_def, limit_over_def,"
+		" base_rec, add_rec, ext_rec, limit_over_rec,"
+		" exp, total_exp,"
+		" skill_id, skill_lv, extra_skill_id, extra_skill_lv,"
+		// ⚠ leader_skill_id WAS MISSING HERE, so every unit this path ever
+		// granted arrived with no Leader Skill -- 0 on all 176 units of the
+		// test account, including the 42 whose UnitMst row names one.  The
+		// client reads it off UserUnitInfo.oS3kTZ2W, so a squad leader
+		// contributed nothing.
+		" leader_skill_id,"
+		" element, unit_type_id, \"new\","
+		// -1, not the column default of 0: one sphere slot until a Sphere Frog
+		// says otherwise (kNoSecondSphereSlot).
+		" eqip_item_frame_id2,"
+		// The skill an Elgif carries (#38); 0 for every other unit.
+		" add_extra_passive_skill_id) "
+		"VALUES ($1,$2,1,"
+		" $3,0,0,0, $4,0,0,0, $5,0,0,0,"
+		" $6,0,0,0,"
+		" 1,1,"
+		" $7,$8,$9,$10,"
+		" $11,"
+		" $12,$13,1,"
+		" -1, $14) RETURNING user_unit_id;",
+		identity.userId, std::to_string(unit.id),
+		unit.min_hp, unit.min_atk, unit.min_def, unit.min_rec,
+		unit.skill_id, skillLv, unit.extra_skill_id, extraSkillLv,
+		unit.leader_skill_id,
+		std::string(elementIdToString(unit.element)),
+		unitType,
+		unit.id == kElgifUnitId ? randomElgifSkill() : 0);
+
+	// ⚠ THIS OVERLOAD USED TO DO NEITHER OF THE TWO THINGS ABOVE AND BELOW.
+	//
+	// The UserUnitInfo overload sets is_new and records the species in
+	// user_unit_dictionary; this one is raw SQL and did neither, so every unit
+	// granted through it — slot prizes, Journal rewards, CampaignReceipt —
+	// arrived with no NEW badge and never appeared in the in-game unit
+	// dictionary.  That is why an account with 29 units had 8 distinct species
+	// owned and only 6 listed, the missing five being exactly the ones the
+	// reward paths handed out.
+	//
+	// recordUnitDictionary is OR IGNORE: obtaining a second Burst Frog must
+	// not fail the grant on the primary key.
+	co_await recordUnitDictionary(database, identity.userId, static_cast<uint32_t>(unit.id));
+
+	co_return inserted.empty() ? 0u : inserted[0]["user_unit_id"].as<uint32_t>();
+}
+
+/*!
+* Looks up player progression MST data for a specific user level.
+*
+* The progression cache is expected to be ordered by level, with level 1 at
+* index 0. This helper centralizes that assumption and validates the row before
+* returning it.
+*
+* @param level Player level to look up.
+* @return Progression row for the level, or std::nullopt if unavailable.
+*/
+inline std::optional<UserLevelMst> getLevelMst(uint32_t level)
+{
+	const auto& progression = theServer()->cache().initializeResp().progression;
+	if (level == 0 || level > progression.size())
+	{
+		LOG_ERROR << "Unable to find user level MST for level " << level;
+		return std::nullopt;
+	}
+
+	const auto& mst = progression[level - 1];
+	if (mst.level != level)
+	{
+		LOG_ERROR << "User level progression is not ordered at level " << level;
+		return std::nullopt;
+	}
+
+	return mst;
+}
+
+/*!
+* Seeds the default normal decks when the owning user has no deck rows yet.
+* The starter unit is placed in the middle party position for decks 0
+* through 9. Existing deck rows are ignored and return zero affected rows.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity that owns the deck rows.
+* @param starter_unit Starter unit to place in the default decks.
+* @return Number of affected rows.
+*/
+inline drogon::Task<db::InterfaceResult<>> addDefaultDecks(
+	const db::Database database,
+	const UserIdentity identity,
+	const UserUnitInfo starter_unit)
+{
+	if (!database || identity.userId.empty() || starter_unit.user_unit_id == 0)
+	{
+		LOG_ERROR << "Invalid addDefaultDecks call: "
+			<< "db=" << static_cast<bool>(database)
+			<< ", user_id_empty=" << identity.userId.empty()
+			<< ", user_unit_id=" << starter_unit.user_unit_id;
+		throw std::invalid_argument("Invalid addDefaultDecks call");
+	}
+
+	auto result = co_await database->execSqlCoro(
+		"WITH RECURSIVE deck_nums(deck_num) AS ("
+		"SELECT 0 "
+		"UNION ALL "
+		"SELECT deck_num + 1 FROM deck_nums WHERE deck_num < 9"
+		") "
+		"INSERT INTO user_decks ("
+		"user_id, "
+		"user_unit_id, "
+		"deck_type, "
+		"deck_num, "
+		"member_type, "
+		"disp_order"
+		") "
+		"SELECT "
+		"$1, "
+		"$2, "
+		"1, "
+		"deck_nums.deck_num, "
+		// The client treats member_type 0 as the party leader.
+		"0, "
+		"2 "
+		"FROM deck_nums "
+		"WHERE NOT EXISTS ("
+		"SELECT 1 "
+		"FROM user_decks "
+		"WHERE user_decks.user_id = $1"
+		");",
+		identity.userId,
+		starter_unit.user_unit_id);
+
+	co_return db::InterfaceResult<>{
+		.data = {},
+		.affected = result.affectedRows(),
+	};
+}
+
+/*!
+* Persists deck rows posted by DeckEditRequest.
+* For each deck included in the request, existing rows are replaced with the
+* occupied slots sent by the client. Missing slots are treated as removed.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity that owns the deck rows.
+* @param decks Deck slot packets to persist.
+* @return Number of affected rows.
+*/
+inline drogon::Task<db::InterfaceResult<>> updateDecks(
+	const db::Database database,
+	const UserIdentity identity,
+	const std::vector<UserPartyDeckInfo> decks)
+{
+	if (!database || identity.userId.empty())
+	{
+		LOG_ERROR << "Invalid updateDecks call: "
+			<< "db=" << static_cast<bool>(database)
+			<< ", user_id_empty=" << identity.userId.empty();
+		throw std::invalid_argument("Invalid updateDecks call");
+	}
+
+	// For each modified party, the client sends the full current party state.
+	// Any missing slot should therefore be treated as a removed unit.
+	//
+	// The simplest way to persist that is to clear each affected deck first,
+	// then insert the UserPartyDeckInfo rows the client sent.
+	std::set<std::pair<int32_t, int32_t>> affectedDecks;
+	for (const auto& deck : decks)
+	{
+		affectedDecks.emplace(deck.deck_type, deck.deck_num);
+	}
+
+	size_t affected = 0;
+	for (const auto& [deckType, deckNum] : affectedDecks)
+	{
+		const auto result = co_await db::DatabaseInterface::remove(
+			database,
+			"user_decks",
+			{
+				db::Lookup("user_id", identity.userId),
+				db::Lookup("deck_type", deckType),
+				db::Lookup("deck_num", deckNum),
+			});
+	}
+
+	for (const auto& deck : decks)
+	{
+		const auto insert = co_await db::PacketInterfaceFor<UserPartyDeckInfo>::insert(
+			database,
+			"user_decks",
+			deck,
+			{ db::Data("user_id", identity.userId) });
+		affected += insert.affected;
+	}
+
+	co_return db::InterfaceResult<>{
+		.data = {},
+		.affected = affected,
+	};
+}
+
+/*!
+* The player's public friend ID (98WfKiyA), assigned on first need.
+*
+* Lazy rather than set in CreateUser so accounts made before
+* 16102026_FriendRelations get one too, with the draw and its retry in one
+* place.  9 random digits from the OS CSPRNG: the Add Friend box is
+* decimal-only (FriendIdSearchScene, input mode 5), and a sequential id would
+* let anyone enumerate every player.  The UNIQUE index makes a collision throw,
+* so the loop simply draws again.
+*
+* @return The id, or "" when the user row does not exist.
+*/
+inline drogon::Task<std::string> ensurePublicFriendId(
+	const db::Database database,
+	const std::string& userId)
+{
+	for (int attempt = 0; attempt < 8; ++attempt)
+	{
+		const auto row = co_await database->execSqlCoro(
+			"SELECT friend_id FROM user_info WHERE id = $1;", userId);
+		if (row.empty())
+			co_return std::string{};
+		if (!row[0]["friend_id"].isNull())
+			co_return row[0]["friend_id"].as<std::string>();
+
+		std::random_device rd;
+		const auto candidate = std::to_string(100000000u + rd() % 900000000u);
+		try
+		{
+			co_await database->execSqlCoro(
+				"UPDATE user_info SET friend_id = $1 WHERE id = $2 AND friend_id IS NULL;",
+				candidate, userId);
+		}
+		catch (const drogon::orm::DrogonDbException&)
+		{
+			// UNIQUE collision with another player's id: draw again.
+		}
+	}
+	co_return std::string{};
+}
+
+/*!
+* Builds a login-info packet from the persisted user row.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return Login info packet populated from the database.
+*/
+inline drogon::Task<db::InterfaceResult<LoginInfoResp>> getLoginInfo(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	auto result = co_await db::PacketInterfaceFor<LoginInfoResp>::read(
+		database,
+		"user_info",
+		{
+			db::Lookup("gumi_user_id", identity.gumiUserId),
+			db::Lookup("id", identity.userId),
+		});
+	auto packet = std::move(result.nonEmpty().front());
+
+	// tutorial_status (9sQM2XcN) and tutorial_end_flag (sv6BEI8X) are both read
+	// straight from user_info now.  The flag used to be derived here as
+	// `tutorial_status >= 12`, which ended the tutorial four scripts early and
+	// made the status pointer impossible to test independently; TutorialUpdate
+	// persists what the client reports instead (14082026_AddTutorialEndFlag).
+
+	// THE MASTER SWITCH FOR EVERY PADLOCK.  `a37D29iJ` is the ONLY caller of
+	// FeatureGatingHandler::setFeatureGate (UserInfoResponse::readParam
+	// @0x13FFA5C), and every gate site tests that flag FIRST:
+	// HomeScene2::initialize @0x16E99DC is `cbz w8 -> skip`, so with this at 0
+	// the client never even asks shouldGateLocked() whether a feature is
+	// locked.
+	//
+	// It defaulted to 0, which is why Arena stood wide open on the Home screen
+	// while the server was dutifully sending four perfectly good
+	// FeatureGatingInfo rows -- they arrived, were parsed, and were never
+	// consulted.  Nothing on the wire looked wrong.
+	packet.feature_gate = 1;
+
+	// Shown on Add Friend (UserInfo::getFriendID) and the only thing another
+	// player can search for; it was never emitted before, so the box was blank.
+	packet.friend_id = co_await ensurePublicFriendId(database, identity.userId);
+
+	// The client's scenario markers, echoed so a new login restores what it
+	// last uploaded.  Callers other than the login replies drop them again
+	// with omitClientScenarioMarkers.
+	{
+		const auto markers = co_await database->execSqlCoro(
+			"SELECT scenario_info, special_scenario_info FROM user_info"
+			" WHERE gumi_user_id = $1 AND id = $2;",
+			identity.gumiUserId, identity.userId);
+		if (!markers.empty())
+		{
+			packet.user_scenario_info = markers[0]["scenario_info"].as<std::string>();
+			packet.user_special_scenario_info = markers[0]["special_scenario_info"].as<std::string>();
+		}
+	}
+
+	co_return db::InterfaceResult<LoginInfoResp>{
+		.data = std::move(packet),
+		.affected = result.affected,
+	};
+}
+
+/*!
+* Removes the client-authored scenario markers from a login-info block.
+*
+* UserInfoResponse::readParam @0x13FF340 answers N4XVE1uA with
+* UserScenarioInfoList::parse -- a full REPLACE of the client's cutscene
+* progress -- in EVERY reply carrying IKqx1Cn9, not just at login.  The
+* server's copy is only as new as the client's last upload (DeckEdit,
+* DungeonEventUpdate, ...), and MissionEnd does not upload it, so echoing it in
+* MissionEnd put back a list without the events the player had just watched:
+* a mission's end event, or a dungeon's "cleared" cutscene, then played again
+* after every clear.  A key that is absent is simply not read, so leaving both
+* out keeps the client's own, newer list.
+*/
+inline void omitClientScenarioMarkers(LoginInfoResp& info)
+{
+	info.user_scenario_info.reset();
+	info.user_special_scenario_info.reset();
+}
+
+/*!
+* Persists the scenario markers a request carried in its login block.
+*
+* BaseRequest::createDungeonEventUserInfoTag @0x13A0B8C writes both markers
+* (N4XVE1uA from UserScenarioInfoList::getSaveStr, 9yVsu21R from
+* UserSpecialScenarioInfoList::getSaveStr) into DeckEdit, DungeonEventUpdate,
+* the trial/campaign/guild deck requests and the raid chat requests.  Every
+* one of them carries the client's CURRENT progress, so each is stored as
+* sent; DungeonEventUpdate used to be the only one that was.
+*
+* Stored verbatim: the client sends the complete marker every time.  An empty
+* value (a request built before the list exists) is ignored rather than
+* wiping the stored one.
+*/
+inline drogon::Task<void> storeClientScenarioMarkers(
+	const db::Database database,
+	const UserIdentity identity,
+	const std::string& specialScenarioInfo,
+	const std::string& scenarioInfo)
+{
+	if (!specialScenarioInfo.empty())
+	{
+		co_await database->execSqlCoro(
+			"UPDATE user_info SET special_scenario_info = $1 WHERE id = $2;",
+			specialScenarioInfo, identity.userId);
+	}
+	if (!scenarioInfo.empty())
+	{
+		co_await database->execSqlCoro(
+			"UPDATE user_info SET scenario_info = $1 WHERE id = $2;",
+			scenarioInfo, identity.userId);
+	}
+}
+
+/*!
+* Unit-box slots every player starts with, before buying any.
+*
+* The client's capacity is the SUM of two fields — getSumUnitCnt @0x12AB380
+* adds ouXxIY63 and Px1X7fcd — so the starting slots ride add_unit_count while
+* user_info.max_unit_count carries only the slots bought with gems (ShopUse
+* type 2).  Ours, not MST data: DefineMst.default_unit_count (k0xrd38b) is 50.
+* Owner's rule (2026-10-17): 300 to start, plus kSlotsPerGemStep per gem
+* step bought (ShopUse.cpp); raised to 400 on 2026-10-20.  Every player gets
+* the raise at once, since only bought slots are stored.  ShopUse still keeps
+* base + bought under DefineMst max_unit_count (4000).
+*/
+inline constexpr int32_t kBaseUnitBoxSlots = 400;
+
+/*!
+* Material units do not use unit-box space (owner, 2026-10-22; Discord "Backpack
+* unit stacking" and "Make Evolution/Enhancement/Sell Units stack",
+* ticket #97).  UnitMst kind (xP9oi5Z2) 1 is enhancement fodder
+* (crystals, frogs, imps, ghosts/kings/gods), 2 evolution (nymphs, spirits,
+* idols, totems, pots, mimics), 3 sell units (jewel ghosts/kings/gods).  The
+* special material kinds count too: 10000 Omni Frog, 10001 Omni Emperor and
+* 10010-10019 the Mystery Frogs (the V11 APK stacks them; Golems, 10002/10003,
+* evolve and stay ordinary units).  The
+* v2.19.6 client cannot stack units, so each owned material adds one slot to
+* add_unit_count instead, up to kMaxFreeMaterialSlots so the unit list (sent in
+* full at login) cannot grow without bound.
+*/
+inline constexpr int32_t kMaxFreeMaterialSlots = 1000;
+
+inline const std::set<int32_t>& materialUnitIds()
+{
+	static const std::set<int32_t> ids = []
+	{
+		std::set<int32_t> out;
+		for (const auto& unit : theServer()->cache().unitMst())
+			if ((unit.kind >= 1 && unit.kind <= 3) || unit.kind == 10000 || unit.kind == 10001
+				|| (unit.kind >= 10010 && unit.kind <= 10019))
+				out.insert(unit.id);
+		return out;
+	}();
+	return ids;
+}
+
+/*! Unit-box slots the player's material units add (see kMaxFreeMaterialSlots). */
+inline drogon::Task<int32_t> freeMaterialSlots(const db::Database database, const std::string& userId)
+{
+	int32_t count = 0;
+	for (const auto& row : co_await database->execSqlCoro(
+		"SELECT unit_id FROM user_units WHERE user_id = $1;", userId))
+		count += materialUnitIds().count(row["unit_id"].as<int32_t>()) ? 1 : 0;
+	co_return std::min(count, kMaxFreeMaterialSlots);
+}
+
+/*!
+* Item-box slots every player starts with (owner, 2026-10-21: 200, up from 100).
+*
+* Not like the unit box: user_info.max_warehouse_count holds the WHOLE item
+* capacity, start plus bought, and team_info sends it as is.  CreateUser writes
+* this value; migration 21102026_ItemBoxRebase moved existing players over.
+*/
+inline constexpr int32_t kBaseItemBoxSlots = 200;
+
+/*!
+* Builds a team-info packet from the persisted user row.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return Team info packet populated from the database and derived cache data.
+*/
+/*!
+* Force want_gift to name exactly three gifts that exist.
+*
+* The gift screen draws three slots unconditionally and indexes its want-gift
+* list at 0, 1 and 2 (GiftRecieveScene2::setWantGiftList @0x1671E20, `cmp x22,
+* #3`).  The Windows build does NOT bounds-check that index -- it takes a null
+* element and calls getGiftID on it -- so a want_gift with fewer than three
+* resolvable ids is a guaranteed client crash, and an empty one crashes on the
+* very first slot.
+*
+* Ids the catalogue does not contain are dropped rather than padded around,
+* because getObjectByKey would return null for them and the slot would be just
+* as empty.
+*
+* @param stored The player's own want_gift, possibly empty or short.
+* @return Exactly three comma-separated gift ids, or the input when no
+*         catalogue is loaded and nothing better can be said.
+*/
+inline std::string padWantGift(const std::string& stored)
+{
+	const auto& catalogue = theServer()->cache().userInfoResp().gift;
+	if (catalogue.empty())
+		return stored;
+
+	std::vector<std::string> wanted;
+	for (size_t at = 0; at <= stored.size(); )
+	{
+		const auto comma = stored.find(',', at);
+		auto piece = stored.substr(at, comma == std::string::npos ? std::string::npos : comma - at);
+		while (!piece.empty() && std::isspace(static_cast<unsigned char>(piece.front())))
+			piece.erase(piece.begin());
+		while (!piece.empty() && std::isspace(static_cast<unsigned char>(piece.back())))
+			piece.pop_back();
+
+		// Keep only ids the catalogue can actually resolve.
+		if (!piece.empty() && std::any_of(catalogue.begin(), catalogue.end(),
+			[&piece](const ::GiftItemMst& g) { return std::to_string(g.id) == piece; })
+			&& std::find(wanted.begin(), wanted.end(), piece) == wanted.end())
+		{
+			wanted.push_back(std::move(piece));
+		}
+		if (comma == std::string::npos)
+			break;
+		at = comma + 1;
+	}
+
+	for (const auto& row : catalogue)
+	{
+		if (wanted.size() >= 3)
+			break;
+		const auto id = std::to_string(row.id);
+		if (std::find(wanted.begin(), wanted.end(), id) == wanted.end())
+			wanted.push_back(id);
+	}
+
+	std::string out;
+	for (size_t i = 0; i < wanted.size() && i < 3; ++i)
+	{
+		if (!out.empty())
+			out += ',';
+		out += wanted[i];
+	}
+	return out;
+}
+
+inline drogon::Task<db::InterfaceResult<UserTeamInfo>> getTeamInfo(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	auto result = co_await db::PacketInterfaceFor<UserTeamInfo>::read(
+		database,
+		"user_info",
+		{ db::Lookup("id", identity.userId) });
+	auto packet = std::move(result.nonEmpty().front());
+
+	packet.reinforcement_deck.emplace_back(0);
+	packet.reinforcement_deck.emplace_back(0);
+	packet.reinforcement_deck.emplace_back(0);
+	packet.add_unit_count = kBaseUnitBoxSlots + co_await freeMaterialSlots(database, identity.userId);
+
+	// WANT_GIFT MUST NAME EXACTLY THREE GIFTS, OR THE GIFT SCREEN CRASHES.
+	//
+	// GiftRecieveScene2::setWantGiftList @0x1671E20 loops `cmp x22, #3` --
+	// the screen always draws THREE want-gift slots (giftItemMst0..2 /
+	// want_gift0..2) and indexes GiftRecieveScene2::getGiftMstList() at 0, 1
+	// and 2.  That list is built by splitting want_gift on ',' and resolving
+	// each id through GiftItemMstList::getObjectByKey, so it is only as long as
+	// want_gift is.
+	//
+	// The arm64 build bounds-checks that index (`b.hs` at 0x1671E3C).  THE
+	// WINDOWS BUILD DOES NOT: it yields a NULL element and dereferences it in
+	// getGiftID, which is the deterministic +0x84F533 / read 0x14 crash seen in
+	// four identical minidumps.  So an empty want_gift crashes, and so does one
+	// naming only one or two gifts.
+	//
+	// Padding here rather than in the DB keeps the player's own choices intact:
+	// whatever they picked stays first, and the remaining slots are filled with
+	// gifts they do not already have listed.
+	packet.want_gift = padWantGift(packet.want_gift);
+
+	const auto levelMst = getLevelMst(packet.level);
+	if (levelMst)
+	{
+		packet.deck_cost = levelMst->deck_cost;
+		packet.max_action_point = levelMst->energy;
+		packet.max_friend_count = levelMst->friend_count;
+	}
+
+	// The Rewards badges.  The client never counts either of these itself: it
+	// reads them off team_info.  HomeScene2::setLayoutControl lights the
+	// Rewards button when getPresentCnt() > 0 (0x16EDCA0), and
+	// RewardsTopScene::checkForBadgeAlert badges the Presents and Mystery Chest
+	// tiles from getPresentCnt / getMysteryBoxCount.  Both were always 0, so a
+	// reward waiting in the present box never showed at all.  Built here, every
+	// reply that carries team_info — login, HomeInfo, claims, mission end —
+	// refreshes the badges.
+	packet.present_count = (co_await database->execSqlCoro(
+		"SELECT COUNT(*) AS n FROM user_presents WHERE user_id = $1 AND is_receipt = 0;",
+		identity.userId))[0]["n"].as<int32_t>();
+	packet.mysterybox_count = (co_await database->execSqlCoro(
+		"SELECT COUNT(*) AS n FROM user_mystery_boxes"
+		" WHERE user_id = $1 AND claimed = 0 AND expiry_ts > $2;",
+		identity.userId,
+		static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+			std::chrono::system_clock::now().time_since_epoch()).count())))[0]["n"].as<int32_t>();
+
+	// Calculate the current energy points of the user.
+	const auto stored = co_await db::DatabaseInterface::read(
+		database,
+		"user_info",
+		{
+			db::Data("energy_full_ts"),
+			db::Data("max_friend_count"),
+			db::Lookup("id", identity.userId),
+		});
+	packet.energy_full_seconds = UserEnergy::derive(
+		packet.level,
+		stored.front<uint64_t>("energy_full_ts"),
+		packet.energy);
+
+	// Friend capacity is the SUM of 3u41PhR2 and 2rR5s6wn (getSumFrdCnt
+	// @0x12AB5B8): the level's friend_count above, plus the slots bought with
+	// gems through ShopUse type 7, which user_info.max_friend_count holds.
+	// UserLevelMst's add_friend_count is the most that CAN be bought at a level
+	// (0 until lv 81, then 50): ShopFriendExtScene::touchBegan stops selling
+	// once the sum reaches friend_count + add_friend_count
+	// (UserLevelMst::getSumFriendCnt @0x135CD9C).  Sending that cap here, as
+	// this used to, handed the slots out free and made the purchase unreachable.
+	if (levelMst)
+	{
+		packet.add_friend_count = std::min(
+			stored.front<int32_t>("max_friend_count"),
+			levelMst->add_friend_count);
+	}
+
+	co_return db::InterfaceResult<UserTeamInfo>{
+		.data = std::move(packet),
+		.affected = result.affected,
+	};
+}
+
+/*!
+* The request's identity or session is not valid (unknown gumi user, missing or
+* stale session token).  The dispatcher answers it by closing the client so the
+* player restarts and gets a fresh token from guest login; every other handler
+* failure returns the player Home instead.
+*/
+struct SessionError : std::runtime_error
+{
+	using std::runtime_error::runtime_error;
+};
+
+/*!
+* Resolves and validates the current local user identity.
+*
+* The server stores one current Gumi Live user id, then maps it to the local
+* user_info id. Requests must send the same Gumi Live id, and normally must also
+* send the same user id. During user creation, the client may not have a local
+* user id yet, so allowUnspecifiedUser lets callers accept an empty request
+* user_id and use the database value instead.
+*
+* @param database Database client or transaction to use.
+* @param req Login info from the request packet.
+* @param allowUnspecifiedUser True when an empty request user_id is allowed.
+* @param ignoreClientUserId True to log, not reject, a request user_id that
+*        differs from the database.  Only Initialize passes it: an account
+*        transfer swaps the id in the client's keychain on Confirm OK, before
+*        TransferRequest is sent, so a failed transfer leaves a device sending
+*        the target's id while still bound to its own gumi user.  Initialize
+*        must then hand back the device's real account (or '' for the
+*        new-user flow) instead of failing at the title screen.
+* @return Resolved Gumi Live id and local user id.
+*/
+inline drogon::Task<db::InterfaceResult<UserIdentity>> getUserIdentity(
+	const db::Database database,
+	const LoginInfoReq req,
+	const bool allowUnspecifiedUser=false,
+	const bool ignoreClientUserId=false)
+{
+	// The client names its gumi user; it must exist and, unless disabled for
+	// legacy clients, the request must carry the token from its latest guest
+	// login.  Only the token's SHA-256 is stored.
+	if (req.gumi_live_userid.empty())
+	{
+		LOG_WARN << "GME request without a gumi user id";
+		throw SessionError("Missing gumi user id");
+	}
+	const auto gumiUser = co_await db::DatabaseInterface::read(
+		database,
+		"gumi_live_users",
+		{ db::Data("id"), db::Data("token_hash"), db::Lookup("id", req.gumi_live_userid) });
+	if (gumiUser.affected == 0)
+	{
+		LOG_WARN << "GME request for unknown gumi user " << req.gumi_live_userid;
+		throw SessionError("Unknown gumi user");
+	}
+	if (theServer()->cache().serverConfig().requireSessionToken)
+	{
+		const auto stored = gumiUser.data.front()["token_hash"];
+		if (stored.isNull() || req.gumi_live_token.empty()
+			|| !account::ConstantTimeEquals(stored.as<std::string>(), account::Sha256Hex(req.gumi_live_token)))
+		{
+			LOG_WARN << "Rejected GME request with an invalid session token for gumi user " << req.gumi_live_userid;
+			throw SessionError("Invalid session token");
+		}
+	}
+	const auto gumiUserId = req.gumi_live_userid;
+
+	// Upon user creation, the client might not have a user Id stored locally yet,
+	// so we allow the client to omit it in the request, and instead fallback to
+	// whatever user ID we have in the database.
+	if (!allowUnspecifiedUser && req.user_id.empty())
+	{
+		LOG_ERROR << "Missing user_id; request did not include user_id";
+		throw std::runtime_error("Missing user_id; request did not include user_id");
+	}
+
+	auto user = co_await db::DatabaseInterface::read(
+		database,
+		"user_info",
+		{
+			db::Data("id"),
+			db::Lookup("gumi_user_id", gumiUserId),
+	});
+	std::string userId;
+	if (user.affected > 0)
+	{
+		userId = user.front<std::string>("id");
+	}
+
+	// If the client gave us a user_id, we require it to match the database.
+	if (!req.user_id.empty() && userId != req.user_id && ignoreClientUserId)
+	{
+		LOG_WARN << "User ID mismatch for Gumi Live user " << gumiUserId
+			<< ": client sent " << req.user_id
+			<< ", database has '" << userId << "'; answering with the database user"
+			<< " (expected after an account transfer that did not complete)";
+	}
+	else if (!req.user_id.empty() && userId != req.user_id)
+	{
+		LOG_ERROR << "User ID mismatch for Gumi Live user " << gumiUserId
+			<< ": client sent " << req.user_id
+			<< ", database has " << userId;
+		throw std::runtime_error("User ID mismatch for Gumi Live user "
+			+ gumiUserId + ": client sent " + req.user_id + ", database has " + userId);
+	}
+
+	co_return db::InterfaceResult<UserIdentity>{
+		.data = {
+			.gumiUserId = gumiUserId,
+			.userId = userId,
+		},
+		// This means we must have found a user for the nonEmpty() check to
+		// succeed.
+		.affected = user.affected,
+	};
+}
+
+/*!
+* Folds one battle's statistics into the caller's lifetime trophy archive.
+*
+* UserTeamArchive (zI2tJB7R) is the progress half of the trophy system: every
+* one of its counters is answered by PlayerInfoBattleResultScene::getActual
+* (libgame.so 0x1791EEC), a 32KB chain of TrophyMst::getTrophyID() compares that
+* maps exactly one trophy id to one counter.
+*
+* These eight are the ones the client already reports in every MissionEnd
+* request under rXvA1E5y, with byte-identical keys, each sourced from BattleLog
+* — i.e. THIS BATTLE's value, never a running total, so the server accumulates.
+*
+* SUM vs MAX comes from each trophy's own label in deploy/mst/trophy_mst.json
+* (累計 / 総合 sum, 最大 max), NOT from the setter name:
+*
+*   b_crystal              += hoG2ieT5   trophy 100310 累計バトルクリスタル出現数
+*   h_crystal              += 6PLsn8xo   trophy 100320 累計ハートクリスタル出現数
+*   battle_spark_cnt       += U8uZLA34   trophy 100350 累計スパーク回数
+*   battle_skill_cnt       += rZQJF5G9   trophy 100360 累計BB使用回数
+*   quest_mimic_cnt        += TW1Mrtp5   trophy 200040 総合ミミック出現数
+*   battle_turn_max_damage  = max(…, 5NRJQ1LU)  trophy 100330 戦闘1ターン最大ダメージ数
+*   battle_turn_max_spark   = max(…, XP06YWdT)  trophy 100340 戦闘1ターン最大スパーク回数
+*   turn_max_unit_damage    = max(…, e6BKoYy9)  trophy 100325 ユニット単体最大ダメージ数
+*
+* Negative values are clamped to 0 before folding: the wire fields are quoted
+* ints the client controls, and a negative would corrupt a lifetime total that
+* nothing ever recomputes.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to update.
+* @param battle   The request's rXvA1E5y block.
+*/
+inline drogon::Task<void> accumulateBattleArchive(
+	const db::Database database,
+	const UserIdentity identity,
+	const ::MissionBattleResultInfo battle)
+{
+	const auto clamp = [](const int32_t v) { return std::max(v, 0); };
+
+	// One UPSERT rather than read-modify-write: MissionEnd already runs inside a
+	// transaction on the single-connection SQLite pool, and a second await here
+	// would be another sequential round trip (handbook §6.14).  The conflict
+	// clause does the summing and the max-ing in SQL, so a concurrent clear
+	// cannot lose an update.
+	//
+	// Values are ints off a parsed struct plus a server-minted user id, so
+	// inlining them carries no injection surface.
+	const std::string sql =
+		"INSERT INTO user_team_archive ("
+		"user_id, b_crystal, h_crystal, battle_spark_cnt, battle_skill_cnt,"
+		" quest_mimic_cnt, battle_turn_max_damage, battle_turn_max_spark,"
+		" turn_max_unit_damage, b_crystal_max, h_crystal_max, spark_cnt_max) VALUES ('"
+		+ identity.userId + "',"
+		+ std::to_string(clamp(battle.battle_crystal_num)) + ","
+		+ std::to_string(clamp(battle.heart_crystal_num)) + ","
+		+ std::to_string(clamp(battle.spark_cnt)) + ","
+		+ std::to_string(clamp(battle.skill_use_cnt)) + ","
+		+ std::to_string(clamp(battle.mimic_cnt)) + ","
+		+ std::to_string(clamp(battle.max_turn_damage)) + ","
+		+ std::to_string(clamp(battle.max_turn_spark_cnt)) + ","
+		+ std::to_string(clamp(battle.one_attack_damage)) + ","
+		// Trophies 100290 / 100300 are the BEST SINGLE BATTLE, not the total —
+		// the same two numbers as b_crystal/h_crystal, MAX-ed instead of summed.
+		+ std::to_string(clamp(battle.battle_crystal_num)) + ","
+		+ std::to_string(clamp(battle.heart_crystal_num)) + ","
+		// The best sparks in ONE quest -- a third number from the same field,
+		// distinct from the lifetime sum above and from the per-turn max.
+		+ std::to_string(clamp(battle.spark_cnt)) + ")"
+		" ON CONFLICT(user_id) DO UPDATE SET"
+		" b_crystal        = b_crystal        + excluded.b_crystal,"
+		" h_crystal        = h_crystal        + excluded.h_crystal,"
+		" battle_spark_cnt = battle_spark_cnt + excluded.battle_spark_cnt,"
+		" battle_skill_cnt = battle_skill_cnt + excluded.battle_skill_cnt,"
+		" quest_mimic_cnt  = quest_mimic_cnt  + excluded.quest_mimic_cnt,"
+		" battle_turn_max_damage = MAX(battle_turn_max_damage, excluded.battle_turn_max_damage),"
+		" battle_turn_max_spark  = MAX(battle_turn_max_spark,  excluded.battle_turn_max_spark),"
+		" turn_max_unit_damage   = MAX(turn_max_unit_damage,   excluded.turn_max_unit_damage),"
+		" b_crystal_max          = MAX(b_crystal_max,          excluded.b_crystal_max),"
+		" h_crystal_max          = MAX(h_crystal_max,          excluded.h_crystal_max),"
+		" spark_cnt_max          = MAX(spark_cnt_max,          excluded.spark_cnt_max);";
+
+	try
+	{
+		co_await database->execSqlCoro(sql);
+	}
+	catch (const drogon::orm::DrogonDbException& ex)
+	{
+		// Never fail a mission clear over a statistics row.  The reward, the
+		// unit drops and the clear flag matter; a missed trophy tick does not.
+		LOG_WARN << "accumulateBattleArchive: " << ex.base().what();
+	}
+	co_return;
+}
+
+/*!
+* Loads the caller's lifetime trophy archive for zI2tJB7R.
+*
+* Returns a single-element vector because that is the shape UserInfoResp wants.
+* Only the eight counters accumulateBattleArchive maintains are filled; the
+* other 31 fields stay 0 because nothing feeds them yet, which reads on the
+* client as a trophy with no progress rather than as an error.
+*
+* A user with no row yet yields an all-zero entry rather than an empty vector —
+* UserTeamArchiveResponse is a singleton readParam, so sending the row is what
+* makes the Trophy screen show 0/N instead of leaving stale values in place.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return One UserTeamArchive, ready to serialise under zI2tJB7R.
+*/
+/*!
+* Counts today's login for TROPHY 100010 (login days) and 100020 (consecutive
+* login days), and returns nothing -- loadTeamArchive reads the result back.
+*
+* Idempotent within a calendar day: the whole update is gated on
+* last_login_day, so the many UserInfo calls a single session makes count once.
+*
+* LOCAL midnight, not UTC, for the same reason the dungeon-key claim uses local:
+* "did I log in today" has to mean what the player's clock says.
+*
+* A gap of exactly one day continues the streak; any larger gap restarts it at
+* 1.  A first-ever login also starts at 1 rather than 0 -- the day you log in is
+* day one of the streak, which is what the client's "<n> days" label reads as.
+*
+* Consumed by: UserInfo (the login envelope).  Writes user_team_archive, which
+* MissionEnd also upserts, hence ON CONFLICT rather than a bare INSERT.
+*/
+/*!
+* Rewrites a unit's base_* to the statline for `level`.
+*
+* user_units.base_* holds the stats AT THE UNIT'S CURRENT LEVEL.  The client
+* renders them verbatim -- it does no scaling of its own -- so any code that
+* changes a unit's level has to change these too or the unit keeps the statline
+* of the level it used to be.
+*
+* Interpolates UnitMst min..max across 1..max_lv, the same curve UnitMix uses
+* for its level-up animation rows.  A unit whose MST row is missing is left
+* untouched rather than zeroed.
+*
+* Consumed by: Mission drop parsing.  UnitMix does the same arithmetic inline
+* because it already has the MST row in hand.
+*/
+inline void scaleUnitBaseStats(::UserUnitInfo& unit, int level)
+{
+	const auto& unitMst = theServer()->cache().unitMst();
+	const auto id = static_cast<int32_t>(unit.unit_id);
+
+	const auto* mst = static_cast<const ::UnitMst*>(nullptr);
+	for (const auto& u : unitMst)
+	{
+		if (u.id == id) { mst = &u; break; }
+	}
+	if (!mst)
+		return;
+
+	const auto at = [&](int minV, int maxV) -> int32_t {
+		const int maxLv = mst->max_lv;
+		if (maxLv <= 1 || level <= 1) return minV;
+		if (level >= maxLv)           return maxV;
+		return minV + static_cast<int>(
+			static_cast<double>(maxV - minV) * (level - 1) / (maxLv - 1));
+	};
+	unit.base_hp  = at(mst->min_hp,  mst->max_hp);
+	unit.base_atk = at(mst->min_atk, mst->max_atk);
+	unit.base_def = at(mst->min_def, mst->max_def);
+	unit.base_rec = at(mst->min_rec, mst->max_rec);
+}
+
+inline drogon::Task<void> touchLoginStreak(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	const auto now = std::time(nullptr);
+	std::tm local = *std::localtime(&now);
+	local.tm_hour = 0;
+	local.tm_min = 0;
+	local.tm_sec = 0;
+	local.tm_isdst = -1;
+	const int64_t today = static_cast<int64_t>(std::mktime(&local)) / 86400;
+
+	try
+	{
+		co_await database->execSqlCoro(
+			"INSERT INTO user_team_archive (user_id, login_cnt, serial_login_day, last_login_day)"
+			" VALUES ($1, 1, 1, $2)"
+			" ON CONFLICT(user_id) DO UPDATE SET"
+			"   login_cnt        = login_cnt + 1,"
+			"   serial_login_day = CASE WHEN last_login_day = $2 - 1"
+			"                          THEN serial_login_day + 1 ELSE 1 END,"
+			"   last_login_day   = $2"
+			" WHERE last_login_day <> $2;",
+			identity.userId, today);
+
+		const auto rows = co_await database->execSqlCoro(
+			"SELECT login_cnt, serial_login_day FROM user_team_archive WHERE user_id = $1;",
+			identity.userId);
+		if (!rows.empty())
+		{
+			LOG_INFO << "Login streak for " << identity.userId << ": day "
+				<< rows[0]["serial_login_day"].as<int32_t>() << " consecutive, "
+				<< rows[0]["login_cnt"].as<int32_t>() << " total";
+		}
+	}
+	catch (const drogon::orm::DrogonDbException& ex)
+	{
+		// A login must never fail because a trophy counter could not be written.
+		LOG_WARN << "touchLoginStreak: " << ex.base().what();
+	}
+	co_return;
+}
+
+inline drogon::Task<std::vector<::UserTeamArchive>> loadTeamArchive(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	::UserTeamArchive archive = {};
+	archive.user_id = identity.userId;
+
+	try
+	{
+		const auto rows = co_await database->execSqlCoro(
+			"SELECT b_crystal, h_crystal, battle_spark_cnt, battle_skill_cnt,"
+			" quest_mimic_cnt, battle_turn_max_damage, battle_turn_max_spark,"
+			" turn_max_unit_damage, zel_get, karma_get, zel_use, karma_use,"
+			" zel_unit_sale, unit_mix_cnt, unit_mix_elem_cnt, unit_evo_cnt,"
+			" town_harvest_cnt, quest_challenge_cnt, quest_clear_cnt,"
+			" login_cnt, serial_login_day, zel_item_sale, unit_sum_cnt,"
+			" item_mix_cnt, item_mix_elem_cnt, sphere_mix_cnt,"
+			" b_crystal_max, h_crystal_max, quest_win_cnt,"
+			" friend_p_get, friend_p_use"
+			" FROM user_team_archive WHERE user_id = $1;",
+			identity.userId);
+
+		if (!rows.empty())
+		{
+			const auto& row = rows.front();
+			archive.b_crystal              = row["b_crystal"].as<int32_t>();
+			archive.h_crystal              = row["h_crystal"].as<int32_t>();
+			archive.battle_spark_cnt       = row["battle_spark_cnt"].as<int32_t>();
+			archive.battle_skill_cnt       = row["battle_skill_cnt"].as<int32_t>();
+			archive.quest_mimic_cnt        = row["quest_mimic_cnt"].as<int32_t>();
+			archive.battle_turn_max_damage = row["battle_turn_max_damage"].as<int32_t>();
+			archive.battle_turn_max_spark  = row["battle_turn_max_spark"].as<int32_t>();
+			archive.turn_max_unit_damage   = row["turn_max_unit_damage"].as<int32_t>();
+			archive.zel_get                = row["zel_get"].as<int64_t>();
+			archive.karma_get              = row["karma_get"].as<int64_t>();
+			archive.zel_use                = row["zel_use"].as<int64_t>();
+			archive.karma_use              = row["karma_use"].as<int64_t>();
+			archive.zel_unit_sale          = row["zel_unit_sale"].as<int64_t>();
+			archive.unit_mix_cnt           = row["unit_mix_cnt"].as<int32_t>();
+			archive.unit_mix_elem_cnt      = row["unit_mix_elem_cnt"].as<int32_t>();
+			archive.unit_evo_cnt           = row["unit_evo_cnt"].as<int32_t>();
+			archive.town_harvest_cnt       = row["town_harvest_cnt"].as<int32_t>();
+			archive.quest_challenge_cnt    = row["quest_challenge_cnt"].as<int32_t>();
+			archive.quest_clear_cnt        = row["quest_clear_cnt"].as<int32_t>();
+			// Trophies 100010 and 100020 — see touchLoginStreak, which writes them.
+			archive.login_cnt              = row["login_cnt"].as<int32_t>();
+			archive.serial_login_day       = row["serial_login_day"].as<int32_t>();
+			// The rest of the 100-series the handlers can source.
+			archive.zel_item_sale          = row["zel_item_sale"].as<int64_t>();     // 100060
+			archive.unit_sum_cnt           = row["unit_sum_cnt"].as<int32_t>();      // 100190
+			archive.item_mix_cnt           = row["item_mix_cnt"].as<int32_t>();      // 100250
+			archive.item_mix_elem_cnt      = row["item_mix_elem_cnt"].as<int32_t>(); // 100260
+			archive.sphere_mix_cnt         = row["sphere_mix_cnt"].as<int32_t>();    // 100270
+			archive.b_crystal_max          = row["b_crystal_max"].as<int32_t>();     // 100290
+			archive.h_crystal_max          = row["h_crystal_max"].as<int32_t>();     // 100300
+			archive.quest_win_cnt          = row["quest_win_cnt"].as<int32_t>();     // 200030
+			// Honor earned / spent.  MissionEnd pays it for a borrowed helper,
+			// Gacha charges it on an Honor Summon.
+			archive.friend_p_get           = row["friend_p_get"].as<int32_t>();      // 100090
+			archive.friend_p_use           = row["friend_p_use"].as<int32_t>();      // 100100
+		}
+	}
+	catch (const drogon::orm::DrogonDbException& ex)
+	{
+		LOG_WARN << "loadTeamArchive: " << ex.base().what();
+	}
+
+	co_return std::vector<::UserTeamArchive>{ std::move(archive) };
+}
+
+/*!
+* Adds to one or more cumulative trophy counters on user_team_archive.
+*
+* The counters wired through here are the ones a HANDLER observes as it does the
+* work -- zel earned, a fusion performed, a tile tapped -- as opposed to the
+* eight that arrive pre-measured in MissionEnd's rXvA1E5y block (those go through
+* accumulateBattleArchive, which also has to MAX three of them).
+*
+* Every counter here is a SUM. That is not inferred from the column name: each
+* one's trophy label in deploy/mst/trophy_mst.json is 累計 / 総合 / 回数 / 数,
+* all cumulative, and none is 最大. See tools/SERVER_COMPONENT_AUDIT.md for the
+* per-field citation.
+*
+* One UPSERT for the whole set, because several call sites already run inside a
+* transaction on the single-connection SQLite pool and an await per counter
+* would be a sequential round trip each (handbook §6.14).
+*
+* Negative deltas are dropped: these are lifetime totals nothing ever recomputes,
+* and every caller is adding an amount it just granted or charged.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to update.
+* @param deltas   column -> amount to add. Columns are compile-time literals
+*                 from the call sites, never user input.
+*/
+inline drogon::Task<void> bumpArchiveCounters(
+	const db::Database database,
+	const UserIdentity identity,
+	const std::vector<std::pair<std::string, int64_t>> deltas,
+	const bool propagateFailure = false)
+{
+	std::string cols, vals, sets;
+	for (const auto& [col, raw] : deltas)
+	{
+		const auto delta = std::max<int64_t>(raw, 0);
+		if (delta == 0)
+		{
+			continue;
+		}
+
+		cols += ", " + col;
+		vals += ", " + std::to_string(delta);
+		sets += (sets.empty() ? " " : ", ") + col + " = " + col + " + excluded." + col;
+	}
+
+	if (sets.empty())
+	{
+		co_return;
+	}
+
+	try
+	{
+		co_await database->execSqlCoro(
+			"INSERT INTO user_team_archive (user_id" + cols + ") VALUES ('"
+			+ identity.userId + "'" + vals + ") ON CONFLICT(user_id) DO UPDATE SET" + sets + ";");
+	}
+	catch (const drogon::orm::DrogonDbException& ex)
+	{
+		// Transactional callers must not acknowledge a craft whose transaction
+		// failed. Other callers retain the historical best-effort statistics policy.
+		LOG_WARN << "bumpArchiveCounters: " << ex.base().what();
+		if (propagateFailure) throw;
+	}
+	co_return;
+}
+
+/*!
+* Returns a zero-initialised arena standing for 8jBJ7uKR.
+*
+* Same singleton trap as zeroedArenaArchive: UserArenaInfoResponse::readParam
+* (libgame.so 0x13FCDF0) writes per ROW, so "8jBJ7uKR":[] never runs it and the
+* client draws uninitialised memory -- observed as 9,765,061 Total Entries and
+* 14,614,711 Total Wins on the Battle Record.
+*
+* Nothing instruments arena battles, so 0 is the honest value; sending the row
+* is what matters.
+*
+* @param identity Resolved user identity.
+* @return Exactly one UserArenaInfo, ready to serialise under 8jBJ7uKR.
+*/
+inline std::vector<::UserArenaInfo> zeroedArenaInfo(const UserIdentity identity)
+{
+	::UserArenaInfo arena = {};
+	arena.user_id = identity.userId;
+	return { std::move(arena) };
+}
+
+/*!
+* Returns a zero-initialised arena archive for PQ56vbkI.
+*
+* ⚠ THIS MUST BE SENT EVEN THOUGH EVERY COUNTER IS ZERO.
+*
+* UserTeamArenaArchiveResponse::readParam (libgame.so 0x1402AC8) is a SINGLETON
+* parser: removeAllObjects/addObject fire per row, so a zero-row array means
+* readParam never runs at all and the client-side singleton is never written.
+* It then draws whatever was in that memory.
+*
+* That is not theoretical.  With `"PQ56vbkI":[]` the Battle Record's Arena
+* section rendered uninitialised heap: 9,765,061 entries, a defense win streak
+* of -1,191,182,337, "Earth Units Defeated -216".  Sending one all-zero row
+* makes readParam run and the screen read an honest 0.
+*
+* This is the general singleton trap — an EMPTY LIST IS NOT A CLEAR.  The same
+* reasoning applies to any singleton response class; contrast the list classes,
+* where omitting a key genuinely leaves the previous contents.
+*
+* Nothing instruments arena battles yet, so every field here is legitimately 0
+* except the user id.  When arena scoring lands, this is where it reads from.
+*
+* @param identity Resolved user identity.
+* @return Exactly one UserTeamArenaArchive, ready to serialise under PQ56vbkI.
+*/
+inline std::vector<::UserTeamArenaArchive> zeroedArenaArchive(const UserIdentity identity)
+{
+	::UserTeamArenaArchive arena = {};
+	arena.user_id = identity.userId;
+	return { std::move(arena) };
+}
+
+/*!
+* Reads the caller's cleared-mission history (UT1SVg59).
+*
+* THE progression driver: the client evaluates feature unlocks against this
+* list, and the server's own PermitPlace progression gate reads the same set so
+* the two agree. Backed by user_campaign_missions rows with state=2, written by
+* MissionEnd and CampaignBattleEnd.
+*
+* Shared by UserInfo and UpdateInfoLight — both have to report the identical
+* set or a refresh would contradict the login snapshot.
+*
+* @param database Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return One entry per cleared mission, ready to serialise under UT1SVg59.
+*/
+/*!
+* Evaluate the client's feature-release table for this player.
+*
+* ★ THIS IS WHAT OPENS THE SUMMONER AVATAR ARC, and it is why clearing the
+* Karna Masta fight appeared to do nothing.  `F_FUNCTION_RELEASE_MST` row 9
+* carries the condition `2:10864` -- "mission 10864 cleared" -- and 10864 is
+* "The Holy Emperor" in Menon, exactly the fight the wiki names as what opens
+* the arc.  The client asks the SERVER whether each function is released;
+* `UserReleaseInfo` (Dp0MjKAf) on UserInfoResp is the answer, and this fork had
+* never sent a single row, so every gated feature stayed shut no matter what
+* the player cleared.
+*
+* The conditions themselves live client-side and cannot be changed from here --
+* the server only reports whether they are met.
+*
+* @param cleared The player's cleared missions, as getClearedMissions returns.
+* @return One row per function the table knows about.
+*/
+inline std::vector<::UserReleaseInfo> evaluateFunctionReleases(
+	const std::vector<::UserClearMissionInfo>& cleared)
+{
+	std::set<int32_t> done;
+	for (const auto& row : cleared)
+		done.insert(row.mission_id);
+
+	std::vector<::UserReleaseInfo> out;
+	for (const auto& rule : theServer()->cache().functionReleaseMst())
+	{
+		::UserReleaseInfo info = {};
+		info.function_id = static_cast<uint32_t>(rule.function_id);
+
+		// "<type>:<param>".  ⚠ ONLY TYPE 2 IS DECODED.  Type 4 appears once,
+		// as "4:4" on function 8, and nothing here knows what it means -- so it
+		// reports NOT released.  Guessing the other way would hand the player a
+		// feature the real game gated.
+		bool released = false;
+		const auto colon = rule.condition.find(':');
+		if (colon != std::string::npos)
+		{
+			const auto type = rule.condition.substr(0, colon);
+			const auto param = rule.condition.substr(colon + 1);
+			if (type == "2")
+			{
+				try
+				{
+					released = done.contains(std::stoi(param));
+				}
+				catch (const std::exception&)
+				{
+					released = false;
+				}
+			}
+		}
+
+		info.released = released;
+		// The NEW badge. UserEnteredFeatureList (2386Diw1) is what clears it
+		// once the player opens the feature, and nothing here tracks that yet,
+		// so this stays 0 rather than pinning a badge on permanently.
+		info.new_flg = false;
+		out.push_back(std::move(info));
+	}
+	return out;
+}
+
+
+inline drogon::Task<std::vector<::UserClearMissionInfo>> getClearedMissions(
+	const db::Database database,
+	const UserIdentity identity)
+{
+	std::vector<::UserClearMissionInfo> cleared{};
+
+	const auto rows = co_await database->execSqlCoro(
+		"SELECT mission_id, clear_count, last_cleared_at"
+		" FROM user_campaign_missions WHERE user_id = $1 AND state = 2;",
+		identity.userId);
+
+	for (const auto& row : rows)
+	{
+		::UserClearMissionInfo entry = {};
+		entry.user_id = identity.userId;
+		try
+		{
+			entry.mission_id = std::stoi(row["mission_id"].as<std::string>());
+		}
+		catch (...)
+		{
+			continue;
+		}
+		entry.clear_cnt = row["clear_count"].as<int32_t>();
+		if (const auto epoch = row["last_cleared_at"].as<int64_t>(); epoch > 0)
+		{
+			// setClearDate is a string setter; "YYYY-MM-DD hh:mm:ss" until a
+			// capture proves otherwise (KDL doc marks it UNVERIFIED).
+			std::tm tmv = {};
+			const time_t t = static_cast<time_t>(epoch);
+#ifdef _WIN32
+			localtime_s(&tmv, &t);
+#else
+			localtime_r(&t, &tmv);
+#endif
+			char buf[24] = {};
+			std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tmv);
+			entry.clear_date = buf;
+		}
+		cleared.push_back(std::move(entry));
+	}
+
+	co_return cleared;
+}
+
+/*!
+* Reads the caller's Vortex dungeon-key inventory, seeding any row DungeonKeyMst
+* declares that the player does not have yet.
+*
+* The two derived response fields — receipt_possible_flg and
+* next_receipt_possible_date — are computed against the local calendar on every
+* call rather than stored, so the result is only valid for the request that
+* asked for it.  See the 08082026_CreateUserDungeonKeysTable migration.
+*
+* Declared here rather than defined inline because the calendar helpers it
+* needs are private to the translation unit.  Defined in
+* gme/handlers/DungeonKey.cpp; consumed there and by UserInfo.
+*
+* @param db Database client or transaction to use.
+* @param identity Resolved user identity to read.
+* @return One entry per DungeonKeyMst row, ready to serialise under eFU7Qtb0.
+*/
+drogon::Task<std::vector<::UserDungeonKeyInfo>> dungeonKeyState(
+	const db::Database db,
+	const UserIdentity identity);
+
+/*!
+* How many key types can be claimed today — the "key ready" badge,
+* BadgeInfo.dungeon_key_num (net/badge_info.kdl).
+*
+* @param state The inventory dungeonKeyState just built.
+* @return Rows whose receipt is possible today.
+*/
+inline int32_t claimableKeyCount(const std::vector<::UserDungeonKeyInfo>& state)
+{
+	return static_cast<int32_t>(std::count_if(state.begin(), state.end(),
+		[](const ::UserDungeonKeyInfo& key) { return key.receipt_possible_flg != 0; }));
+}
+
+}

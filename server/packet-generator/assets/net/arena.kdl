@@ -1,0 +1,526 @@
+// Classic Arena (async PvP).  Wire shapes rebuilt from the v2.19.6 client's
+// createBody / readParam; the full derivation, scene flow and open questions
+// are in docs/features/ARENA_SPEC.md.  Handlers: gme/handlers/Arena.cpp.
+//
+// Request values are all strings on the wire, so every request field here is
+// `str` and the handler parses numbers itself: a malformed number must turn
+// into a refusal, not a glaze parse failure that closes the session.
+//
+// Registration (GmeControllerHandlers.cpp):
+//   oim9TU1D ArenaInfo / oqQxdFfa      zu6ifpy0 ArenaStart / bGjK4UH1
+//   82ztj6Iy ArenaMatching / Q53tUIBE  7f1rg92L ArenaBattleStart / zaMR9o0d
+//   NPyXDgV9 ArenaBattleRestart / sWofKGMl
+//   oQNtKU51 ArenaBattleEnd / jkgWq1d0 eyg8sA32 ArenaRetire / 93i8EbyM
+//   xkd9H50w ArenaFriendList / L3TDhrn2
+
+// ---------------------------------------------------------------------------
+// Requests
+// ---------------------------------------------------------------------------
+
+json ArenaPlainReq {
+    doc "Arena request whose body is only the login block: ArenaInfo, ArenaStart, ArenaBattleRestart (plus the ignored 60subGk3 header) and ArenaFriendList."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json ArenaDeckEntry {
+    doc "fq2C03jh node sent by ArenaMatching and ArenaBattleStart: the deck the player fights with and the event bonus the client thinks is live."
+
+    field deck_num type="str" {
+        key "Z0Y4RoD7"
+        doc "Deck number (0-9) of the arena deck, UserTeamInfo.arena_deck_num on the client."
+        optional #true
+    }
+
+    field bonus_type type="str" {
+        key "ciDqCjAF"
+        doc "GeneralEventMst arena campaign type; echoed in the battle result, otherwise unused."
+        optional #true
+    }
+
+    field bonus_param type="str" {
+        key "59b1eE6N"
+        doc "GeneralEventMst arena campaign parameter; echoed in the battle result."
+        optional #true
+    }
+}
+
+json ArenaMatchingReq {
+    doc "ArenaMatching (82ztj6Iy): find one opponent.  Re-sent by 'search again'."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field deck type="[ArenaDeckEntry]" {
+        key "fq2C03jh"
+        doc "The attacking deck."
+        optional #true
+    }
+}
+
+json ArenaBattleStartEnemyEntry {
+    doc "9NX83YVe node of ArenaBattleStart: which offered opponent the player accepted."
+
+    field enemy_user_id type="str" {
+        key "h7eY3sAK"
+        doc "ArenaSuggestEnemy.user_id from the last Matching reply."
+        optional #true
+    }
+
+    field random_rule type="str" {
+        key "Z7PXoxc2"
+        doc "Random-rule toggle.  Extra rules are not implemented; ignored."
+        optional #true
+    }
+}
+
+json ArenaBattleStartReq {
+    doc "ArenaBattleStart (7f1rg92L): spend an orb and open the battle.  The rj5fgJh0 drop-display group is ignored."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field enemy type="[ArenaBattleStartEnemyEntry]" {
+        key "9NX83YVe"
+        doc "The accepted opponent."
+        optional #true
+    }
+
+    field deck type="[ArenaDeckEntry]" {
+        key "fq2C03jh"
+        doc "The attacking deck."
+        optional #true
+    }
+}
+
+json ArenaBattleEndEntry {
+    doc "yTEvm85f node of ArenaBattleEnd / ArenaRetire.  Only the fields the server keeps are modelled; the rest of the ~30 battle-log counters are read past."
+
+    field battle_id type="str" {
+        key "xL0p2MkY"
+        doc "Battle id handed out by ArenaBattleStart."
+        optional #true
+    }
+
+    field result type="str" {
+        key "3pAQY5KW"
+        doc "BattleState::getArenaResult: \"1\" win, \"0\" loss (give-up and a lost HP judge included).  Absent on Retire."
+        optional #true
+    }
+
+    field b_crystal_cnt type="str" {
+        key "hoG2ieT5"
+        doc "BC crystals picked up."
+        optional #true
+    }
+
+    field h_crystal_cnt type="str" {
+        key "6PLsn8xo"
+        doc "HC crystals picked up."
+        optional #true
+    }
+
+    field max_turn_damage type="str" {
+        key "5NRJQ1LU"
+        doc "Highest single-turn damage."
+        optional #true
+    }
+
+    field max_turn_spark type="str" {
+        key "XP06YWdT"
+        doc "Most sparks in one turn."
+        optional #true
+    }
+
+    field defeat_unit_cnt type="str" {
+        key "mFID53JZ"
+        doc "Enemy units knocked out."
+        optional #true
+    }
+}
+
+json ArenaBattleEndReq {
+    doc "ArenaBattleEnd (oQNtKU51) and ArenaRetire (eyg8sA32) share this body."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field result type="[ArenaBattleEndEntry]" {
+        key "yTEvm85f"
+        doc "The battle being settled."
+        optional #true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Response rows
+// ---------------------------------------------------------------------------
+
+json ArenaSuggestEnemy {
+    doc "fQ3XImM2 ArenaSuggestEnemyResponse.  SINGLETON: exactly one row per reply."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Opponent id (a player id or a bot id); echoed back by ArenaBattleStart."
+    }
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "Opponent name, also the enemy party name in battle."
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "Opponent team level."
+    }
+
+    field arena_rank_id type="i32::str" {
+        key "JmFn3g9t"
+        doc "Opponent arena rank; must exist in ArenaRankMst."
+    }
+
+    field unit_id type="str" {
+        key "pn16CNah"
+        doc "Leader unit mst id, drawn as the thumbnail."
+    }
+
+    field battle_cnt type="i32::str" {
+        key "69vnphig"
+        doc "Opponent attack entries."
+    }
+
+    field win_cnt type="i32::str" {
+        key "8CEu9Kcm"
+        doc "Opponent attack wins."
+    }
+
+    field battle_cnt_accept type="i32::str" {
+        key "20iEWRCV"
+        doc "Opponent defence entries."
+    }
+
+    field win_cnt_accept type="i32::str" {
+        key "0rAkzg7L"
+        doc "Opponent defence wins."
+    }
+
+    field ranking_point type="i32::str" {
+        key "U4pMNjy0"
+        doc "Opponent arena points."
+    }
+
+    field friend_id type="str" {
+        key "98WfKiyA"
+        doc "Unused by the scene; always empty."
+    }
+
+    field unit_img_type type="i32::str" {
+        key "2pAyFjmZ"
+        doc "Leader alternate art, 0 = default."
+    }
+}
+
+json ArenaBattleEnemyInfo {
+    doc "9NX83YVe ArenaBattleEnemyInfoResponse.  SINGLETON.  team/party/units are JSON TEXT in the npc_mst P_* format, fed to RivalParty::entry."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Opponent id."
+    }
+
+    field battle_id type="i32::str" {
+        key "xL0p2MkY"
+        doc "Server battle id; echoed by ArenaBattleEnd / ArenaRetire."
+    }
+
+    field team type="str" {
+        key "INT1K9Pf"
+        doc "NpcTeamParse JSON: P_USER_ID, P_FRIEND_MESSAGE, P_LV, P_GUILD_ID."
+    }
+
+    field party type="str" {
+        key "nZc1Ip3N"
+        doc "NpcPartyParseList JSON: P_USER_UNIT_ID, P_MEMBER_TYPE (0 = leader), P_DISPORDER."
+    }
+
+    field units type="str" {
+        key "U42YcFNu"
+        doc "NpcUnitParseList JSON: one object of P_* stat strings per unit."
+    }
+
+    field friend_message type="str" {
+        key "bM7RLu5K"
+        doc "Opponent's friend message."
+    }
+
+    field rule type="i32::str" {
+        key "IvuccUuD"
+        doc "UserArenaRuleInfo rule id; 0 = no extra rule (INFERRED)."
+    }
+}
+
+json ArenaBattlePartyInfo {
+    doc "5K5wsBoL ArenaBattlePartyInfoResponse: the attacker's own side, read only when the client restarts a battle."
+
+    field party type="str" {
+        key "nZc1Ip3N"
+        doc "Attacker party JSON, same format as ArenaBattleEnemyInfo.party."
+    }
+
+    field units type="str" {
+        key "U42YcFNu"
+        doc "Attacker unit JSON, same format as ArenaBattleEnemyInfo.units."
+    }
+}
+
+json ArenaBattleResult {
+    doc "yTEvm85f ArenaBattleResultResponse.  SINGLETON."
+
+    field battle_id type="str" {
+        key "xL0p2MkY"
+        doc "The settled battle."
+    }
+
+    field result type="str" {
+        key "3pAQY5KW"
+        doc "\"1\" win, \"0\" loss."
+    }
+
+    field before_rank_id type="str" {
+        key "s07yWuZR"
+        doc "Rank before the battle."
+    }
+
+    field after_rank_id type="str" {
+        key "C1w4H62i"
+        doc "Rank after the battle."
+    }
+
+    field before_point type="i32::str" {
+        key "jPoM1UV8"
+        doc "Points before the battle."
+    }
+
+    field after_point type="i32::str" {
+        key "TJ9cQ8AY"
+        doc "Points after the battle."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "Karma awarded."
+    }
+
+    field friend_req_state type="i32::str" {
+        key "Sx5H0Ikn"
+        doc "1 shows the friend-request prompt (scene 409).  Always 0 for now."
+    }
+
+    field bonus_point type="i32::str" {
+        key "tvWWL9wI"
+        doc "Event bonus points; no arena events, so 0."
+    }
+
+    field bonus_type type="str" {
+        key "ciDqCjAF"
+        doc "Echo of the request's bonus type."
+    }
+
+    field bonus_param type="str" {
+        key "59b1eE6N"
+        doc "Echo of the request's bonus parameter."
+    }
+
+    field battle_cnt type="i32::str" {
+        key "69vnphig"
+        doc "Attack entries after this battle."
+    }
+}
+
+json ArenaBattleReward {
+    doc "okd0y3Ir ArenaBattleRewardResponse: one row per rank gained, walked in order by ArenaResultRewardScene."
+
+    field dia type="i32::str" {
+        key "1ef7JNSC"
+        doc "Gems granted for this rank."
+    }
+
+    field items type="str" {
+        key "4T0Q2Bh5"
+        doc "Items granted, \"itemId:num,itemId:num\"; delivered to the present box."
+    }
+
+    field first_flag type="i32::str" {
+        key "ZBwx5ct3"
+        doc "1 when this is the first time the player reached the rank."
+    }
+}
+
+json FriendUserArenaInfo {
+    doc "BYaF62TE FriendUserArenaInfoResponse row (a list, full replace).  The caller's own row is built client-side, so it is never in the list."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Player id."
+    }
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "Player name."
+    }
+
+    field lv type="i32::str" {
+        key "2Fh3J7ng"
+        doc "Team level."
+    }
+
+    field unit_id type="str" {
+        key "pn16CNah"
+        doc "Leader unit mst id."
+    }
+
+    field unit_lv type="i32::str" {
+        key "4A6LzBxr"
+        doc "Leader unit level."
+    }
+
+    field arena_rank_id type="i32::str" {
+        key "JmFn3g9t"
+        doc "Arena rank."
+    }
+
+    field ranking_point type="i32::str" {
+        key "U4pMNjy0"
+        doc "Arena points."
+    }
+
+    field battle_cnt type="i32::str" {
+        key "69vnphig"
+        doc "Attack entries."
+    }
+
+    field win_cnt type="i32::str" {
+        key "8CEu9Kcm"
+        doc "Attack wins."
+    }
+
+    field battle_cnt_accept type="i32::str" {
+        key "20iEWRCV"
+        doc "Defence entries."
+    }
+
+    field win_cnt_accept type="i32::str" {
+        key "0rAkzg7L"
+        doc "Defence wins."
+    }
+
+    field info_type type="i32::str" {
+        key "NH65Wj0f"
+        doc "Which tab the row belongs to (getList(type), 0 or 1).  Which value is Friends and which is Total is UNVERIFIED; see Arena.cpp."
+    }
+
+    field unit_img_type type="i32::str" {
+        key "2pAyFjmZ"
+        doc "Leader alternate art."
+    }
+
+    field position type="i32::str" {
+        key "2rqxaZ6K"
+        doc "Ranking position, 1-based."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Response envelopes
+// ---------------------------------------------------------------------------
+
+json ArenaStandingResp {
+    doc "ArenaInfo / ArenaStart / ArenaRetire reply: the refreshed standing."
+
+    field arena_info type="[UserArenaInfo]" {
+        key "8jBJ7uKR"
+        doc "Exactly one row (singleton parser)."
+    }
+}
+
+json ArenaMatchingResp {
+    doc "ArenaMatching reply."
+
+    field enemy type="[ArenaSuggestEnemy]" {
+        key "fQ3XImM2"
+        doc "Exactly one row."
+    }
+}
+
+json ArenaBattleStartResp {
+    doc "ArenaBattleStart / ArenaBattleRestart reply."
+
+    field enemy_info type="[ArenaBattleEnemyInfo]" {
+        key "9NX83YVe"
+        doc "Exactly one row."
+    }
+
+    field party_info type="[ArenaBattlePartyInfo]" {
+        key "5K5wsBoL"
+        doc "Attacker snapshot; sent only on Restart."
+        optional #true
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "HUD with the spent Arena Orb."
+    }
+}
+
+json ArenaBattleEndResp {
+    doc "ArenaBattleEnd reply."
+
+    field result type="[ArenaBattleResult]" {
+        key "yTEvm85f"
+        doc "Exactly one row."
+    }
+
+    field rewards type="[ArenaBattleReward]" {
+        key "okd0y3Ir"
+        doc "One row per rank gained; empty when no rank-up."
+    }
+
+    field arena_info type="[UserArenaInfo]" {
+        key "8jBJ7uKR"
+        doc "New standing, one row."
+    }
+
+    field arena_archive type="[UserTeamArenaArchive]" {
+        key "PQ56vbkI"
+        doc "Updated arena archive, one row."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "HUD with the awarded karma and gems."
+    }
+
+    field badge type="BadgeAchievementCount" {
+        key "h23iRjGN"
+        doc "The achievement badges after this battle (complete set), so an Arena daily Challenge it finished lights Missions > Challenges at once.  The copy kept in arena_battle.result_json for resends leaves it out, and a resend gets the badge as it is at that moment (gme::withCurrentBadge): replaying the stored count would re-light a challenge claimed since."
+        optional #true
+    }
+}
+
+json ArenaFriendListResp {
+    doc "ArenaFriendList reply."
+
+    field list type="[FriendUserArenaInfo]" {
+        key "BYaF62TE"
+        doc "Ranking rows for both tabs."
+    }
+}

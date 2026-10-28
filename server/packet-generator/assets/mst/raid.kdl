@@ -1,0 +1,561 @@
+// F_RAID_* — the Raid Battle subsystem MSTs (RC lobby, raid maps, bosses,
+// missions, spawn routes, and encounter battle groups).  13 of the 14
+// tables ported 2026-07-19 from 2-mst-decoded to deploy/system/raid_*.json;
+// wrapper keys are each struct's `hash`, sourced from response_mappings.json
+// (mst_responses, response_class noted per struct).  F_RAID_BOSS_PARTS_MST
+// remains unported — no Raid*Parts response class exists in the binary
+// (see tools/MST_PORTING_BACKLOG.md "Family accounting").
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (1/44/6/6/287/347/154/264/235/1378/344/4135/11121 rows).  Naming:
+// fields reuse names already established for the same hash in other KDL
+// files where one exists (map_id/pos_x/pos_y from grand_mission.kdl,
+// earn_zel/karma/stamina_cost/battle_monster_group_id from mission.kdl,
+// weight from gacha.kdl, display_order from banner.kdl, scenario_info from
+// arena.kdl, ...).  Unknown fields use unk<N> names — the wire hash in
+// `key` is the stable grep handle.
+//
+// Separator caution (learned here): the raid map rect pairs are
+// COLON-separated ("0:0", "1280:1440") while the same hashes in
+// grand_mission.kdl carry COMMA-separated values — the separator is
+// per-table, always verify against the ported data before reusing a type.
+
+json RaidWorldMst {
+    doc "Raid world/server descriptor (wrapper hash S9zI8iPU, RaidWorldMstResponse).  Single row."
+    hash "S9zI8iPU"
+
+    field id type="i32::str" {
+        key "43hMuY2I"
+        doc "World id — captured 1 (net/raid.kdl still carries this hash as unk3 on RaidUserInfo)."
+    }
+
+    field name type="str" {
+        key "3D42LTtj"
+        doc "World code name — captured \"WORLD1\"."
+    }
+
+    field host type="str" {
+        key "PIa6T3RK"
+        doc "Legacy raid matchmaking host — captured \"ios125.bravefrontier.gumi.sg\".  Dead endpoint; kept verbatim for the client."
+    }
+
+    field world_code type="str" {
+        key "1n9caurK"
+        doc "Short world prefix — captured \"rw1\"."
+    }
+
+    field interval_sec type="i32::str" {
+        key "Rqc8pi0x"
+        doc "CONFIRMED setIntervalSec (readParam).  constant 4 — likely the max party/room size."
+    }
+}
+
+json RaidMapMst {
+    doc "Raid area map metadata (wrapper hash K3H0uzhE, RaidMapMstResponse).  44 rows, one per raid map (\"Moize Plains Lv. 1\", ...)."
+    hash "K3H0uzhE"
+
+    field map_id type="i32::str" {
+        key "H9sx5D08"
+        doc "Map id (1..8710).  Same hash grand_mission.kdl uses for its map ids."
+    }
+
+    field name type="str" {
+        key "0QyCU1dR"
+        doc "Display name — e.g. \"Moize Plains Lv. 1\"."
+    }
+
+    field img type="[str]::sep(comma)" {
+        key "b5VveUd8"
+        doc "Comma list of packed background tiles, each \"<file.jpg>:<x>:<y>\" — e.g. \"raid_map000_01.jpg:0:0,raid_map000_02.jpg:0:1022\"."
+    }
+
+    field rect1_pos type="[i32::str]::sep(colon)" {
+        key "d54Z3hUc"
+        doc "// UNVERIFIED: x:y pair — captured \"0:0\".  COLON-separated here; the same hash in grand_mission.kdl is comma-separated."
+    }
+
+    field rect1_size type="[i32::str]::sep(colon)" {
+        key "sdE1oku7"
+        doc "// UNVERIFIED: w:h pair — captured \"1280:1440\", \"1280:2022\".  Likely the map pixel size."
+    }
+
+    field rect2_pos type="[i32::str]::sep(colon)" {
+        key "U0s6Wkoq"
+        doc "// UNVERIFIED: second x:y pair — captured \"540:380\", \"0:800\" (viewport origin?)."
+    }
+
+    field rect2_size type="[i32::str]::sep(colon)" {
+        key "W4QdZ6pE"
+        doc "// UNVERIFIED: second w:h pair — mirrors rect1_size in most captured rows."
+    }
+}
+
+json RaidRcMst {
+    doc "Raid Class (RC) rank gate table (wrapper hash Yr5PCpo3, RaidRCMstResponse).  6 rows — RC1..RC6 lobby ranks."
+    hash "Yr5PCpo3"
+
+    field rc_id type="i32::str" {
+        key "7x3pPB2C"
+        doc "// UNVERIFIED (named from context): raid class rank id, 2..7 captured.  friends.kdl still carries this hash as unk_7x3pPB2C."
+    }
+
+    field reward_info type="[str]::sep(comma)" {
+        key "JQ23rIvk"
+        doc "CONFIRMED setRewardInfo (readParam).  comma list of packed colon tuples — captured \"6:20302:1:1:1,8:0:3:0:0\".  Likely the rank-up requirement set."
+    }
+
+    field scenario_info type="str" {
+        key "N4XVE1uA"
+        doc "Rank-up cutscene script — captured \"raid_01_2.txt\".  Same hash arena.kdl/LoginInfoReq use for scenario_info."
+    }
+}
+
+json RaidPlaystyleMst {
+    doc "Raid lobby playstyle labels (wrapper hash n2kNWdq5, RaidPlayStyleMstResponse).  6 rows."
+    hash "n2kNWdq5"
+
+    field id type="i32::str" {
+        key "NQR1Vd3t"
+        doc "Playstyle id 1..6."
+    }
+
+    field name type="str" {
+        key "QB0KYH2R"
+        doc "Display label — \"Not Specified\", etc."
+    }
+}
+
+json RaidBossMst {
+    doc "Raid boss catalog (wrapper hash 0qK4FXpC, RaidBossMstResponse).  287 rows."
+    hash "0qK4FXpC"
+
+    field id type="i32::str" {
+        key "tA4T0GXB"
+        doc "Boss id (10000..800514)."
+    }
+
+    field name type="str" {
+        key "K1sM9FtZ"
+        doc "Boss display name — \"Edelma\", ..."
+    }
+
+    field battle_monster_group_id type="u32::str" {
+        key "Qzhp8B40"
+        doc "Monster-group backing this boss (20000000..850000133).  Same hash/name as mission.kdl."
+    }
+
+    field img type="str" {
+        key "SsNg4d6o"
+        doc "Boss image file — captured lowercase \"aaa.jpg\" placeholders on early rows."
+    }
+
+    field img2 type="str" {
+        key "Uh3Te4AI"
+        doc "Second boss image file — captured \"AAA.jpg\" placeholders on early rows."
+    }
+
+    field bgm type="str" {
+        key "nDf28LtU"
+        doc "Battle BGM — e.g. \"bf049_raid_boss.mp3\"."
+    }
+
+    field recover_comp_sec type="i32::str" {
+        key "8Pbr70Wv"
+        doc "CONFIRMED setRecoverCompSec (readParam).  0..60 captured."
+    }
+
+    field move_time type="i32::str" {
+        key "iSgK67Du"
+        doc "CONFIRMED setMoveTime (readParam).  0..5 captured (difficulty tier?)."
+    }
+
+    field interval_move_time type="i32::str" {
+        key "w46VY1zm"
+        doc "CONFIRMED setIntervalMoveTime (readParam).  0..1800 captured (time limit in seconds?)."
+    }
+
+    field escape_hp_per type="i32::str" {
+        key "ogFx8s2Y"
+        doc "CONFIRMED setEscapeHpPer (readParam).  0..30 captured."
+    }
+
+    field rest_flg type="i32::str" {
+        key "S8NI2xZk"
+        doc "CONFIRMED setRestFlg (readParam).  0/1 flag."
+    }
+}
+
+json RaidBossRouteMst {
+    doc "Raid boss patrol routes (wrapper hash VyDP51hx, RaidBossRouteMstResponse).  347 rows.  IDA names this family's exact-name class here; the user-route table takes RaidMapRouteMstResponse by elimination (see backlog)."
+    hash "VyDP51hx"
+
+    field id type="i32::str" {
+        key "WB6bsRX9"
+        doc "Route row id (1000..85017)."
+    }
+
+    field unk1 type="i32::str" {
+        key "SP29fLtH"
+        doc "// UNVERIFIED: 1..87086 captured — mission/boss reference this route belongs to."
+    }
+
+    field unk2 type="i32::str" {
+        key "4vSjr6zw"
+        doc "// UNVERIFIED: 0..15 captured — likely the from-spot index (same hash in raid_user_route)."
+    }
+
+    field unk3 type="i32::str" {
+        key "Qf67k1ut"
+        doc "// UNVERIFIED: 0..15 captured — likely the to-spot index (same hash in raid_user_route)."
+    }
+
+    field unk4 type="str" {
+        key "gW70zeZ5"
+        doc "// UNVERIFIED: empty string in all 347 rows."
+    }
+}
+
+json RaidMissionMst {
+    doc "Raid mission catalog (wrapper hash 8J0dh4YZ, RaidMissionMstResponse).  154 rows (2000..88003)."
+    hash "8J0dh4YZ"
+
+    field id type="i32::str" {
+        key "j28VNcUW"
+        doc "Raid mission id.  Same hash the campaign tables use for mission ids."
+    }
+
+    field name type="str" {
+        key "0iAIR2LP"
+        doc "Mission name — \"Fire Eater\", ... (free text; can contain commas)."
+    }
+
+    field rc_id type="i32::str" {
+        key "7x3pPB2C"
+        doc "// UNVERIFIED (named from context): required raid class rank, 1..7 — pairs with RaidRcMst.rc_id."
+    }
+
+    field map_id type="i32::str" {
+        key "H9sx5D08"
+        doc "Raid map this mission runs on — RaidMapMst.map_id."
+    }
+
+    field time_limit type="i32::str" {
+        key "qY49LBjw"
+        doc "Mission time limit in seconds — 1800/2100 captured.  Name follows daily_task.kdl's use of this hash."
+    }
+
+    field unk1 type="i32::str" {
+        key "KR6JacN8"
+        doc "// UNVERIFIED: 1..4 captured (max players?)."
+    }
+
+    field need_mission_id type="[i32::str]::sep(comma)" {
+        key "HSRhkf70"
+        doc "Prerequisite raid mission ids — comma list, e.g. \"2000,2001,2002\".  Name follows sound.kdl's use of this hash."
+    }
+
+    field unk2 type="i32::str" {
+        key "UJTR1h5r"
+        doc "// UNVERIFIED: 0/1 flag."
+    }
+
+    field earn_zel type="i32::str" {
+        key "Najhr8m6"
+        doc "Zel reward (8000..150000).  Same hash/name as mission.kdl."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "Karma reward (2000..18000).  Same hash/name as mission.kdl."
+    }
+
+    field unk3 type="[i32::str]::sep(colon)" {
+        key "b5yeVr61"
+        doc "// UNVERIFIED: colon pair, captured \"1:0\".  slots.kdl carries this hash as use_medal (at-separated) — semantics here unknown."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Mission blurb (free text; contains commas/quotes)."
+    }
+
+    field comment type="str" {
+        key "WDUyI85C"
+        doc "Objective line with client markup — e.g. \"<color=242:215:145>Target:</color>...\"."
+    }
+
+    field room_asset type="str" {
+        key "21VKZo0E"
+        doc "// UNVERIFIED (named from value): lobby room asset — captured \"raid_room_shadow_boss_01\"."
+    }
+
+    field banner_img type="str" {
+        key "yTPw0BD7"
+        doc "// UNVERIFIED (named from value): lobby banner image — captured \"raid_room_quest_flame.png\"."
+    }
+
+    field bgm type="str" {
+        key "2ty57Bcv"
+        doc "Field BGM — e.g. \"bf050_raid02_fld.mp3\"."
+    }
+
+    field scenario_info type="str" {
+        key "N4XVE1uA"
+        doc "// UNVERIFIED: captured \"0,0\" here (vs a .txt script in RaidRcMst) — kept as the established scenario_info string."
+    }
+}
+
+json RaidMissionBossMst {
+    doc "Boss placements per raid mission (wrapper hash 7pJD5tNd, RaidMissionBossMstResponse).  264 rows."
+    hash "7pJD5tNd"
+
+    field mission_boss_id type="i32::str" {
+        key "SP29fLtH"
+        doc "CONFIRMED setMissionBossID (readParam).  1..88003 captured — placement/slot ordinal on low rows, mission-id-like on high rows."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "Raid mission this placement belongs to — RaidMissionMst.id."
+    }
+
+    field boss_id type="i32::str" {
+        key "tA4T0GXB"
+        doc "Boss spawned — RaidBossMst.id."
+    }
+
+    field init_point_num type="i32::str" {
+        key "i5r7Vjkq"
+        doc "CONFIRMED setInitPointNum (readParam).  0..15 captured (spawn spot index?)."
+    }
+
+    field rest_point_num type="i32::str" {
+        key "E0yfb8eK"
+        doc "CONFIRMED setRestPointNum (readParam).  0..15 captured."
+    }
+
+    field boss_visible_flg type="i32::str" {
+        key "g9EcMPR6"
+        doc "CONFIRMED setBossVisibleFlg (readParam).  0/1 flag."
+    }
+
+    field boss_appear_cnd_param type="[str]::sep(comma)" {
+        key "P6uVAa3m"
+        doc "CONFIRMED setBossAppearCndParam (readParam).  comma list of packed colon triples — captured \"1:0:0,1:0:0,1:0:0\"."
+    }
+}
+
+json RaidMissionClearCndMst {
+    doc "Raid mission clear conditions (wrapper hash 9EmPTqn3, RaidMisCondClearMstResponse).  235 rows."
+    hash "9EmPTqn3"
+
+    field id type="i32::str" {
+        key "FcKX8O65"
+        doc "Condition row id (8000..88003)."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "Raid mission this condition applies to — RaidMissionMst.id."
+    }
+
+    field display_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Display order within the mission (1..4).  Same hash/name as banner.kdl."
+    }
+
+    field unk1 type="i32::str" {
+        key "JRqU2bS6"
+        doc "// UNVERIFIED: 1..3 captured (condition type?)."
+    }
+
+    field clear_id type="[str]::sep(comma)" {
+        key "3l52Vq2h"
+        doc "CONFIRMED setClearID (readParam).  packed colon triple(s) \"<type>:<target>:<n>\" — usually one (\"1:800:0\") but row 201 carries a comma list (\"1:87000:0,1:87001:0\"), so this is a comma list of packed strings."
+    }
+}
+
+json RaidMissionPointMst {
+    doc "Per-mission spawn/loot points (wrapper hash 6hLn3bBr, RaidMissionPointMstResponse).  1378 rows."
+    hash "6hLn3bBr"
+
+    field id type="i32::str" {
+        key "yx4YL1Ua"
+        doc "Row id (20100..804914)."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "Raid mission — RaidMissionMst.id."
+    }
+
+    field point_id type="i32::str" {
+        key "PV3gH1Yf"
+        doc "Map point index this entry binds to — RaidPointMst.point_id (0..15)."
+    }
+
+    field count type="i32::str" {
+        key "H6k1LIxC"
+        doc "CONFIRMED setCount (readParam).  0..8 captured."
+    }
+
+    field item_info type="[str]::sep(comma)" {
+        key "8fjZN6Mx"
+        doc "// UNVERIFIED element shape: comma list of \"<weight>:<item_id>:<n>\" triples — captured \"5000:10610:1,5000:10300:1\".  Name follows town.kdl's use of this hash."
+    }
+}
+
+json RaidPointMst {
+    doc "Raid map points (camps/battle spots) (wrapper hash 4XA9m7of, RaidMapPointMstResponse — by elimination; MISSION_POINT takes the exact-name class).  344 rows."
+    hash "4XA9m7of"
+
+    field map_id type="i32::str" {
+        key "H9sx5D08"
+        doc "Raid map — RaidMapMst.map_id."
+    }
+
+    field point_id type="i32::str" {
+        key "PV3gH1Yf"
+        doc "Point index within the map (0..19)."
+    }
+
+    field point_type type="i32::str" {
+        key "AZFM14In"
+        doc "CONFIRMED setPointType (readParam).  0/1 flag."
+    }
+
+    field name type="str" {
+        key "f3L8HeKn"
+        doc "Point label — \"Camp\", ..."
+    }
+
+    field pos_x type="i32::str" {
+        key "SnNtTh51"
+        doc "Map x position (0..1544).  Same hash/name as grand_mission.kdl."
+    }
+
+    field pos_y type="i32::str" {
+        key "M6C1aXfR"
+        doc "Map y position (0..1536).  Same hash/name as grand_mission.kdl."
+    }
+
+    field pick_time type="i32::str" {
+        key "X7g8cNAI"
+        doc "CONFIRMED setPickTime (readParam).  0..40 captured."
+    }
+
+    field img type="str" {
+        key "L8iA9M6c"
+        doc "Point/battle thumbnail — e.g. \"dungeon_battle_10100.jpg\"."
+    }
+
+    field battle_effect type="[str]::sep(comma)" {
+        key "8f4NYKxb"
+        doc "CONFIRMED setBattleEffect (readParam).  comma list of \"<a>:<b>\" pairs — captured \"3:10100,1:10101,0:10102\" (spawn table per point?)."
+    }
+
+    field bgm type="str" {
+        key "3sRN9BPS"
+        doc "Point BGM — e.g. \"bf051_boss02_vari02.mp3\"."
+    }
+}
+
+json RaidUserRouteMst {
+    doc "Player-traversable route segments per mission (wrapper hash maU6riN7, RaidMapRouteMstResponse — by elimination; BOSS_ROUTE takes the exact-name class).  4135 rows."
+    hash "maU6riN7"
+
+    field id type="i32::str" {
+        key "E0VbaLr7"
+        doc "Route row id (20100..880023)."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "Raid mission — RaidMissionMst.id."
+    }
+
+    field unk1 type="i32::str" {
+        key "4vSjr6zw"
+        doc "// UNVERIFIED: 0..15 captured — likely the from-point index (same hash in raid_boss_route)."
+    }
+
+    field unk2 type="i32::str" {
+        key "Qf67k1ut"
+        doc "// UNVERIFIED: 0..15 captured — likely the to-point index (same hash in raid_boss_route)."
+    }
+
+    field stamina_cost type="i32::str" {
+        key "69vnphig"
+        doc "Stamina cost to traverse (0..4).  Same hash/name as mission.kdl."
+    }
+}
+
+json RaidBattleGroupMst {
+    doc "Raid encounter battle groups (wrapper hash QEv8VG6C, RaidBattleGroupMstResponse).  11121 rows — weighted monster-group rolls per point."
+    hash "QEv8VG6C"
+
+    field battle_group_id type="u32::str" {
+        key "ZSf8e1MG"
+        doc "Battle group id (1..36417).  Same hash/name as grand_mission.kdl."
+    }
+
+    field unk1 type="i32::str" {
+        key "E0VbaLr7"
+        doc "// UNVERIFIED: 20100..880023 captured — matches the RaidUserRouteMst.id space (encounter binding?)."
+    }
+
+    field weight type="u32::str" {
+        key "ug9xV4Fz"
+        doc "Roll weight (0..10000).  Same hash/name as gacha.kdl."
+    }
+
+    field battle_monster_group_id type="u32::str" {
+        key "Qzhp8B40"
+        doc "Monster group rolled (102000..850000059).  Same hash/name as mission.kdl."
+    }
+}
+
+json RaidBossPartsMst {
+    doc "Raid boss body parts (F_RAID_BOSS_PARTS_MST Ver78, 865 rows; client class RaidBossPartsMst, read from the client's own MST cache).  Server-only copy in deploy/mst/raid_boss_parts_mst.json: the server builds the boss battle's MonsterMst rows from it, so the wrapper key is a local name, not a wire hash."
+    hash "F_RAID_BOSS_PARTS_MST"
+
+    field boss_id type="i32::str" {
+        key "tA4T0GXB"
+        doc "RaidBossMst.id this part belongs to."
+    }
+
+    field monster_id type="u32::str" {
+        key "o49dYfpH"
+        doc "Part monster id (MonsterMst id the battle uses)."
+    }
+
+    field body_flg type="i32::str" {
+        key "7Hf3DnVj"
+        doc "1 = main body; the boss is defeated when this part reaches 0 HP."
+    }
+
+    field z_order type="i32::str" {
+        key "2gZIRQ7D"
+        doc "Draw order."
+    }
+
+    field img_a type="str" {
+        key "2EF0d6ue"
+        doc "Sprite sheet (content/monster/img)."
+    }
+
+    field anm_cgg type="str" {
+        key "QqfI9mM4"
+        doc "Frame geometry (content/monster/cgg)."
+    }
+
+    field cgs_idle type="str" {
+        key "0QxL2is7"
+        doc "Idle animation (content/monster/cgs)."
+    }
+
+    field target_area type="str" {
+        key "8GNxt1XE"
+        doc "Touch area \"x,y,w,h\"."
+    }
+}

@@ -1,0 +1,112 @@
+json BraveSlotPrize {
+    doc """
+    One outcome of a Brave Slots pull.
+
+    The SERVER decides the outcome and the client animates to it - wheelSpin's
+    sibling here is RandallSlotActionScene, which stops the reels where
+    SlotgameResultInfo tells it to.  So a prize carries both what is paid AND
+    the reel positions that represent it.
+
+    Symbols come from the picture list already authored in
+    deploy/system/brave_slots.json (rY6j0Jvs): 81 j_god, 1 s_flog, 7 allup_unit,
+    2 b_flog, 8 c_god, 6 pup_unit, 3 b_emperor, 18 sphere, 9 g_god, 80 m_god,
+    13/12/15 item, 82 medal.
+
+    ⚠ That claim used to read "no source anywhere - wiki included", and it was
+    wrong: https://bravefrontierglobal.fandom.com/wiki/Slots lists the real
+    payout table (Sphere Frog, Burst Emperor, Elemental Crystal, the sphere
+    list, Almighty Imp Arton, the imps, Elemental God, consumables, Jewel God,
+    1 Raid Medal, Jewel King).  What is true is that almost none of those
+    entities exist in this server's unit_mst/item_mst or the client's
+    text_local.csv, so the table stays AUTHORED - but by necessity, not for
+    lack of a source.  Check the wiki before assuming there is none.
+
+    Rewards deliberately reuse the shared present_type vocabulary.
+    """
+
+    field key type=str {
+        key "key"
+        doc "Stable identifier, used in logs so an odd result is legible without decoding ids."
+    }
+
+    field weight type="u32::int" {
+        key "weight"
+        doc "Relative chance of this outcome.  Rolled against the sum of all weights."
+    }
+
+    field reels type="[u32::int]" {
+        key "reels"
+        doc """
+        The three picture ids the reels stop on, left to right.
+
+        Goes out as h6smq0WE (setReelStopNum), comma-joined.  The exact encoding
+        the client expects is UNVERIFIED - it is a string field carrying several
+        numbers, which handbook 3.4 says to treat as a delimited list, but
+        nothing pins whether these are picture ids or reel indices.  If the
+        reels stop somewhere other than the symbols named here, THIS is the
+        field to change first.
+        """
+    }
+
+    field prize_rank type=str {
+        key "prize_rank"
+        doc """
+        Goes out as 3WZ7KTp8 (setPrizeRank) and picks the win ANIMATION tier -
+        it is not a payout scale and nothing reads it as one.
+
+        RandallSlotResultScene::setPrizeData @0x1A74554 switches on exactly
+        three values and defaults the rest:
+            2  SlotReaGet.sam          / SlotReaGetAdd.sam
+            3  SlotGekiReaGet.sam      / SlotGekiReaGetAdd.sam
+            4  SlotSuperGekiReaGet.sam / SlotSuperGekiReaGetAdd.sam
+            *  SlotGet.sam             / SlotGetAdd.sam      (b.ne @0x1A74578)
+
+        So 4 is the TOP tier, and a higher number is not a louder one: a 5 is
+        legal but falls through the default and plays the plainest animation,
+        which is how the jackpot row used to undersell itself.
+        """
+    }
+
+    field present_type type="u32::int" {
+        key "present_type"
+        doc """
+        Shared reward vocabulary: 3 = zel, 8 = gem, 6 = unit, 4/5/7 = item
+        domains.  Zero means the pull pays nothing.
+
+        ⚠ THE PRIZE POPUP HAS ITS OWN, DIFFERENT VOCABULARY.  yT3NBME0
+        (setPrizeType) is a 1..5 slot-local code, resolved by
+        RandallSlotScene::createPrizeDrawInfo's jump table @0x1A757D8:
+
+            0 -> setPrizeData calls popScene()   (no popup at all)
+            1 -> UnitMstList     2,3 -> ItemMstList     5 -> MedalMstList
+            4 -> handled, draws nothing
+
+        The server derives it from present_type rather than storing it, so the
+        two cannot drift apart.  A prize whose present_type has no popup code -
+        zel and gem - would show NOTHING, so slot prizes are kept to units and
+        items.
+        """
+    }
+
+    field target_id type="u32::int" {
+        key "target_id"
+        doc "Rewarded entity, interpreted per present_type."
+    }
+
+    field target_cnt type="u32::int" {
+        key "target_cnt"
+        doc "Quantity awarded."
+    }
+
+    field description type=str {
+        key "description"
+        doc """
+        Human-readable, for logs only.
+
+        ⚠ It is NOT what goes out as CW1bko4F.  That field is built from
+        target_id and target_cnt as "<targetId>@<count>" - createPrizeDrawInfo
+        splits it and needs BOTH halves.  See the CW1bko4F doc in handlers.kdl;
+        a bare id reads element [1] off the end of the split vector.
+        """
+    }
+}

@@ -1,0 +1,93 @@
+
+json DailyLoginRewardsUserInfo {
+    doc """
+    Drudr2w5 — the Daily Spin wheel's per-user state.  Read by DailyLoginScene
+    and, for `user_current_count` alone, by both Home scenes.
+    """
+    field id type="i32::str" {
+        key "XIvaD6Jp"
+        doc """
+        setId.  The REWARD ID the wheel lands on, NOT a day number.
+
+        setupSpinWheelRewards @0xE52740 resolves it through
+        DailyLoginRewardsMstList::getObject(id) -> getGroupType() ->
+        getRewardGroupViaGroupType(), so it picks BOTH which day's six prizes
+        are drawn AND which of them is won.  A day number here draws a
+        different day's wheel than the spin scores against, and an id past the
+        end of the table draws a group belonging to no day at all — neither
+        fails loudly.  See gme::dailySpinAnchor.
+        """
+    }
+
+    field user_current_count type="i32::str" {
+        key "35JXN4Ay"
+        doc """
+        setUserCurrentCount.  Spins ALREADY USED today, not spins remaining.
+
+        ⚠ NOT COSMETIC.  isDailyLoginAvailable @0x1CC8278 returns
+        `user_current_count < 1`, and its only callers are
+        HomeScene2::updateEvent @0x16F2D9C and AnotherHomeScene::updateEvent
+        @0x16E5128 — so below 1 makes Home force-open the wheel over itself.
+        The wheel only closes once used >= limit (DailyLoginScene::updateEvent
+        state 1 @0xE52FDC), so 0 against a non-zero limit with no working spin
+        handler locks the player out of Home entirely.
+        """
+    }
+
+    field user_spin_limit_count type="i32::str" {
+        key "5xStG99s"
+        doc """
+        setUserLimitCount.  Spins allowed per day.  Raising it above 1 does not
+        grant usable spins: the client renders spins 2..5 as ad-gated "Bonus Ad
+        Spin" and refuses them for want of an ad provider.
+        """
+    }
+
+    field current_day type="i32::str" {
+        key "ad6i23pO"
+        doc """
+        setCurrentDay.  The "Days: N" header — the player's LIFETIME spin day,
+        which keeps climbing past the end of the reward table.  It is not the
+        row being played; that comes from `id`.
+        """
+    }
+
+    field remaining_days_till_guaranteed_reward type="str" {
+        key "u8iD6ka7"
+        doc """
+        setDay.  Text prepended to `message`, giving "N day(s) more to
+        guaranteed Gem!".  The live game guaranteed a Gem on the first spin of
+        days 7 / 14 / 21 / 28.
+
+        ⚠ A STRING, AND EMPTY MEANS "DRAW NOTHING".  setMainWindow @0xE52324
+        tests the returned string's length and SKIPS the append when it is
+        empty (the branch at @0xE52338), so an empty value suppresses the
+        counter and leaves `message` alone.  That is the only way to stop the
+        label promising a Gem: past day 28 the table's terminal "Day 29+" row
+        repeats forever and no further guaranteed Gem is coming.
+
+        // RETYPED FROM: i32::str.  The setter has always taken a string —
+        // i32::str merely serialised compatibly while every value was a
+        // number, and it made the empty case unrepresentable.
+        """
+    }
+
+    field message type="str" {
+        key "ZC0msu2L"
+        doc """
+        setMessage.  Passed through GameScene::getText @0xE523A4, which returns
+        unknown strings unchanged, so the server sends the literal text rather
+        than a localisation key.  Appended after the counter above.
+        """
+    }
+
+    field next_reward_id type="i32::str" {
+        key "outas79f"
+        doc """
+        setNextRewardId.  The reward id anchoring TOMORROW's wheel, read by
+        setupSpinWheelRewards @0xE52768 for the preview.  Same id space and
+        same hazards as `id`.
+        """
+    }
+
+}

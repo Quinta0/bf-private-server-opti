@@ -1,0 +1,825 @@
+json GetAchievementInfoNode {
+    doc """
+    The achievement query selector.
+
+    Wire: {\"1Q2pGAXE\":[{\"YQG2AE5h\":<mode>,\"KT71m8Ae\":<n>,\"3rhygS9K\":<n>}]}
+    per GetAchievementInfoRequest::createBody (0x13A4BD8).  All three go out
+    through the addParam(..., int) overload.
+    """
+
+    field mode type="i32::str" {
+        key "YQG2AE5h"
+        doc """
+        Which list the client is asking for.  createBody branches on this same
+        value straight after sending it: 1 clears UserAchievementSubjectInfoList
+        (subject/mission list), 2 clears UserAchievementTradeInfoList (the trade
+        shop).  So the client empties the list it is about to be sent, which
+        means a response omitting that list leaves it EMPTY rather than stale.
+        """
+    }
+
+    field category type="i32::str" {
+        key "KT71m8Ae"
+        doc "Achievement category.  Same key as F_ACHIEVEMENT_SUBJECT_MST's category column, so the two are joinable.  // UNVERIFIED: no readParam setter names exist for the achievement responses; semantics inferred from the shared MST key."
+    }
+
+    field sub_category type="i32::str" {
+        key "3rhygS9K"
+        doc "Achievement sub-category.  Also shared with F_ACHIEVEMENT_SUBJECT_MST.  // UNVERIFIED: as above."
+    }
+}
+
+json GetAchievementInfoReq {
+    doc "Request for the achievement screen.  Sent when the menu that hosts achievements opens — GroupId YPBU7MD8, AES key AKjzyZ81."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[GetAchievementInfoNode]" {
+        key "1Q2pGAXE"
+        doc "The query selector."
+    }
+}
+
+json UserAchievementSubjectInfo {
+    doc """
+    One achievement's progress for this player (wrapper YTRJLG65,
+    UserAchievementSubjectInfoResponse, readParam @0x13FBEEC).
+
+    ⚠ MERGE, not replace: readParam calls addObject with no removeAll of any
+    kind.  The list IS emptied, but by the REQUEST -- GetAchievementInfoRequest::
+    createBody clears UserAchievementSubjectInfoList before it sends, so a reply
+    that omits this key leaves the screen empty rather than stale.
+
+    Field map decoded 2026-09-13.  The class has no setters at all (every store
+    is inlined), so the wire keys were matched to members through readParam and
+    then the members were read back out of the two screens that draw them --
+    RandallAchievementListItem::createSprite @0x1A57364 (the row) and
+    RandallAchievementListDetailScene::setLayout @0x1A53D40 (the page).  Between
+    them every field below is now CONFIRMED by a reader, not inferred from a
+    hash.  setParameter @0x1A56B6C is the bridge: it copies info+0x30..0x4b to
+    scene+0x388.., so scene+0x388 == info+0x30 (`pG2n1A28`) and so on.
+
+    THIS BLOCK WAS SENT ALL-ZEROES AND EVERY ZERO MEANT SOMETHING.  The screen
+    reported "Time Expired" on all 873 achievements, "Achieved 26/0" on a
+    finished one, and offered a Start button instead of Receive -- three symptoms
+    of three fields left at 0 because they were documented as unknown state.
+    """
+
+    field subject_id type="str" {
+        key "M7SXoc31"
+        doc "AchievementSubjectMst.id -- or a COMMA-SEPARATED LIST of them.  The Receive All button sweeps the whole visible page into one request: a live capture on 2026-09-14 carried \"25000,25010,26000,27000,27010,27020\".  A single claim is just the one-element case, so the handler splits on commas and claims each independently, skipping ids that are already claimed or unfinished rather than failing the batch.  A STRING here -- readParam assigns it without conversion, unlike the MST side."
+    }
+
+    field progress type="i64::str" {
+        key "pG2n1A28"
+        doc """
+        StrToLL -> +0x30.  How far along the condition this player is, and the
+        NUMERATOR of the detail page's "Achieved n/m": setLayout builds that
+        string as CommonUtils::LLToString(scene+0x388) + "/" +
+        CommonUtils::IntToString(scene+0x390) @0x1A54DF8.  64-bit because zel
+        and damage totals live here.
+        """
+    }
+
+    field need_count type="i32::str" {
+        key "9g4hdDJn"
+        doc """
+        StrToInt -> +0x38.  The TARGET -- the denominator of "Achieved n/m",
+        printed from scene+0x390 by the same builder at 0x1A54E48.
+
+        It is AchievementSubjectMst.cond_param restated per user, and the client
+        does NOT fall back to the MST: left at 0 a finished achievement reads
+        "Achieved 26/0", which is what the screen showed on 2026-09-13.
+        """
+    }
+
+    field state type="i32::str" {
+        key "0B5bQgZh"
+        doc """
+        StrToInt -> +0x3c.  The row's STATE, and the detail page's button.
+
+        The row (createSprite @0x1A57B2C) picks the badge from it:
+          1 -> achievement_situation_label2.png  "In Progress"
+          2 -> rPk8gtY5 decides: 2 gives label3 "Completed", anything else
+               label1 "Completed / Claim Rewards"
+          anything else -> no badge at all
+        The page (setLayout @0x1A55E1C) indexes a four-entry jump table with it
+        (`cmp #3; b.hi` guards it, so the domain is 0..3):
+          0    -> sub_m_btn_start_label      "Start"   (AchievementAccept, flag 1)
+          1,3  -> sub_m_btn_cancellation_... "Cancel"  (AchievementAccept, flag 2)
+          2    -> sub_m_btn_receive_label    "Receive" / "Received"
+
+        This fork sends 1 while the condition is unmet and 2 once it is met.
+        There is no 0: accepting is what starts the original's timer, and here
+        every counter is tracked unconditionally, so nothing has to be started.
+        """
+    }
+
+    field time_left type="i32::str" {
+        key "VDKB0Y5h"
+        doc """
+        StrToInt -> +0x40.  SECONDS REMAINING on an accepted challenge -- NOT an
+        accept status, which is what this was called before a reader was traced.
+
+        Both screens run the same test (list @0x1A57CC8, page @0x1A545B4):
+          >= 1  -> GameUtils::convertToTimeLimitString(seconds)
+          == 0  -> the literal text RANDALL_ACHIEVEMENT_TIME_LIMIT, "Time Expired"
+          <  0  -> the label is left as the empty string it was zeroed to
+        So 0 -- the value this block used to carry for every row -- is the one
+        value that says EXPIRED.  Achievements here have no timer, so -1 goes out
+        and the line simply is not drawn.
+        """
+    }
+
+    field reward_received type="i32::str" {
+        key "rPk8gtY5"
+        doc """
+        StrToInt -> +0x44.  Whether the reward is waiting, and it is a THREE-way
+        value, not a flag:
+          0 -> nothing to claim; the page draws no receive button at all
+          1 -> claimable: sub_m_btn_receive_label1 "Receive" (@0x1A56034)
+          2 -> claimed:   sub_m_btn_receive_label3 "Received", and the row's
+               badge becomes label3 "Completed" instead of "Claim Rewards"
+        AchievementRewardReceive (uq69mTtR) is what moves 1 -> 2.
+        """
+    }
+
+    field new_flag type="i32::str" {
+        key "dJNpLc81"
+        doc "StrToInt -> +0x48.  NewFlg in UserUnitInfoResponse and RaidUserBagInfoResponse -- the NEW badge on the row."
+    }
+
+    field cond_info type="str" {
+        key "AKtVeaZ2"
+        doc "Passed whole to UserAchievementSubjectInfo::parseAchievementCondInfo @0x1C6CFE0 -- a packed per-condition detail string.  Empty until that parser is decoded; the client accepts an empty one."
+    }
+
+    field chain_info type="str" {
+        key "oJIEa3hU"
+        doc "Passed whole to UserAchievementSubjectInfo::parseAchievementChainInfo @0x13E280 -- the chain (10 -> 100 -> 1000 ...) this subject belongs to.  Empty for the same reason."
+    }
+}
+
+json UserAchievementTradeInfo {
+    doc "What this player has bought from the Merit Point shop (wrapper 9j3ALx8I, UserAchievementTradeInfoResponse, readParam @0x13FCC68 -- a REPLACE list)."
+
+    field trade_id type="str" {
+        key "Mdgsh04u"
+        doc "AchievementTradeMst.id."
+    }
+
+    field count type="i32::str" {
+        key "H6k1LIxC"
+        doc "How many of this offer the player has bought in total (row+0x30), against AchievementTradeMst.limit_count (S8rdp9zk): the shop shows limit_count minus this as the remaining stock and caps the slider with it.  Named Cnt by PermitRecipeResponse and used the same way by the selector-ticket and guild-exchange blocks."
+    }
+
+    field state type="i32::str" {
+        key "VDKB0Y5h"
+        doc "The same per-row state hash the subject block carries.  // UNVERIFIED; sent 0."
+    }
+
+    field unk_ypV81b7k type="i32::str" {
+        key "ypV81b7k"
+        doc "// UNVERIFIED: no setter for this hash in any class.  Sent 0."
+    }
+}
+
+json UserAchievementSPSubjectInfo {
+    doc "The SP (special) achievements this player has, one id per row (wrapper LcFCx1Uz, readParam @0x13FBC64 -- a REPLACE list with a single key).  Nothing here fills it yet: the SP tab is category 4/5 and its conditions are Trials, which this server does not run."
+
+    field subject_id type="str" {
+        key "M7SXoc31"
+        doc "AchievementSubjectMst.id."
+    }
+}
+
+json GetAchievementInfoResp {
+    doc """
+    The achievement screen.
+
+    This used to be deliberately empty -- the four response classes were known
+    but their fields were not, and handbook rule 3.4 says an unknown field sent
+    as 0 is worse than an absent one.  The readParam audit behind
+    UserAchievementSubjectInfo lifted that block for everything that matters;
+    the two keys still unnamed are sent as 0, which is the value the client's own
+    constructor gives them.
+
+    Three of the four blocks below are MASTER data, and they do not travel
+    through getResponseObject at all: `H9ATfJ38`, `82CcMZhp` and `1tJiqKgZ` are
+    parseBodyTag tags, written into the client's own MST store by
+    DataMstManager::save* and read back by load*, which HomeScene::loadFiles
+    re-runs -- so a table sent here is live from the next trip through Home.
+    Nothing had ever sent them, which is why the screen had no achievement names
+    to print even for a player whose counters were full.
+
+    The request is a QUERY (see GetAchievementInfoNode): mode 1 wants the
+    subject list, mode 2 the trade shop, filtered by category and cond_type.
+    Both lists are answered, filtered, because the client clears the one it asks
+    for and a missing key reads as "none".
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field achievementInfo type="UserAchievementInfo" {
+        key "Bnc4LpM8"
+        doc "The Merit Point balance -- see gme/common/Achievements.hpp.  The screen prints it and nothing else writes the client's singleton."
+    }
+
+    field subjectMst type="[AchievementSubjectMst]" {
+        key "H9ATfJ38"
+        doc "The achievement catalogue (parseBodyTag -> the client's MST store)."
+        optional #true
+    }
+
+    field tradeMst type="[AchievementTradeMst]" {
+        key "82CcMZhp"
+        doc "The Merit Point shop catalogue (parseBodyTag)."
+        optional #true
+    }
+
+    field deliverRateMst type="[AchievementDeliverRateMst]" {
+        key "1tJiqKgZ"
+        doc "The dedicate-rate table (parseBodyTag)."
+        optional #true
+    }
+
+    field subjects type="[UserAchievementSubjectInfo]" {
+        key "YTRJLG65"
+        doc "This player's progress on the subjects the query asked for."
+        optional #true
+    }
+
+    field trades type="[UserAchievementTradeInfo]" {
+        key "9j3ALx8I"
+        doc "This player's purchase counts."
+        optional #true
+    }
+
+    field spSubjects type="[UserAchievementSPSubjectInfo]" {
+        key "LcFCx1Uz"
+        doc "SP achievements; empty until Trials run here."
+        optional #true
+    }
+}
+
+json DailyTaskUserInfoResp {
+    doc """
+    Brave Points & Rewards payload (m7g0Ekb5).
+
+    Echoes the three daily-task MST tables back to the client.  They are ALSO
+    sent in Initialize, so this looks redundant — it is not.  The client empties
+    the list it is about to receive before issuing a request (proved for the
+    achievement path, where GetAchievementInfoRequest::createBody calls
+    UserAchievementSubjectInfoList::removeDataObject / removeAllObjects).  With
+    this handler answering {} the Brave Points screen therefore WIPED the tiles
+    Initialize had populated at boot, and they never came back — the screen
+    rendered once on a fresh launch and was empty on every visit afterwards.
+
+    Re-sending the tables makes the screen self-sufficient rather than depending
+    on boot state that it destroys on entry.
+
+    ⚠ PER-USER STATE RIDES ON THE TASK ROWS, not on a separate block.  An
+    earlier note here guessed it lived in 6C0kzwM5 UserBraveMedalInfoResponse;
+    that block is the Brave MEDAL item (medal_id / possession), nothing to do
+    with Brave Points.  DailyTaskMst carries all three counters itself —
+    `getBravePoints` (22rqpZTo, the spendable balance), `getBravePointsTotal`
+    (bya9a67k, the lifetime total the milestones are gated on) and
+    `getTimesCompleted` (9cKyb15U, this task's progress).  The server repeats
+    the two totals on every row.
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field dailyTaskBonuses type="DailyTaskBonusMst" {
+        key "p283g07d"
+        doc "Bonus tier table — same rows Initialize sends."
+    }
+
+    field dailyTaskPrizes type="[DailyTaskPrizeMst]" {
+        key "a739yK18"
+        doc "Redeem Prizes catalog — same rows Initialize sends."
+    }
+
+    field dailyTasks type="[DailyTaskMst]" {
+        key "k23D7d43"
+        doc "Today's Tasks table — same rows Initialize sends."
+    }
+}
+
+json DailyTaskUserInfoReq {
+    doc """
+    Brave Points & Rewards, read side (m7g0Ekb5).
+
+    DailyTaskUserInfoRequest::createBody sends no feature-specific group at all
+    — just identity, the signal key and the MST version list — so this exists
+    only to recover the caller, which is what the per-user half of the reply
+    needs.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Caller identity."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag."
+    }
+}
+
+json DailyTaskClaimRewardNode {
+    doc """
+    The prize being claimed — the whole body of
+    DailyTaskClaimRewardRequest::createBody, which sends exactly one param.
+    """
+
+    field prize_id type="i32::str" {
+        key "d83aQ39U"
+        doc """
+        DailyTaskPrizeMst.id.  `setPrizeId` is the request's only setter, so the
+        server has to decide from the MST row alone whether this is a milestone
+        (claim once at a BP TOTAL threshold, spending nothing) or a regular
+        shop prize (spend `brave_points_cost` from the available balance).
+        """
+    }
+}
+
+json DailyTaskClaimRewardReq {
+    doc """
+    DailyTaskClaimReward — GroupId `oP3bn47e`, AES key `ut0j9h3K`.
+
+    ⚠ THIS WAS UNREGISTERED UNTIL 2026-09-20, and the Redeem Prizes and
+    Milestone tabs were both reachable, so tapping Claim closed the session —
+    indistinguishable from a crash, with no log line (see
+    [[unsupported-requests]]).  The pair came from `getRequestID` /
+    `getEncodeKey` on the request class rather than from the aligned handler
+    table, the same way DailyTaskUserInfo's 7-character key did.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Caller identity."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag, echoed back."
+    }
+
+    field claim type="[DailyTaskClaimRewardNode]::size(1)" {
+        key "a739yK18"
+        doc "The prize id.  Keyed on the PRIZE TABLE's own hash, not a request-specific one."
+    }
+}
+
+json DailyTaskClaimRewardResp {
+    doc """
+    The reply to a claim.
+
+    Carries the same three tables the read path does, because the screen empties
+    them before every request — answering with the prize alone would blank the
+    catalogue exactly as an empty DailyTaskUserInfo reply once did.  The
+    refreshed rows are what move the BP counters and the claim ticks.
+
+    The prize itself goes to the PRESENT BOX (gme::addUserPresent) rather than
+    being granted inline, which is what the live game did and what keeps one
+    reward vocabulary for every payout path.
+
+    ⚠ THE PRESENT BOX IS DELIBERATELY NOT CARRIED HERE, which is a departure
+    from the usual "refresh every cache you changed" rule.  The box is its own
+    scene and re-reads itself on entry, so there is nothing on screen at claim
+    time to go stale; the Home badge catches up on the next UserInfo, which is
+    one back-press away.  Sending it would mean lifting Present.cpp's
+    readPresents (and its date formatting and list-op derivation) into a shared
+    header for a refresh nobody can observe.
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field dailyTaskBonuses type="DailyTaskBonusMst" {
+        key "p283g07d"
+        doc "Bonus tier table, re-sent so the screen keeps it."
+    }
+
+    field dailyTaskPrizes type="[DailyTaskPrizeMst]" {
+        key "a739yK18"
+        doc "Redeem Prizes catalog with this player's claim counts applied."
+    }
+
+    field dailyTasks type="[DailyTaskMst]" {
+        key "k23D7d43"
+        doc "Today's Tasks with progress and the updated BP totals."
+    }
+}
+
+json AchievementRewardReceiveNode {
+    doc """
+    Which achievement is being claimed -- the 1Q2pGAXE group of
+    AchievementRewardReceiveRequest::createBody @0x139E3A8.  The three params go
+    out in this order: category and cond_type through addParam(const char*, int),
+    subject_id through the std::string overload.
+    """
+
+    field category type="i32::str" {
+        key "KT71m8Ae"
+        doc "AchievementSubjectMst.category -- the tab the row was on."
+    }
+
+    field cond_type type="i32::str" {
+        key "3rhygS9K"
+        doc "AchievementSubjectMst.cond_type -- the filter the row was under."
+    }
+
+    field subject_id type="str" {
+        key "M7SXoc31"
+        doc "The achievement being claimed.  This is the one field that identifies it; the other two are the screen's filters, echoed so the reply can re-answer the same list."
+    }
+}
+
+json AchievementRewardReceiveReq {
+    doc "AchievementRewardReceive (GroupId uq69mTtR, AES key cbE74zBZ) -- claim a finished achievement's Merit Points."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[AchievementRewardReceiveNode]" {
+        key "1Q2pGAXE"
+        doc "The achievement to pay out.  Same group key the screen's query uses."
+    }
+}
+
+json AchievementRewardReceiveResp {
+    doc """
+    The claim's result: the new balance and the list the screen is looking at.
+
+    The subject list goes back FILTERED by the node's own category/cond_type,
+    because that is the list the client has on screen -- and it clears its copy
+    before every request, so re-sending is how the claimed row turns into a
+    claimed row rather than staying lit.
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field achievementInfo type="UserAchievementInfo" {
+        key "Bnc4LpM8"
+        doc "The Merit Point balance after the payout.  Nothing else writes the client's singleton, so this is what makes the number move."
+    }
+
+    field subjects type="[UserAchievementSubjectInfo]" {
+        key "YTRJLG65"
+        doc "The same slice of the achievement list the request named, with the claimed row now marked."
+    }
+
+    field badge type="BadgeAchievementCount" {
+        key "h23iRjGN"
+        doc "The achievement badges after the claim.  AchievementBadgeInfo is written only by parseBadgeData, so a claim that does not re-send this leaves the badge lit on the Randall town tile and the record row until the next login -- the same trap DungeonKeyInfoResp's BadgeKeyCount fixes for keys."
+    }
+}
+
+json AchievementAcceptNode {
+    doc """
+    Which achievement is being started or given up -- the 1Q2pGAXE group of
+    AchievementAcceptRequest::createBody @0x139DCA0.
+    """
+
+    field category type="i32::str" {
+        key "KT71m8Ae"
+        doc "AchievementSubjectMst.category -- the tab the row was on."
+    }
+
+    field cond_type type="i32::str" {
+        key "3rhygS9K"
+        doc "AchievementSubjectMst.cond_type -- the filter the row was under."
+    }
+
+    field subject_id type="str" {
+        key "M7SXoc31"
+        doc "The achievement being accepted or dropped."
+    }
+
+    field accept_flag type="i32::str" {
+        key "mnZ5K4Ii"
+        doc """
+        1 = accept, 2 = give up.  One request serves both buttons:
+        NormalState::challengeStart @0x1A570CC writes 1 and
+        QuitRequestState::updateEvent @0x1A571D8 writes 2 into the same member
+        (+0x40) before sending.
+        """
+    }
+}
+
+json AchievementAcceptReq {
+    doc """
+    AchievementAccept (GroupId dx5qvm7L, AES key g9N1y7bc) -- the Start and Give
+    Up buttons on an achievement's detail page.
+
+    REGISTERING THIS IS A SAFETY FIX, not a feature.  The buttons became
+    reachable the moment the achievement screen started drawing rows, and an
+    unregistered GroupId closes the session -- which on that page looks like a
+    crash.
+
+    The original gated progress behind accepting: RandallAchievementCommon::
+    getMaxAchievementAcceptCnt (called at 0x1A57038) caps how many may be held
+    at once, and accepting starts the VDKB0Y5h countdown.  Here every counter is
+    tracked whether or not anything was accepted, so there is nothing to start
+    and nothing to lose by giving up; the handler answers with the refreshed
+    list and stores nothing.  That is also why `state` never goes out as 0 --
+    see UserAchievementSubjectInfo.state.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[AchievementAcceptNode]" {
+        key "1Q2pGAXE"
+        doc "The achievement, and which button was pressed."
+    }
+}
+
+json AchievementAcceptResp {
+    doc """
+    The refreshed list.
+
+    Answering is not optional and neither is the list: createBody calls
+    UserAchievementSubjectInfoList::removeDataObject(category, cond_type) on its
+    way out, so the client has already thrown away the page it is looking at.  A
+    bare acknowledgement would leave the screen blank.
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field achievementInfo type="UserAchievementInfo" {
+        key "Bnc4LpM8"
+        doc "The Merit Point balance, unchanged -- the page prints it and nothing else writes the client's singleton."
+    }
+
+    field subjects type="[UserAchievementSubjectInfo]" {
+        key "YTRJLG65"
+        doc "The same slice of the list the request named, rebuilt."
+    }
+}
+
+json AchievementTradeNode {
+    doc "One purchase -- the rX74GNsm group of AchievementTradeRequest::createBody @0x139E600: trade id as a string, count as an int."
+
+    field trade_id type="str" {
+        key "Mdgsh04u"
+        doc "AchievementTradeMst.id."
+    }
+
+    field count type="i32::str" {
+        key "H6k1LIxC"
+        doc "How many to buy: the shop slider's value, 1 .. AchievementTradeMst.limit_count (S8rdp9zk) minus what this player has already bought (RandallAchievementShopDetailScene::sliderSet @0x1A62FBC) -- 400 on the Ignis Shard offer.  Quoted like every request number."
+    }
+}
+
+json AchievementTradeReq {
+    doc "AchievementTrade (GroupId m9LiF6P2, AES key 0IWC9LVq) -- buy from the Merit Point shop."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[AchievementTradeNode]" {
+        key "rX74GNsm"
+        doc "What is being bought."
+    }
+}
+
+json AchievementTradeResp {
+    doc """
+    The purchase's result.
+
+    Merit Points are not part of the currency block, so `Bnc4LpM8` has to come
+    back on its own; everything the reward touched comes back beside it, because
+    the shop is reachable from Randall without passing through a login.
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field achievementInfo type="UserAchievementInfo" {
+        key "Bnc4LpM8"
+        doc "The Merit Point balance after the spend."
+    }
+
+    field trades type="[UserAchievementTradeInfo]" {
+        key "9j3ALx8I"
+        doc "Purchase counts after the buy -- a REPLACE list, so the whole catalogue goes back."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "The header, for an offer that pays zel, karma or gems."
+        optional #true
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "The item warehouse, for an offer that pays an item or a sphere.  A full replace -- see the item emitters."
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "The item dictionary, so a first-time item is not missing from the guide."
+        optional #true
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        doc "The unit a unit offer granted.  Insert-if-absent on the client, which is right for a brand-new unit."
+        optional #true
+    }
+
+    field unit_dictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        doc "The COMPLETE unit dictionary, never just the new species -- see the reward emitters."
+        optional #true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AchievementDeliver -- the Trade Zel / Karma / Units / Spheres screens.
+//
+// GroupId vsaXI4M0, AES key 2Lj5hIEG, /actionSymbol/H2guKY1A.php
+// (AchievementDeliverRequest::getRequestID/getEncodeKey/getUrl @0x139DF5C).
+// createBody @0x139DF80 sends exactly two groups and nothing else.
+//
+// THE FLOW SELECTOR IS cond_type, not a field of its own.
+// RandallAchievementDedicateKarmaScene::setBaseData @0x1A35FB0 asks
+// UserAchievementSubjectInfoList::getDataObject(3, 5), and the four Dedicate
+// screens each own one bucket of achievement category 3:
+//     4 = Zel      (subjects 9000000..9000030, "Traded N Zel Total")
+//     5 = Karma    (subjects 9100010..9100040, "Traded N Karma Total")
+//     6 = Sphere   (subject  9300000, "Trade Sphere")
+//     8 = Unit     (subject  9200000, "Traded Unit")
+// ---------------------------------------------------------------------------
+json AchievementDeliverNode {
+    doc "Which Dedicate screen the delivery came from -- group 1Q2pGAXE, the same selector shape the achievement query uses."
+
+    field category type="i32::str" {
+        key "KT71m8Ae"
+        doc "Achievement category; 3 on every Dedicate screen."
+    }
+
+    field cond_type type="i32::str" {
+        key "3rhygS9K"
+        doc "THE FLOW: 4 Zel, 5 Karma, 6 Sphere, 8 Unit.  See the note above."
+    }
+
+    field subject_id type="str" {
+        key "M7SXoc31"
+        doc "The achievement row the screen was opened from."
+    }
+}
+
+json AchievementDeliverGoods {
+    doc "What is being handed over -- group dE79UwNE.  Which fields are filled depends on the flow: the currency screens set amount, the unit screen sets the id list and leaves amount 0."
+
+    field amount type="i32::str" {
+        key "Rs7bCE3t"
+        doc "Zel or Karma being traded.  0 on the unit and sphere screens (RandallAchievementDedicateUnitScene::sellUnit stores `stp wzr, w10` into amount/point)."
+    }
+
+    field claimed_point type="i32::str" {
+        key "idfCDG70"
+        doc "The Merit the CLIENT worked out it should get, from GameUtils::getSellAchievePoint.  A CLAIM, not a price -- the server recomputes it from the same tables and ignores this."
+    }
+
+    field user_unit_ids type="str" {
+        key "edy7fq3L"
+        doc "Comma-separated user_unit_ids on the unit screen; empty otherwise."
+    }
+
+    field item_ids type="str" {
+        key "n6E8iMf3"
+        doc "The sphere screen's WAREHOUSE ROW ids, comma-separated -- not item ids.  RandallAchievementDedicateSphereScene::sell @0x1A3D5D0 joins UserWarehouseInfo::getItemIndex() of each selected row, zeroes the row locally (setItemNum(0)), and assigns the string to request+0x60, which createBody @0x139DF80 sends under this key.  A crafted row not yet refreshed arrives as its INT_MAX - itemId placeholder."
+    }
+}
+
+json AchievementDeliverReq {
+    doc "Hand goods over for Merit Points.  GroupId vsaXI4M0, AES key 2Lj5hIEG."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[AchievementDeliverNode]" {
+        key "1Q2pGAXE"
+        doc "The screen selector."
+    }
+
+    field goods type="[AchievementDeliverGoods]" {
+        key "dE79UwNE"
+        doc "What is being delivered."
+    }
+}
+
+json AchievementDeliverResp {
+    doc """
+    The delivery's result.
+
+    There is no AchievementDeliverResponse class in the binary, so this combines
+    existing response keys through the global registry the same way
+    AchievementTrade does.
+
+    The unit roster goes back as a FULL REPLACE (4ceMWH6k) rather than the
+    insert-if-absent 4ceMWH6k sibling qC2tJs4E, because a delivery REMOVES units
+    and insert-if-absent can never remove one -- and unlike UnitSellTopScene2,
+    RandallAchievementDedicateUnitScene::sellUnit does not drop them from the
+    client list itself.  Without this the traded units stay on screen.
+    """
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal-key dispatch tag echoed back to the client."
+    }
+
+    field achievementInfo type="UserAchievementInfo" {
+        key "Bnc4LpM8"
+        doc "The Merit Point balance after the delivery.  Nothing else writes the client's singleton."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "The header, for the Zel and Karma flows."
+        optional #true
+    }
+
+    field unit_refresh type="[UserUnitInfo]" {
+        key "4ceMWH6k"
+        doc "The whole roster after the traded units were deleted.  Full replace; see the note above."
+        optional #true
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "The item warehouse after a sphere delivery.  A full replace."
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field subjects type="[UserAchievementSubjectInfo]" {
+        key "YTRJLG65"
+        doc "The screen's own achievement slice, so the \"Traded N Zel Total\" rows move as the totals do."
+    }
+
+    field badge type="BadgeAchievementCount" {
+        key "h23iRjGN"
+        doc "The achievement badges, since a delivery can finish one of the trade-total rows."
+    }
+}

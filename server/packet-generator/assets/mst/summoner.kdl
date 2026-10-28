@@ -1,0 +1,507 @@
+// F_SU_* — the Summoner Unit subsystem: the player's own avatar, its level
+// curve, per-element progression, the weapon ("arm") catalog with its
+// per-element stat blocks, the ability tree, EX skills, and the avatar
+// illustration table.  9 of the cluster's 11 tables ported 2026-07-19 from
+// 2-mst-decoded to deploy/system/summoner_*.json; wrapper keys are each
+// struct's `hash`, sourced from response_mappings.json (mst_responses,
+// response_class noted per struct).  F_SU_ARM_LEVEL_MST and
+// F_SU_ARM_PASSIVE_MST remain unported — neither has a response class in the
+// export (see tools/MST_PORTING_BACKLOG.md).
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (18/389/668/23/276/600/59/828/500 rows).  This cluster is
+// Japanese-only: every display string shipped untranslated.
+//
+// SummonerImageMst and SummonerLevelMst reuse most of mst/unit.kdl's hash
+// vocabulary (the *_img_pos rects, the move-type set, base_hp/atk/def/rec,
+// exp, cost), so those field names carry straight over.
+//
+// `RVVgyuor` is the summoner ARM id — it is the primary key of
+// SummonerArmMst and a foreign key in SummonerArmElementMst and
+// SummonerImageMst.  net/reinforcement_info.kdl still carries this hash as
+// `unk_RVVgyuor`.
+//
+// Separator caution, per-table as always:
+//   * `2Smu5Mtq` is a comma list in SummonerAbilityUpMst but contains
+//     DECIMALS ("1.01"), so its elements stay strings; in SummonerExSkillMst
+//     it is at-separated and its elements also embed '&'.
+//   * `9i2xhMaJ` (sex) is a plain int in SummonerImageMst but EMPTY in every
+//     SummonerArmElementMst row, so it is a string there.
+//   * `RVVgyuor` is likewise empty in every SummonerAbilityMst row.
+//   * `5SUvj4tM` carries a trailing comma ("100,100,100,0,"), which would
+//     split into an empty final token, so it stays a packed string.
+
+json SummonerAbilityMst {
+    doc "Summoner ability catalog (wrapper hash aYcBePEP, SummonerAbilityMstResponse).  18 rows — the nodes of the summoner ability tree."
+    hash "aYcBePEP"
+
+    field id type="i32::str" {
+        key "5pkWU4yH"
+        doc "Ability id 1001..1019 (1013 absent)."
+    }
+
+    field arm_id type="str" {
+        key "RVVgyuor"
+        doc "// UNVERIFIED: empty string in all 18 rows — abilities are not arm-scoped in this data.  Same hash SummonerArmMst uses for its primary key."
+    }
+
+    field display_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Display order, 100..900 in steps of 50.  Same hash/name as banner.kdl/raid.kdl."
+    }
+
+    field kind type="i32::str" {
+        key "xP9oi5Z2"
+        doc "Ability category 1..14.  Same hash/name as unit.kdl."
+    }
+
+    field thumbnail_img type="str" {
+        key "M2cv6dum"
+        doc "Ability icon — \"su_skill_icon_01_01.png\" .. \"su_skill_icon_16_01.png\".  Same hash/name as dungeon_key.kdl."
+    }
+}
+
+json SummonerAbilityLevelMst {
+    doc "Summoner ability level table (wrapper hash 6XHRamCn, SummonerAbilityLevelMstResponse).  389 rows — the per-level SP cost and effect of each ability.  FIELD NAMES CONFIRMED against SummonerAbilityLevelMstResponse::readParam (IDA, 2026-08-05): every key below matched the setter the binary calls for it, so this struct is verified rather than inferred — unlike the rest of this file."
+    hash "6XHRamCn"
+
+    field ability_id type="i32::str" {
+        key "5pkWU4yH"
+        doc "Ability this row levels — SummonerAbilityMst.id (1001..1019).  CONFIRMED: setSummonerAbilityID."
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "Ability level 1..50.  CONFIRMED: setSummonerAbilityLevel.  Same hash/name as unit.kdl/town.kdl."
+    }
+
+    field name type="str" {
+        key "NgrYgZht"
+        doc "Ability name — Japanese only, e.g. \"最大ＨＰ強化\" (Max HP Boost).  Repeats across every level of the same ability.  CONFIRMED: setSummonerAbilityName."
+    }
+
+    field need_sp type="i32::str" {
+        key "nm1USVcx"
+        doc "SP required to reach this level — 0 at level 1, rising to 90000.  CONFIRMED: setNeedSP (this was an inferred guess before the readParam landed)."
+    }
+
+    field ability_up_id type="i32::str" {
+        key "qfg7P2sK"
+        doc "Effect granted at this level — SummonerAbilityUpMst.id (1001..19050).  CONFIRMED: setAbilityUpID."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Level blurb — e.g. \"最大ＨＰ＋１％\"; higher tiers carry <br> markup.  CONFIRMED: setDescription.  Same hash/name as item.kdl/gacha.kdl."
+    }
+}
+
+json SummonerAbilityUpMst {
+    doc "Summoner ability effects (wrapper hash xUo0D9Xb, SummonerAbilityUpMstResponse).  668 rows — the effect payload referenced by SummonerAbilityLevelMst.ability_up_id."
+    hash "xUo0D9Xb"
+
+    field id type="i32::str" {
+        key "qfg7P2sK"
+        doc "Effect id (1001..19050)."
+    }
+
+    field name type="str" {
+        key "B76UmxCQ"
+        doc "Effect name — Japanese only; usually identical to `description`."
+    }
+
+    field kind type="i32::str" {
+        key "xP9oi5Z2"
+        doc "Effect category 1..14.  Same hash/name as unit.kdl."
+    }
+
+    field effect_type type="i32::str" {
+        key "jeR2rN3V"
+        doc "// UNVERIFIED: constant 1 across all 668 rows.  Same hash/name as town.kdl."
+    }
+
+    field process_id type="i32::str" {
+        key "hjAy9St3"
+        doc "Effect processor id (1..143, 14 distinct).  Same hash/name as passive_skill.kdl.  Plain int here; at-separated in SummonerExSkillMst."
+    }
+
+    field process_param type="[str]::sep(comma)" {
+        key "2Smu5Mtq"
+        doc "Effect parameters — comma list.  Elements stay STRINGS because some rows carry decimals (\"1.01\", \"1.02\"), not just ints.  Same hash/name as passive_skill.kdl."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Effect blurb — Japanese only, e.g. \"残りＨＰが多いほど、攻撃力をアップ＋５０％\"."
+    }
+}
+
+json SummonerArmMst {
+    doc "Summoner arm (weapon) catalog (wrapper hash JuBeb6YR, SummonerArmMstResponse).  23 rows."
+    hash "JuBeb6YR"
+
+    field id type="i32::str" {
+        key "RVVgyuor"
+        doc "Arm id — 10..90 for the base weapons, then 8010/9010/9020.  Referenced by SummonerArmElementMst and SummonerImageMst."
+    }
+
+    field name type="str" {
+        key "oO1opB6Z"
+        doc "Weapon name — Japanese only, e.g. \"冥華刀『鏡月』\", \"ジャンクヤード・ドッグ\"."
+    }
+
+    field getting_type type="i32::str" {
+        key "6yHMXYv1"
+        doc "Acquisition route 1..3.  Same hash/name as unit.kdl."
+    }
+
+    field rarity type="i32::str" {
+        key "7ofj5xa1"
+        doc "Weapon rarity 1..4.  Same hash/name as unit.kdl/item.kdl."
+    }
+
+    field thumbnail_img type="str" {
+        key "M2cv6dum"
+        doc "Weapon icon — \"weapon_thum_0010.png\" ..  Same hash/name as dungeon_key.kdl."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Weapon lore — Japanese only, up to 180 chars."
+    }
+}
+
+json SummonerArmElementMst {
+    doc "Per-element arm stat blocks (wrapper hash kgaeVEzx, SummonerArmElementMstResponse).  276 rows but only 144 DISTINCT — 132 rows are exact duplicates of another row.  Measured 2026-08-06; an earlier note here guessed a clean 23 arms x 6 elements x 2 doubling, which the data does not support (23 x 6 = 138, not 144, and the multiplicity is mixed: some rows appear once, some twice).  The duplication is in the decoded source, not introduced by the port."
+    hash "kgaeVEzx"
+
+    field arm_id type="i32::str" {
+        key "RVVgyuor"
+        doc "Arm this block belongs to — SummonerArmMst.id."
+    }
+
+    field element type="i32::str" {
+        key "iNy0ZU5M"
+        doc "Element 1..6.  Same hash/name as unit.kdl/skill.kdl."
+    }
+
+    field sex type="str" {
+        key "9i2xhMaJ"
+        doc "// UNVERIFIED: empty string in all 276 rows — kept as a string for that reason.  A plain int in SummonerImageMst, where this hash is unit.kdl's `sex`."
+    }
+
+    field skill_id type="i32::str" {
+        key "nj9Lw7mV"
+        doc "Base skill (11001001..167011001).  Same hash/name as unit.kdl."
+    }
+
+    field extra_skill_id type="i32::str" {
+        key "iEFZ6H19"
+        doc "Extra skill (11001002..167011002) — the base skill id + 1.  Same hash/name as unit.kdl."
+    }
+
+    field ultimate_skill_id type="i32::str" {
+        key "cb0P4mp1"
+        doc "Ultimate skill (0 where absent, else base + 2).  Same hash/name as unit.kdl."
+    }
+
+    field unk1 type="str" {
+        key "5SUvj4tM"
+        doc "// UNVERIFIED: \"100,100,100,0,\" on 96 rows, empty on the rest.  Kept PACKED: the trailing comma would split into an empty final token that no numeric element type can parse."
+    }
+
+    field ability_unlock type="[str]::sep(comma)" {
+        key "eyUo6a8c"
+        doc "// UNVERIFIED (named from shape): comma list of \"<lv>:<ability_up_id>:<n>\" triples — the level at which each ability unlocks for this arm/element (\"23:701001:1,52:701021:1\")."
+    }
+
+    field damage_frame type="[str]::sep(comma)" {
+        key "6Aou5M9r"
+        doc "CONFIRMED setDamageFrame (readParam).  comma list of \"<lv>:<a>:<b>:<c>\" quads (\"23:25:2:2,27:15:2:2\") — a second per-level schedule, present on every row."
+    }
+
+    field drop_check_count type="i32::str" {
+        key "n9h7p02P"
+        doc "Drop-check count 2..10.  Same hash/name as unit.kdl."
+    }
+
+    field move_speed type="i32::str" {
+        key "J2hPXGo5"
+        doc "Battle move speed 2..5.  Same hash/name as unit.kdl."
+    }
+
+    field attack_move_type type="i32::str" {
+        key "mv4o39Uz"
+        doc "Attack move type 1..3.  Same hash/name as unit.kdl."
+    }
+
+    field back_move_type type="i32::str" {
+        key "h2L1YI90"
+        doc "Return move type — constant 1.  Same hash/name as unit.kdl."
+    }
+
+    field skill_move_type type="i32::str" {
+        key "XE7Yi5c3"
+        doc "Skill move type 1..3.  Same hash/name as unit.kdl."
+    }
+
+    field move_offset type="[i32::str]::sep(comma)" {
+        key "jFX0a7qe"
+        doc "CONFIRMED setMoveOffset (readParam).  comma pair, negatives included — \"0,0\", \"-15,0\", \"35,10\" (a sprite offset?)."
+    }
+
+    field after_image type="i32::str" {
+        key "D4Y5bWK7"
+        doc "After-image flag — constant 1.  Same hash/name as unit.kdl."
+    }
+}
+
+json SummonerElementLevelMst {
+    doc "Per-element summoner progression (wrapper hash eKPdSFdy, SummonerElementLevelMstResponse).  600 rows = 6 elements x 100 levels."
+    hash "eKPdSFdy"
+
+    field element type="i32::str" {
+        key "iNy0ZU5M"
+        doc "Element 1..6.  Same hash/name as unit.kdl/skill.kdl."
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "Element level 1..100.  Same hash/name as unit.kdl."
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "Cumulative exp to reach this level (0..6552).  Same hash/name as mission.kdl/user_level.kdl."
+    }
+
+    field summon_info type="[str]::sep(comma)" {
+        key "SWfnWyuQ"
+        doc "// UNVERIFIED (named from context): 8-element comma list, each \"<rarity>@<a>:<b>:<c>\" — the per-rarity summon rates/caps unlocked at this level (\"1@100:1:100,2@100:1:100,...,8@0:0:0\").  Elements stay strings: they mix '@' and ':' inside."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Level blurb — Japanese only, e.g. \"光属性★６のユニットが召喚可能\" (Light 6-star units become summonable)."
+    }
+}
+
+json SummonerExSkillMst {
+    doc "Summoner EX skills (wrapper hash cq1n3Nfy, SummonerExSkillMstResponse).  59 rows."
+    hash "cq1n3Nfy"
+
+    field id type="i32::str" {
+        key "7GMDoJ8n"
+        doc "EX skill id (1010..9021)."
+    }
+
+    field name type="str" {
+        key "dyF0xAz1"
+        doc "Skill name — Japanese only, e.g. \"神殺しの双耀刃\"."
+    }
+
+    field kind type="i32::str" {
+        key "xP9oi5Z2"
+        doc "Skill category 1..14.  Same hash/name as unit.kdl."
+    }
+
+    field rarity type="i32::str" {
+        key "7ofj5xa1"
+        doc "Skill rarity 1..8.  Same hash/name as unit.kdl/item.kdl."
+    }
+
+    field effect_type type="[i32::str]::sep(at)" {
+        key "jeR2rN3V"
+        doc "Effect types — at-separated list, one per chained effect (\"1\", \"1@1\", \"1@1@1\"); all values are 1.  A plain int in SummonerAbilityUpMst.  Same hash/name as town.kdl."
+    }
+
+    field process_id type="[i32::str]::sep(at)" {
+        key "hjAy9St3"
+        doc "Effect processor ids — at-separated, positionally paired with `effect_type` (\"66@33@9\", or a bare \"14\").  Same hash/name as passive_skill.kdl."
+    }
+
+    field process_param type="[str]::sep(at)" {
+        key "2Smu5Mtq"
+        doc "Effect parameters — at-separated, one element per effect; each element is a comma list that can itself embed '&'-joined sub-values (\"93,100&100&100&100&0&0&1&0,1,2,0,1,1,0@0,0,0,0,30\").  Strings for that reason."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Skill blurb — Japanese only, up to 91 chars."
+    }
+}
+
+json SummonerImageMst {
+    doc "Summoner avatar illustrations (wrapper hash BbmQBxhV, SummonerImageMstResponse).  828 rows — one per element/sex/arm/variant combination.  Field names follow mst/unit.kdl, which shares most of this table's hashes."
+    hash "BbmQBxhV"
+
+    field id type="i32::str" {
+        key "7oHiOxXu"
+        doc "Avatar id (10100101..20390206) — encodes sex/element/arm/variant, matching the asset filenames."
+    }
+
+    field name type="str" {
+        key "xfwp0xVC"
+        doc "Internal label — Japanese only, e.g. \"光刀女1\" (light / blade / female / 1)."
+    }
+
+    field element type="i32::str" {
+        key "iNy0ZU5M"
+        doc "Element 1..6.  Same hash/name as unit.kdl."
+    }
+
+    field sex type="i32::str" {
+        key "9i2xhMaJ"
+        doc "Sex 1..2.  Same hash/name as unit.kdl.  Empty (and therefore a string) in SummonerArmElementMst."
+    }
+
+    field arm_id type="i32::str" {
+        key "RVVgyuor"
+        doc "Arm worn in this illustration — SummonerArmMst.id."
+    }
+
+    field unk1 type="i32::str" {
+        key "btZizNep"
+        doc "// UNVERIFIED: 1..3, the variant index within an element/sex/arm group.  net/reinforcement_info.kdl carries this hash as unk_btZizNep."
+    }
+
+    field full_img type="str" {
+        key "zKXSM4vh"
+        doc "Full-body illustration — \"unit_ills_full_10100101_U.png\"."
+    }
+
+    field full_img_l type="str" {
+        key "wHWHChDV"
+        doc "Full-body illustration, L variant — \"unit_ills_full_10100101_L.png\".  Only 276 distinct values across 828 rows."
+    }
+
+    field battle_img type="str" {
+        key "YGVldhVW"
+        doc "Battle illustration — \"unit_ills_battle_10100101.png\"."
+    }
+
+    field thumbnail_img type="str" {
+        key "M2cv6dum"
+        doc "Thumbnail — \"unit_ills_thum_10100101.png\".  Same hash/name as dungeon_key.kdl."
+    }
+
+    field anime_img type="str" {
+        key "WpFjS0PA"
+        doc "Animation sheet — \"unit_anime_10100101_U.png\"."
+    }
+
+    field anime_img_l type="str" {
+        key "NgRIeeJc"
+        doc "Animation sheet, L variant — \"unit_anime_10100101_L.png\"."
+    }
+
+    field cgg_file type="str" {
+        key "QqfI9mM4"
+        doc "CGG sprite-sheet table — \"unit_cgg_10100101.csv\".  Same hash/name as dbb.kdl."
+    }
+
+    field idle_cgs_file type="str" {
+        key "0QxL2is7"
+        doc "Idle CGS animation table — \"unit_idle_cgs_10100101.csv\".  NOTE: mst/dbb.kdl names this hash `atk_cgs_file` after ITS captured values (unit_atk_cgs_*.csv), so the hash is a generic CGS slot rather than a fixed animation — here the attack tables live in `atk_cgs_file`/`atk_cgs_file_2` below."
+    }
+
+    field move_cgs_file type="str" {
+        key "LI5euJ7T"
+        doc "Move CGS animation table — \"unit_move_cgs_20180101.csv\" (early rows reuse an idle table)."
+    }
+
+    field atk_cgs_file type="str" {
+        key "7CcgbUt0"
+        doc "Attack CGS animation table — \"unit_atk_cgs_10100101.csv\"."
+    }
+
+    field atk_cgs_file_2 type="str" {
+        key "pRKFVb2k"
+        doc "// UNVERIFIED: second attack CGS slot — identical to `atk_cgs_file` on every captured row."
+    }
+
+    field home_img_pos type="[i32::str]::sep(comma)" {
+        key "1W9CxaFK"
+        doc "Home-screen crop rect \"x,y,w,h\" (\"49,7,168,459\").  Same hash/name as unit.kdl."
+    }
+
+    field detail_img_pos type="[i32::str]::sep(comma)" {
+        key "6z54rgb3"
+        doc "Detail-screen crop rect, negatives included (\"-135,110,950,679\").  Same hash/name as unit.kdl."
+    }
+
+    field confirm_img_pos type="[i32::str]::sep(comma)" {
+        key "MYK1fq6c"
+        doc "Confirm-dialog crop rect, 5 elements (\"15,297,500,357,0\").  Same hash/name as unit.kdl."
+    }
+
+    field skill_cut_image_pos type="[i32::str]::sep(comma)" {
+        key "7hLR6pDN"
+        doc "Skill-cutin crop rect, negatives included.  Same hash/name as unit.kdl."
+    }
+
+    field hp_disp_pos type="[i32::str]::sep(comma)" {
+        key "3BpHN6VD"
+        doc "HP-bar offset \"x,y\", negatives included (\"-1,7\").  Same hash/name as unit.kdl."
+    }
+
+    field unk2 type="[i32::str]::sep(comma)" {
+        key "Lkh6gYkT"
+        doc "// UNVERIFIED: comma pair, only 6 distinct values (\"0,0\", \"0,3\", \"1,5\")."
+    }
+}
+
+json SummonerLevelMst {
+    doc "Summoner level curve (wrapper hash LRB9Z5zm, SummonerLevelMstResponse).  500 rows.  Stat hashes are shared with mst/unit.kdl."
+    hash "LRB9Z5zm"
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "Summoner level 1..500.  Same hash/name as unit.kdl."
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "Cumulative exp to reach this level (0..1107768).  Same hash/name as mission.kdl/user_level.kdl."
+    }
+
+    field cost type="i32::str" {
+        key "gvT2ds0Q"
+        doc "// UNVERIFIED: constant 0 across all 500 rows.  Same hash/name as unit.kdl."
+    }
+
+    field base_hp type="i32::str" {
+        key "e7DK0FQT"
+        doc "HP at this level (4000..8000).  Same hash/name as net/unit.kdl."
+    }
+
+    field base_atk type="i32::str" {
+        key "67CApcti"
+        doc "ATK at this level (1500..2900).  Same hash/name as net/unit.kdl."
+    }
+
+    field base_def type="i32::str" {
+        key "q08xLEsy"
+        doc "DEF at this level (1500..2900).  Same hash/name as net/unit.kdl."
+    }
+
+    field base_rec type="i32::str" {
+        key "PWXu25cg"
+        doc "REC at this level (1500..2900).  Same hash/name as net/unit.kdl."
+    }
+
+    field get_sp type="i32::str" {
+        key "iIDqD50O"
+        doc "// UNVERIFIED (named from context): SP granted on reaching this level (0 at level 1, then 5..103) — the currency SummonerAbilityLevelMst.need_sp spends."
+    }
+
+    field extra_passive_skill_id type="i32::str" {
+        key "cP83zNsv"
+        doc "// UNVERIFIED: constant 0 across all 500 rows.  Same hash/name as unit.kdl."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "// UNVERIFIED: empty string in all 500 rows."
+    }
+}

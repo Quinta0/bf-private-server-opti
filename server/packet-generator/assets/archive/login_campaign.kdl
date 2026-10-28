@@ -1,0 +1,80 @@
+json LoginCampaignPrize {
+    doc """
+    One prize on one day of the login advent calendar.
+
+    ⚠ THE CONTENTS ARE NOT RECOVERED DATA.  F_LOGIN_CAMPAIGN_REWARD_MST carries
+    a day number and an ICON PATH and nothing else -- there is no field anywhere
+    in the MST that says what a day actually pays.  The live server decided it,
+    and that server is gone.
+
+    What IS recoverable is the artwork: /logincampaign/Feb2022_login_icon_dayN
+    .png is a pre-rendered composite showing the prize and its quantity, so most
+    of this table was read straight off the icons.  Days 1/3 read "Gem x1 +
+    <sigil> x200", days 5-21 the same at x400, days 23/25 at x500; 6/12/20 are
+    a SUMMON TICKET; 24 is a HERO SELECTOR; 22 is unmistakably the crowned frog,
+    Burst Emperor.
+
+    The recurring sigil beside the Gem could NOT be identified: it matches no
+    icon shipped in game_content (checked against karma/gem/zel/friend-point
+    thumbnails, the achievement and medal icons, and a template sweep of every
+    content PNG under 200px).  It is bespoke campaign art.  Honor was chosen for
+    those slots because it is the one currency whose scale fits -- an Honor
+    Summon costs exactly 200, so day 1 is one free pull -- and because Honor has
+    no other source on this server than borrowing helpers.  That is an authored
+    choice, not a reading.
+
+    Days 2, 4, 10, 14 and 18 show units and materials whose sprites are too
+    small to name; those are authored from ids verified present in the archive,
+    and deliberately kept modest so claiming a backlog cannot overflow a 100
+    slot unit box.
+    """
+
+    field kind type=str {
+        key "kind"
+        doc """
+        How to award this prize: gem, honor, karma, zel, unit, item, ticket or
+        selector.
+
+        Same vocabulary as the Daily Spin table so both route onto the reward
+        primitives the server already has instead of adding another switch.
+        Everything except `honor` is delivered as a PRESENT; see
+        gme::grantLoginCampaignDay for why honor is credited directly.
+        """
+    }
+
+    field name type=str {
+        key "name"
+        doc "Human-readable prize name.  Logged on grant so a mis-set day is legible without resolving ids."
+    }
+
+    field id type="i32::int" {
+        key "id"
+        doc "unit_mst / item_mst id for kind=unit and kind=item.  Zero and ignored for the currency and ticket kinds, which carry their amount in count."
+    }
+
+    field count type="i32::int" {
+        key "count"
+        doc "Quantity awarded."
+    }
+}
+
+json LoginCampaignDay {
+    doc """
+    One day of the calendar.
+
+    The DAY NUMBER is the calendar cell, not a date: a player on their third
+    distinct login day gets day 3 whenever that falls.  That is what makes the
+    calendar survive an offline server with no event schedule -- nothing here is
+    tied to the 2022 window the MST's start_date names.
+    """
+
+    field day type="i32::int" {
+        key "day"
+        doc "1-based cell, matching F_LOGIN_CAMPAIGN_REWARD_MST's n0He37p1 so the icon the client draws is the prize we pay."
+    }
+
+    field rewards type="[LoginCampaignPrize]" {
+        key "rewards"
+        doc "Everything that cell pays.  Several entries per day is normal -- most days are a Gem plus a currency."
+    }
+}

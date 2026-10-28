@@ -1,0 +1,120 @@
+
+json DungeonKeyMst {
+    doc "TODO"
+
+    field id type="i32::str" {
+        key "16KMNJLb"
+        doc "TODO"
+    }
+
+    field name type="str" {
+        key "BM29ZgnK"
+        doc "TODO"
+    }
+
+    field dungeon_id type="i32::str" {
+        key "MHx05sXt"
+        doc "TODO"
+    }
+
+    field thumbnail_img type="str" {
+        key "M2cv6dum"
+        doc "TODO"
+    }
+
+    field open_img type="str" {
+        key "VX0j1fni"
+        doc "TODO"
+    }
+
+    field close_img type="str" {
+        key "9unNZ6b0"
+        doc "TODO"
+    }
+
+    field limit_sec type="i32::str" {
+        key "i9sBW8uD"
+        doc "TODO"
+    }
+
+    field possession_limit type="i32::str" {
+        key "N7I9vYZb"
+        doc """
+        Maximum number of this key the player may hold.
+        // REVERTED FROM str: "50" on all three rows, no decimals, no
+        delimiters — the narrower type fits every observed value (handbook
+        §3.3 evidence checklist).
+        """
+    }
+
+    field distribute_flag type="i32::str" {
+        key "EK5I6MQ9"
+        doc """
+        Whether this key is handed out on a schedule at all.  1 on Metal and
+        Jewel, 0 on Imp — and Imp is correspondingly the one row with an empty
+        distribute_days.
+        """
+    }
+
+    field distribute_days type="[i32::str]::sep(comma)" {
+        key "fK15a73g"
+        doc """
+        Which weekdays this key can be claimed, ISO numbering (1 = Monday).
+        Metal Key "1,2,4,5" = Mon/Tue/Thu/Fri, Jewel Key "3" = Wed, Imp Key ""
+        = never.
+
+        // CAPTURED FROM: deploy/mst/dungeon_key_mst.json, and independently
+        corroborated by the Brave Frontier wiki, which states Metal Keys are
+        distributed every day except Wednesday and the weekend, Jewel Keys on
+        Wednesday, and none at all on Sat/Sun.  Both sources agree exactly,
+        including the absence of 6 and 7 on every row.
+        // REVERTED FROM str: values are a plain comma list of small ints with
+        no trailing delimiter; the empty string on Imp parses to an empty list,
+        which is the correct meaning.
+        """
+    }
+
+    field unk2 type="i32::str" {
+        key "zfdw7Ry1"
+        doc "TODO"
+    }
+
+    field usage_pattern type="str" {
+        key "CR6aKWg8"
+        doc """
+        The parade ladder: how many keys to spend, and what that opens.
+        '/'-separated tiers, each ':'-separated as
+        `keys_required : active_type : display_name : mission_ids : unknown`,
+        where mission_ids is itself a comma list.
+
+        // CAPTURED FROM: deploy/mst/dungeon_key_mst.json —
+        Metal: "1:1:Metal Parade!:100600:6/3:1:Super Metal Parade:100601:6/
+                5:3:Mega Metal Parade:100601,100614:6"
+        Imp:   "1:0:Garden of Imps:102920:"
+        Field 1 is read as active_type because it varies independently of the
+        key count (1/1/3 across a 1/3/5 ladder) and Imp — the key with no
+        parade tiers to choose between — is the one row where it is 0.  That is
+        exactly the value UserDungeonKeyInfo.active_type (BY8fZ7M1) has to
+        carry.  The trailing field (6 on Metal, 7 on Jewel, empty on Imp) is
+        NOT decoded.
+
+        Kept as `str` rather than a typed list: the tiers are heterogeneous
+        (int : int : free text : comma list : sometimes-empty), the display
+        name can contain punctuation, and Imp's entry ends on a bare trailing
+        colon that an array codec would drop.
+        """
+    }
+
+    field state type="i32::str" {
+        key "j0Uszek2"
+        doc "TODO"
+    }
+
+    field distribute_count type="i32::str" {
+        key "khsb74Nq"
+        doc "TODO"
+        // "default": DefaultType.Omit
+        optional #true
+    }
+
+}

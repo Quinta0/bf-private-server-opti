@@ -1,0 +1,70 @@
+// Dungeon-key (Vortex parade) request entry types.
+//
+// The dungeon-key subsystem is the Vortex's key economy: the player claims a
+// Metal / Jewel key on the days DungeonKeyMst.distribute_days (fK15a73g)
+// allows, then spends 1 / 3 / 5 of them to open successively better parades
+// per DungeonKeyMst.usage_pattern (CR6aKWg8).
+//
+// All three handlers answer with the SAME shape — the per-user key inventory
+// under eFU7Qtb0 (UserDungeonKeyInfoResponse).  That is the only dungeon-key
+// response class the binary defines; there is no dedicated Receipt or Use
+// response.  The entry struct itself is UserDungeonKeyInfo in net/user.kdl,
+// decoded in tools/ida/audits/eFU7Qtb0_audit.txt.
+
+json DungeonKeyReceiptEntry {
+    doc """
+    DungeonKeyReceipt (WCJE0xe2) payload — one node under group 9S5M2yI3.
+    From DungeonKeyReceiptRequest::createBody @0x13A34E4, which emits
+    addGroup("9S5M2yI3") + a single addNode() then two addParam calls, both
+    fed through CommonUtils::IntToString — so both arrive QUOTED.
+    """
+
+    field unk type="i32::str" {
+        key "i1WQkh4G"
+        doc """
+        // UNVERIFIED: written from `this + 8`, one slot ahead of the key id.
+        No setter exists for this hash anywhere in readparam_analysis.json and
+        it appears in no response class, so there is nothing to anchor it
+        against.  Parsed and logged but NOT acted on — the claim is driven
+        entirely by dungeon_key_id plus the server's own day check, so a wrong
+        reading here cannot corrupt state.  Candidates: the dungeon id being
+        claimed against, or a requested claim count.
+        """
+    }
+
+    field dungeon_key_id type="i32::str" {
+        key "16KMNJLb"
+        doc "Which key to claim — joins to DungeonKeyMst.id (1 Metal, 2 Jewel, 3 Imp)."
+    }
+}
+
+json DungeonKeyUseEntry {
+    doc """
+    DungeonKeyUse (aGT5S6qZ) payload — one node under group xki65BPq.
+    From DungeonKeyUseRequest::createBody @0x13A366C, same shape as Receipt but
+    note the SLOTS ARE SWAPPED: here `this + 9` is written first (use_count)
+    and `this + 8` second (the key id), the reverse of Receipt.  Both quoted.
+    """
+
+    field use_count type="i32::str" {
+        key "phe9Ta54"
+        doc """
+        How many keys to spend — selects the parade tier out of
+        DungeonKeyMst.usage_pattern, whose Metal ladder is
+        "1:1:Metal Parade!:100600:6 / 3:1:Super Metal Parade:100601:6 /
+        5:3:Mega Metal Parade:100601,100614:6" (spend 1, 3 or 5).
+
+        Named by cross-class anchoring: this hash has no setter on any
+        dungeon-key class, but UserItemTimeLimitInfoResponse (YmaEqtA8) maps it
+        to setUseCnt, and a use-count is exactly what a 1/3/5 ladder needs.
+        // UNVERIFIED against a live capture, but the tier ladder and the
+        setter name agree, and the server validates the value against
+        usage_pattern before spending anything.
+        """
+    }
+
+    field dungeon_key_id type="i32::str" {
+        key "16KMNJLb"
+        doc "Which key to spend — joins to DungeonKeyMst.id (1 Metal, 2 Jewel, 3 Imp)."
+    }
+}

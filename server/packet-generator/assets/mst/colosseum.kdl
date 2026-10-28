@@ -1,0 +1,162 @@
+// F_COLOSSEUM_* — the Colosseum (PvP arena) rule tables: class/bracket
+// definitions, extra battle rules, squad formations, and support effects.
+// All 4 tables ported 2026-07-19 from 2-mst-decoded to
+// deploy/system/colosseum_*.json; wrapper keys are each struct's `hash`,
+// sourced from response_mappings.json (mst_responses, response_class noted
+// per struct).
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (4/16/6/4 rows).  This cluster is early-era data and still carries
+// Japanese display strings — names and descriptions were never localised
+// before the tables stopped shipping, so treat the text as-is.
+//
+// Separator caution: `hjAy9St3` + `2Smu5Mtq` appear in both
+// ColosseumExtraRuleMst and ColosseumSupportMst, but with DIFFERENT shapes —
+// plain int / comma list in the extra-rule table, at-separated lists in the
+// support table.  The separator is per-table; always re-scan before reusing
+// a type for a hash (see mst/raid.kdl for the same trap).
+
+json ColosseumClassMst {
+    doc "Colosseum class (bracket) definitions (wrapper hash wmpLokaR, ColosseumClassMstResponse).  4 rows — the cost-capped PvP brackets."
+    hash "wmpLokaR"
+
+    field id type="i32::str" {
+        key "3mMAn6L5"
+        doc "Class id 1..4."
+    }
+
+    field name type="str" {
+        key "NGL2K1id"
+        doc "Class display name — Japanese only, e.g. \"極輝召\", \"天星召\"."
+    }
+
+    field unk1 type="i32::str" {
+        key "YDxl64JI"
+        doc "// UNVERIFIED: 999/54/50/45 captured, descending with the class id.  Does NOT match the unit-cost caps quoted in `description` (unlimited/35/28/15), so this is some other per-class ceiling."
+    }
+
+    field display_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Display order 1..4.  Same hash/name as banner.kdl and raid.kdl."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Bracket blurb — e.g. \"ユニットコスト15以下限定の対戦ルール\" (unit cost 15 or lower)."
+    }
+
+    field image type="str" {
+        key "1gDkL6XR"
+        doc "Bracket banner — \"banner_event20140703_1.jpg\" on all 4 rows.  Same hash/name as banner.kdl."
+    }
+}
+
+json ColosseumExtraRuleMst {
+    doc "Colosseum extra battle rules (wrapper hash iG9H7mHS, ColosseumExtraRuleMstResponse).  16 rows — the modifier applied on top of a bracket's base rules."
+    hash "iG9H7mHS"
+
+    field id type="i32::str" {
+        key "IvuccUuD"
+        doc "Rule id, 100..1600 in steps of 100."
+    }
+
+    field name type="str" {
+        key "LikAxb70"
+        doc "// UNVERIFIED: empty string in all 16 rows — the rule label ships in the client, not here."
+    }
+
+    field img type="str" {
+        key "b5VveUd8"
+        doc "Rule icon — \"arena_rule_01.png\" .. \"arena_rule_16.png\".  Same hash/name as first_desc.kdl (a comma list in raid.kdl — single value here)."
+    }
+
+    field process_id type="i32::str" {
+        key "hjAy9St3"
+        doc "Effect processor id, 2..9.  Same hash/name as passive_skill.kdl.  Plain int here; the same hash is an at-separated list in ColosseumSupportMst."
+    }
+
+    field process_param type="[i32::str]::sep(comma)" {
+        key "2Smu5Mtq"
+        doc "Effect parameters — comma list of ints, negatives included (\"1,2,3,4,5,6,-50,0,0,0\").  Empty on 5 rows.  Same hash/name as passive_skill.kdl; at-separated in ColosseumSupportMst."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "// UNVERIFIED: empty string in all 16 rows."
+    }
+}
+
+json ColosseumFormationMst {
+    doc "Colosseum squad formations (wrapper hash aCmTmaOx, ColosseumFormationMstResponse).  6 rows — 3 offensive (1xx) and 3 defensive (2xx), in a rock-paper-scissors triangle described by `description`."
+    hash "aCmTmaOx"
+
+    field id type="i32::str" {
+        key "peCeLuNq"
+        doc "Formation id — 101/102/103 (attack set) and 201/202/203 (defence set)."
+    }
+
+    field name type="str" {
+        key "gBLoOL3p"
+        doc "Formation name — Japanese only, e.g. \"五芒堅鎖の陣\", \"テトラウォール\"."
+    }
+
+    field deck_type type="i32::str" {
+        key "U9ABSYEp"
+        doc "Formation set — 1 for the 1xx ids, 2 for the 2xx ids.  Same hash/name as net/user.kdl."
+    }
+
+    field element type="i32::str" {
+        key "iNy0ZU5M"
+        doc "CONFIRMED setElement (readParam).  1..3, the index within the set.  This hash is `element` in unit.kdl/skill.kdl — that meaning does not apply here."
+    }
+
+    field img type="[str]::sep(comma)" {
+        key "b5VveUd8"
+        doc "Per-slot effect overlay — comma list of 5 entries, one per squad position, empty where the slot gets no overlay (\",,formation_effect_move.png,,\").  Same hash/name as first_desc.kdl."
+    }
+
+    field effect_info type="str" {
+        key "VuIPnfDO"
+        doc "// UNVERIFIED shape: per-slot stat modifiers, 5 groups joined by '#', each \"<n>:<atk>,<def>,<rec>,<crit>,<hp>\" — e.g. \"1:0,0,0,0,0#1:0,0,0,0,0#1:100,0,0,0,100#...\".  Kept as a packed string: '#' is not a supported list separator."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Formation blurb with client markup — e.g. \"すべてのユニットの攻撃力が２５％アップ<br />テトラウォールに有利：カイザーシールドに不利\"."
+    }
+}
+
+json ColosseumSupportMst {
+    doc "Colosseum support effects (wrapper hash kaQtidz4, ColosseumSupportMstResponse).  4 rows.  Same column layout as FrontierGateSupportMst — see mst/frontier_gate.kdl."
+    hash "kaQtidz4"
+
+    field id type="i32::str" {
+        key "NungTq5g"
+        doc "Support id — 400/600/700/800."
+    }
+
+    field name type="str" {
+        key "U7LJCqT1"
+        doc "Support name — Japanese only, e.g. \"ブレイブライズ\"."
+    }
+
+    field support_type type="i32::str" {
+        key "esz3O04i"
+        doc "CONFIRMED setSupportType (readParam).  constant 1 here (1 or 2 in FrontierGateSupportMst, where it looks like a category split)."
+    }
+
+    field process_id type="[i32::str]::sep(at)" {
+        key "hjAy9St3"
+        doc "Effect processor ids — at-separated list, one per chained effect (\"33@4\", \"9@32\", or a bare \"71\").  Same hash/name as passive_skill.kdl; a plain int in ColosseumExtraRuleMst."
+    }
+
+    field process_param type="[str]::sep(at)" {
+        key "2Smu5Mtq"
+        doc "Effect parameters — at-separated, positionally paired with `process_id`; each element is itself a comma list (\"500,2000,0@50,50,50,50,50,50\").  Kept as strings because the inner list is comma-separated."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Support blurb — Japanese only, e.g. \"ターン経過でＢＢゲージが増加＆ＢＢゲージ上昇量がアップ\"."
+    }
+}

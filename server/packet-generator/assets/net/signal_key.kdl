@@ -1,0 +1,9 @@
+json SignalKey {
+    doc "The server's signal key, echoed.  BaseRequest::createSignalKeyTag @0x13A0E94 is the only reader of UserInfo::getSignalKey and SignalKeyResponse::readParam @0x13EF150 the only caller of setSignalKey (an empty value is ignored), so a request carries whatever key the last reply that had this block set.  The client never validates it.  This server echoes the request's own key, which keeps it constant -- it identifies nothing per request."
+
+    field key type="str" {
+        key "Kn51uR4Y"
+        doc "The key string; opaque to the client."
+    }
+
+}

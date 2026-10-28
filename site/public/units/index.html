@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unit finder · BF Revive</title><meta name="description" content="Where to find every unit in BF Revive: quests, capture chances, clear rewards, event shops and summon gates."><style>
+@font-face{font-family:Rodin;src:url(/assets/rodin-eb.woff2) format("woff2");font-display:swap}
+:root{--night:#070914;--navy:#0d1330;--ink:#fbf6e8;--muted:#d9d0b8;--gold:#f7d27a;--red:#ff6b5a;--line:#26305a;--green:#7fd88f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--night);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:960px;margin:0 auto;padding:24px 16px 48px}
+h1,h2{font-family:Rodin,"Arial Black",system-ui,sans-serif;color:var(--gold);line-height:1.2}
+h1{font-size:1.7rem;margin:.2rem 0 .4rem}
+h2{font-size:1.2rem;margin:1.6rem 0 .4rem}
+a{color:var(--gold)}
+p{color:var(--muted);margin:.3rem 0}
+.star{color:var(--red);font-weight:700}
+.el{color:var(--muted);font-size:.85em}
+footer{margin-top:2rem;color:var(--muted);font-size:.85rem}
+input,select,button{font:inherit;color:var(--ink);background:var(--navy);border:1px solid var(--line);border-radius:8px}
+#q{width:100%;padding:.7rem .9rem;font-size:1.05rem;margin:.6rem 0 .4rem}
+#q:focus,select:focus,button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.bar{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.3rem 0}
+.chip{padding:.3rem .7rem;cursor:pointer;font-size:.9rem}
+.chip[aria-pressed=true]{background:var(--gold);color:var(--night);border-color:var(--gold);font-weight:600}
+select{padding:.3rem .5rem;font-size:.9rem;max-width:100%}
+.list{list-style:none;padding:0;margin:.6rem 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:.3rem .8rem}
+.list a{display:flex;align-items:center;gap:.6rem;padding:.25rem;border-radius:8px;text-decoration:none;color:var(--ink)}
+.list a:hover,.list a:focus{background:var(--navy)}
+.ico{width:44px;height:44px;flex:none;border-radius:6px;background:var(--navy);object-fit:contain}
+.ico.big{width:72px;height:72px}
+.name{display:block;line-height:1.25}
+.unit-head{display:flex;gap:.9rem;align-items:center;margin-top:.8rem}
+.rows{list-style:none;padding:0;margin:.4rem 0}
+.rows li{padding:.5rem 0;border-bottom:1px solid var(--line)}
+.path{color:var(--muted);font-size:.85rem;display:block}
+.quest{font-weight:600}
+.tags{display:flex;flex-wrap:wrap;gap:.3rem .9rem;font-size:.9rem;margin-top:.15rem}
+.pct{color:var(--green);font-weight:700}
+.no{color:var(--muted)}
+.badge{font-size:.75rem;padding:.05rem .45rem;border-radius:99px;border:1px solid var(--red);color:var(--red)}
+.joins{display:inline-flex;align-items:center;gap:.35rem}
+.joins img{width:24px;height:24px}
+.note{font-size:.85rem}
+#status{min-height:1.5em}
+.hide{display:none}
+</style></head><body><main>
+<p><a href="/">example.com</a> · <a href="/gates">Summon gates</a></p>
+<h1>Unit finder</h1>
+<p>Where each unit shows up in the live game right now: quests it fights in and its capture chance there, clear rewards, event shops and summon gates. Updated from the game server every few minutes.</p>
+<label for="q" class="hide">Unit name</label>
+<input id="q" type="search" placeholder="Search a unit, e.g. Omni Frog" autocomplete="off" spellcheck="false" enterkeyhint="search">
+<div class="bar" id="filters" role="group" aria-label="Show">
+<button class="chip" type="button" data-f="enemy" aria-pressed="false">Appears as enemy</button>
+<button class="chip" type="button" data-f="capture" aria-pressed="false">Capturable</button>
+<button class="chip" type="button" data-f="reward" aria-pressed="false">Clear reward</button>
+<button class="chip" type="button" data-f="shop" aria-pressed="false">Event shop</button>
+<button class="chip" type="button" data-f="summon" aria-pressed="false">Summonable</button>
+</div>
+<div class="bar"><select id="area" aria-label="Area"><option value="">All areas</option></select>
+<select id="sort" aria-label="Sort"><option value="chance">Best capture chance first</option><option value="game">Game order</option><option value="name">Quest name</option></select></div>
+<p id="status" role="status">Loading the live game data…</p>
+<section id="results"></section>
+<section id="unit" class="hide"></section>
+<footer>Read-only. Chances are per enemy and per run, as the server serves them. <span id="built"></span></footer>
+</main><script src="/units/app.js" defer></script></body></html>

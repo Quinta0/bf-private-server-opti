@@ -1,0 +1,35 @@
+// The Music House catalogue -- 108 tracks the player buys with Zel and plays
+// in MyTownSoundRoomScene, and picks as battle BGM in SandbagChangeSoundScene.
+json SoundMst {
+    doc "One buyable BGM track.  Reaches the client through Initialize; what the player OWNS is UserSoundInfo under d98mjNDc."
+    
+    field id type="i32::str" {
+        key "k7Lf0jTt"
+        doc "getSoundID.  The same key identifies an owned track in UserSoundInfo, and the TownUpdate request reports purchases as a comma list of these."
+    }
+
+    field name type="str" {
+        key "xIRA58fC"
+        doc "Loc key for the track title, MST_SOUNDDATA_<id>_NAME."
+    }
+    
+    field file type="str" {
+        key "8R5wDyXb"
+        doc "The mp3 under content/sound, e.g. \"bf001_title.mp3\"."
+    }
+    
+    field need_mission_id type="i32::str" {
+        key "HSRhkf70"
+        doc "Same gate hash as AreaMst/DungeonMst/MissionMst: the mission that has to be cleared before the track is offered."
+    }
+    
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Loc key for the flavour text, MST_SOUNDDATA_<id>_DESCRIPTION."
+    }
+    
+    field amount type="i32::str" {
+        key "Rs7bCE3t"
+        doc "getAmount -- the price in ZEL, 1,200 to 98,000 across the 108 rows.  MyTownSoundRoomScene::confirmAnswerYes reads it next to UserTeamInfo::getZel/setZel, so the client shows and locally applies this number; the server charges the same value when it records the purchase, because the next UserInfo overwrites the client's local Zel."
+    }
+}

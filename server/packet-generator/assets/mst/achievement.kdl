@@ -1,0 +1,303 @@
+json AchievementSubjectMst {
+    hash "H9ATfJ38"
+    doc """
+    F_ACHIEVEMENT_SUBJECT_MST -- the Randall Achievement list (873 unexpired of
+    15,173; ported by tools/gen_achievement_mst.py).  response_class =
+    AchievementSubjectMstResponse, readParam @0x13CB088, which reads exactly the
+    eighteen keys below in this order; the shipped table has a nineteenth
+    column, `8RVXhQjn`, that readParam ignores (constant 1 everywhere).
+
+    ⚠ THIS TABLE IS NOT CARRIED BY getResponseObject.  Its wrapper hash is one of
+    the 58 tags GameResponseParser::parseBodyTag routes to
+    DataMstManager::saveAchievementSubjectMst, which writes the client's own MST
+    file; DataMstManager::loadAchievementSubjectMst reads it back, and
+    HomeScene::loadFiles re-runs that load, so a table sent once is live on the
+    next trip through Home.  See the handbook on the two MST channels.
+
+    ⚠ WHAT IS COUNTED IS THE ID BAND, NOT `cond_type`.  `cond_type` is the
+    screen's filter and lumps unrelated conditions together -- value 1 alone
+    covers logins (band 1000), Honor Points (2000), player level (3000), friends
+    added (4000), favouriting a friend (5000) and editing a comment (6000).
+    Reading progress off cond_type makes "25 Friends Added" report the login
+    count and claim itself finished.  The thousand-band of `id` is what
+    identifies a condition, across 80 bands; `cond_param` is its threshold,
+    except in the three bands that name ONE mission (35000/36000 ordinary
+    quests, 40000 a Grand Quest) where it is a mission id.  Two rows sit in a
+    band that is not theirs and are handled by id: 7500 ("600 Mission Records
+    Cleared", in the merit band) and 18100 (a LIST of six sphere ids).
+    The mapping this server implements is in gme/common/Achievements.hpp.
+    """
+
+    field id type="i32::str" {
+        key "M7SXoc31"
+        doc "Subject id.  Kept as a string by readParam and by the user block (YTRJLG65) that joins to it."
+    }
+
+    field name type=str {
+        key "xXdp1q0Y"
+        doc "Display name, e.g. \"10 Daily Log Ins\".  Carries <br> markup."
+    }
+
+    field description type=str {
+        key "qp37xTDh"
+        doc "Long copy, e.g. \"Log in for a total of 10 days.\".  Same hash/name as item.kdl/gacha.kdl."
+    }
+
+    field category type="i32::str" {
+        key "KT71m8Ae"
+        doc "Tab on the achievement screen (1, 3, 4, 5), and one of the three filters GetAchievementInfo's query node sends back.  StrToInt -> +0x48."
+    }
+
+    field cond_type type="i32::str" {
+        key "3rhygS9K"
+        doc "WHAT is counted -- see the list in this struct's doc.  The screen's second filter.  StrToInt -> +0x4c."
+    }
+
+    field disp_unit type=str {
+        key "5xaMdk8E"
+        doc "Suffix printed after the progress figure; \"Achieved\" on every unexpired row."
+    }
+
+    field need_subject_id type=str {
+        key "np4K1xtq"
+        doc "Subject that must be finished first; empty on every unexpired row.  Same hash as the trade table's prerequisite."
+    }
+
+    field need_mission_id type=str {
+        key "HSRhkf70"
+        doc "Mission that must be cleared first; empty on every unexpired row.  Same hash/name as the progression gate in mission.kdl -- see the Grand Gaia gate notes."
+    }
+
+    field unk_sqL73JYw type="i32::str" {
+        key "sqL73JYw"
+        doc "StrToInt -> +0x98.  0 on 844 rows and 51 on 29.  // UNVERIFIED: no setter name survives and no reader has been traced; sent through unchanged."
+    }
+
+    field unk_a0d2suLZ type="i32::str" {
+        key "a0d2suLZ"
+        doc "StrToInt -> +0x9c.  999 on all but three rows, which carry 50.  // UNVERIFIED, same reason; looks like a cap or a level gate."
+    }
+
+    field unk_8RVXhQjn type="i32::str" {
+        key "8RVXhQjn"
+        doc "Constant 1 on all 873 unexpired rows, and AchievementSubjectMstResponse::readParam does NOT read it -- the client ignores whatever we send.  Modelled only so the ported table stays byte-faithful to the shipped dump; // UNVERIFIED by definition."
+    }
+
+    field disp_order type="i32::str" {
+        key "8zaB7d6W"
+        doc "StrToInt -> +0xa0.  72 distinct values in the hundreds-to-thousands, monotonic within a group.  // UNVERIFIED (named from shape): ordering on the list."
+    }
+
+    field cond_param type=str {
+        key "t5R47iwj"
+        doc "The threshold, kept STRING because it is not always a number: cond_type 0 packs \"<mission>,<x>,<turns>\"."
+    }
+
+    field cond_param2 type=str {
+        key "qA7M9EjP"
+        doc "Identical to cond_param on every shipped row.  NOTE the hash is `start_date` everywhere else (banner.kdl, gacha.kdl); this table reuses it for a second condition parameter, which is exactly the collision the handbook warns about."
+    }
+
+    field end_date type=str {
+        key "SzV0Nps7"
+        doc "Availability end.  tools/gen_achievement_mst.py drops rows already past it, so everything here is open."
+    }
+
+    field weekday type=str {
+        key "fK15a73g"
+        doc "Weekday restriction; empty on every unexpired row."
+    }
+
+    field point type="i32::str" {
+        key "9hH0neGa"
+        doc "Merit Points paid when the subject completes.  StrToInt -> +0x108.  Same hash/name as the Summoner Journal milestone points."
+    }
+
+    field img_frame type=str {
+        key "yTPw0BD7"
+        doc "Frame art for the row; empty on every unexpired row."
+    }
+
+    field reward_info type=str {
+        key "JQ23rIvk"
+        doc "Extra reward beyond the points, in the shared present vocabulary; empty on every unexpired row.  Same hash/name as the campaign's get_reward."
+    }
+}
+
+json AchievementTradeMst {
+    hash "82CcMZhp"
+    doc """
+    F_ACHIEVEMENT_TRADE_MST -- the Merit Point shop (241 offers served since
+    2026-09-25, selected from the original records; earlier 181 unexpired of
+    32,500 after dropping one offer whose unit does not resolve).  response_class =
+    AchievementTradeMstResponse, readParam @0x13CB5C0.  Delivered through
+    parseBodyTag like its sibling above.
+    """
+
+    field id type="i32::str" {
+        key "Mdgsh04u"
+        doc "Offer id.  The user block (9j3ALx8I) joins on it."
+    }
+
+    field name type=str {
+        key "hQ1SJZU9"
+        doc "Display name, e.g. \"Blaze Lance\"."
+    }
+
+    field description type=str {
+        key "qp37xTDh"
+        doc "Blurb; empty on most rows."
+    }
+
+    field price type="i32::str" {
+        key "3EWLm0sA"
+        doc "Merit Points per purchase (50 .. 10,000)."
+    }
+
+    field need_subject_id type=str {
+        key "np4K1xtq"
+        doc "Subject that must be finished first; empty on every unexpired row."
+    }
+
+    field need_mission_id type=str {
+        key "HSRhkf70"
+        doc "Mission that must be cleared first; empty on every unexpired row."
+    }
+
+    field unk_sqL73JYw type="i32::str" {
+        key "sqL73JYw"
+        doc "// UNVERIFIED, as in AchievementSubjectMst; 0 throughout."
+    }
+
+    field unk_a0d2suLZ type="i32::str" {
+        key "a0d2suLZ"
+        doc "// UNVERIFIED, as in AchievementSubjectMst; 999 throughout."
+    }
+
+    field reward_info type=str {
+        key "qBAb07rh"
+        doc "What the purchase pays, colon-packed in the shared present vocabulary: \"<type>:<id>:<count>:<a>:<b>\" -- \"7:47300:1:0:0\" is one sphere 47300, \"6:18830:1:1:0\" one unit.  Kept string: mixed ids and flags."
+    }
+
+    field unk_9Hau45Jj type="i32::str" {
+        key "9Hau45Jj"
+        doc """
+        1 on all 241 served rows.  readParam @0x13CB5C0 stores it at row+0x88,
+        and NOTHING in the Merit shop reads that offset: sliderSet,
+        touchBegan and RandallAchievementShopItem::createSprite all read
+        +0x8c (S8rdp9zk) instead.  // UNVERIFIED meaning.  It was modelled as
+        the purchase limit until 2026-10-02, which refused every purchase of
+        more than one (offer 91000059, Ignis Shard x400) and capped every
+        offer at a single buy.
+        """
+    }
+
+    field limit_count type="i32::str" {
+        key "S8rdp9zk"
+        doc """
+        How many of this offer one player may buy in total (row+0x8c; 1, 2, 3,
+        4, 6, 10, 20, 40, 50, 99 or 400 in the served table).  Binary-confirmed
+        in RandallAchievementShopDetailScene: sliderSet @0x1A62FBC sets the
+        quantity slider to 1 .. (limit_count - bought), bought being
+        UserAchievementTradeInfo.H6k1LIxC (+0x30), floored at 1; touchBegan
+        @0x1A60890 refuses with RANDALL_ACHIEVEMENT_SHOP_CHECK_COUNT when
+        limit_count <= bought; RandallAchievementShopItem::createSprite
+        @0x1A64D50 shows RANDALL_ACHIEVEMENT_REST (limit_count - bought) when
+        limit_count >= 1.  A purchase is quantity x price points
+        (getBeedPointStr) for quantity x the reward's own count.
+        """
+    }
+
+    field start_date type=str {
+        key "qA7M9EjP"
+        doc "Availability start.  The ordinary meaning of this hash, unlike the subject table's reuse of it."
+    }
+
+    field end_date type=str {
+        key "SzV0Nps7"
+        doc "Availability end; the porter drops rows already past it."
+    }
+}
+
+json AchievementDeliverRateMst {
+    hash "1tJiqKgZ"
+    doc """
+    F_ACHIEVEMENT_DELIVER_RATE_MST -- how much Merit Point a delivered unit or
+    item is worth (53 rows).  response_class = AchievementDeliverRateMstResponse,
+    readParam @0x13CAF08, delivered through parseBodyTag.
+
+    FULLY DECODED 2026-09-15.  readParam gives the struct exactly:
+      row+0x0  oC6Dc1xp  StrToInt    rarity
+      row+0x4  6yHMXYv1  StrToInt    getting_type   (same hash as UnitMst's)
+      row+0x8  ug9xV4Fz  StrToFloat  multiplier
+      row+0xC  232id0qQ  StrToInt    flat base
+
+    THE PAYOUT, from GameUtils::getSellAchievePoint @0x1176B70 (unit) and
+    @0x1176EAC (item):
+
+        points = getSellAchievePointRate() * ( base + trunc( mult * unitLv ) )
+
+    where unitLv is UserUnitInfoBase::getUnitLv (vtable +0xb0, resolved from
+    _ZTV12UserUnitInfo's relocations), the row is
+    AchievementDeliverRateMstList::find(rarity, getting_type) for a unit and
+    find(ItemMst::getRare(), 5) for an item -- kind 5 is hardcoded on the item
+    path -- and a missing row yields 0 rather than a default rate.
+
+    getSellAchievePointRate @0x1176D2C reads GeneralEventMst type 19, splits its
+    params on "," and takes element 0; with no such row it returns 1.  This data
+    has no type-19 row, so the rate is 1 and the formula reduces to
+    base + trunc(mult * level).
+
+    ⚠ THE EARLIER "NOT CREDIBLE" READING WAS A PARSE ERROR, NOT BAD DATA.
+    `232id0qQ` values like "1:1:100:20:0" go through StrToInt, which stops at the
+    first non-digit and yields 1.  And the rows with huge bases (839902, 10313)
+    are rarity 1 / getting_type 6 and 7, which NO unit in this data matches.
+    Crossed against all 2291 units the reachable rows are a clean progression --
+    getting_type 1 pays (0.1, 10..200) by rarity 3..8 and getting_type 2 pays
+    (4..12, 496..4488) -- and 304 units of getting_type 3 have no row at all, so
+    the client itself refuses to price them.
+
+    The Deliver flow this prices is AchievementDeliverRequest (vsaXI4M0, key
+    2Lj5hIEG, /actionSymbol/H2guKY1A.php).  // WAS: "still unregistered" — it
+    has been registered since, in GmeControllerHandlers.cpp.  Its request is
+    two groups: `1Q2pGAXE` {KT71m8Ae category, 3rhygS9K cond_type, M7SXoc31
+    subject} and `dE79UwNE` {Rs7bCE3t amount, idfCDG70 the merit the CLIENT
+    thinks it earned, edy7fq3L a comma list of user_unit_ids, n6E8iMf3}.
+    `3rhygS9K` is the flow selector, confirmed by
+    RandallAchievementDedicateKarmaScene::setBaseData's getDataObject(3, 5):
+    category 3 is the Trade category and cond_type 4 = Zel, 5 = Karma,
+    6 = Sphere, 8 = Unit.  Currency is priced from DefineMst instead of this
+    table -- zel_per_achieve_point 10000, karma_per_achieve_point 5000 -- and
+    each flow has its own daily ceiling (max_achieve_point_{zel,karma,item}
+    _per_day = 20000 / 20000 / 99999, plus a unit ceiling DefineMst carries that
+    this schema does not model yet).
+    // UNVERIFIED: what n6E8iMf3 carries; by symmetry with edy7fq3L it is the
+    // sphere/item id list, but no store to that offset was read.
+    """
+
+    field rarity type="i32::str" {
+        key "oC6Dc1xp"
+        doc "RARITY -- UnitMst::getRare() on the unit path, ItemMst::getRare() on the item path.  First argument of AchievementDeliverRateMstList::find."
+    }
+
+    field getting_type type="i32::str" {
+        key "6yHMXYv1"
+        doc "GETTING_TYPE -- the same hash and meaning as UnitMst.getting_type, and the second argument of find().  The item path passes the constant 5 instead."
+    }
+
+    field multiplier type=str {
+        key "ug9xV4Fz"
+        doc "MULTIPLIER on the unit's LEVEL, a decimal string read with StrToFloat into row+0x8.  points = base + trunc(rate * unitLv).  Kept string because it is fractional."
+    }
+
+    field base type=str {
+        key "232id0qQ"
+        doc """
+        FLAT BASE, not a packed band.  readParam runs StrToInt on it into row+0xC
+        and the payout adds it whole.  The colon-packed look of a few rows
+        ("1:1:100:20:0") is leftover text that StrToInt truncates to 1, and those
+        rows are rarity 0, which nothing matches.  Kept as a string because the
+        raw data is not always a clean integer.
+        """
+    }
+}

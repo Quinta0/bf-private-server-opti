@@ -1,0 +1,434 @@
+json UserPresentInfo {
+    doc """
+    One entry in the player's present box.
+
+    Response key sEA41vFK (UserPresentInfoResponse, func_addr 0x1400740).  Every
+    field below carries its real setter name from the readParam export — none of
+    this is inferred.
+
+    The response class declares three params with no readParam setter, reached
+    on the client through hand-coded getValue() calls.  `h7eY3sAK` is modelled
+    below — it is the ordinary user id (see user.kdl) and only *looked* unknown
+    because it has no setter.  **Omitting it made the client discard every
+    present**: the rows went out fully populated and the box still rendered
+    empty.  A missing setter name does NOT mean unknown semantics — check the
+    key against those already documented elsewhere before dismissing it.
+
+    All three of those params are now modelled.  `ZC0msu2L` (setDescription) and
+    `g85qMNxf` (setIsReceipt) were recovered by decompiling
+    `UserPresentInfoResponse::readParam` — neither appears in
+    `readparam_analysis.json`, so the export's silence meant "not extracted",
+    not "does not exist".
+
+    `DbMVG16I` is an OPERATION CODE, not a per-present field — it is stored on
+    the RESPONSE object (`*((_DWORD *)this + 8)`), not on UserPresentInfo, and
+    it decides what happens to the parsed entry:
+
+        1 or 2 -> removeObjectWithPresentID, then **addObject**  (upsert)
+        3      -> removeObjectWithPresentID only                 (delete)
+        other  -> NOTHING — the entry is parsed and then dropped
+
+    `addObject` appears exactly once in readParam and lives inside the 1-or-2
+    branch, so this key is what puts a present into the list at all.  Omitting
+    it, or sending 0, means the box is always empty no matter how correct every
+    other field is.
+    """
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Owning user id — same key and value as the login envelope's user id.  Hand-coded on the client (no readParam setter) and REQUIRED: without it the present box renders empty."
+    }
+
+    field present_id type="str" {
+        key "S1B82FHK"
+        doc "setPresentID.  Opaque id echoed back by PresentReceipt to identify which present is being claimed."
+    }
+
+    field present_type type="i32::str" {
+        key "30Kw4WBa"
+        doc """
+        setPresentType — what the present actually pays out.  Same key and same
+        vocabulary as the campaign reward rows (grand_mission.kdl present_type,
+        consumed by CampaignReceipt): 3 = zel, 8 = gem, 6 = unit,
+        4/5/7 = item/material/sphere (all resolve in item_mst).
+        """
+    }
+
+    field target_id type="str" {
+        key "TdDHf59J"
+        doc "setTargetID — rewarded entity id, interpreted per present_type (unit_mst id for 6, item_mst id for 4/5/7, unused for currency)."
+    }
+
+    field target_cnt type="i32::str" {
+        key "wJsB35iH"
+        doc "setTargetCnt — how many of target_id, or the currency amount for present_type 3/8."
+    }
+
+    field target_param type="str" {
+        key "37moriMq"
+        doc "setTargetParam — extra per-type payload.  // UNVERIFIED: empty on every present this server creates; kept because the setter is real."
+    }
+
+    field receipt_type type="i32::str" {
+        key "i1WQkh4G"
+        doc "setReceiptType — echoed back in PresentReceiptReq alongside present_id, so it selects how the claim is processed."
+    }
+
+    field present_date type="i32::str" {
+        key "fAi8Th5s"
+        doc "setPresentDate — unix seconds when the present was granted."
+    }
+
+    field present_date_str type="str" {
+        key "ya7UHG9v"
+        doc "setPresentDateStr — display form of present_date, \"YYYY-MM-DD HH:MM:SS\".  Travels WITH its epoch sibling; the pair must agree."
+    }
+
+    field receipt_date type="i32::str" {
+        key "0wmDb9vi"
+        doc "setReceiptDate — unix seconds when claimed, 0 while unclaimed."
+    }
+
+    field receipt_date_str type="str" {
+        key "vo1GT3Rs"
+        doc "setReceiptDateStr — display form of receipt_date, empty while unclaimed."
+    }
+
+    field description type="str" {
+        key "ZC0msu2L"
+        doc "setDescription — the tile's display text.  Confirmed from UserPresentInfoResponse::readParam (0x1400740); it has no entry in readparam_analysis.json, which is why it was missed initially."
+    }
+
+    field list_op type="i32::str" {
+        key "DbMVG16I"
+        doc """
+        List operation for this entry: 1/2 = add-or-update, 3 = delete.
+        Anything else (including 0, and omitting the key) makes the client parse
+        the entry and discard it — `addObject` is only reached from the 1-or-2
+        branch of UserPresentInfoResponse::readParam.
+
+        // REVERTED FROM omitted: this was first mis-modelled as `is_receipt`
+        // (readparam_analysis.json names it IsReceipt, which the decompiled
+        // readParam contradicts), then removed entirely on the reading that
+        // 1/2 meant "remove".  Both were wrong; 1/2 is remove-then-ADD.
+        """
+    }
+
+    field is_receipt type="bool::str" {
+        key "g85qMNxf"
+        doc """
+        setIsReceipt(bool) — 1 once claimed, 0 while pending.  THIS is the real
+        received flag.
+
+        // REVERTED FROM DbMVG16I: this field was originally keyed to DbMVG16I
+        // because readparam_analysis.json lists that key against a setter named
+        // IsReceipt.  The decompiled readParam disagrees: DbMVG16I is stored on
+        // the RESPONSE object (`*((_DWORD *)this + 8)`), not on UserPresentInfo,
+        // and g85qMNxf is what actually reaches setIsReceipt.  While we sent
+        // DbMVG16I and omitted g85qMNxf, setIsReceipt was never called at all
+        // and the box reported "no Gifts to receive".
+        """
+    }
+}
+
+json PresentListReq {
+    doc """
+    Request for the present box listing.
+
+    Bare request: PresentListRequest::createBody (0x13ABBB0) adds only
+    createUserInfoTag + createSignalKeyTag + createVersionTag, plus
+    createCampaignReceiptInfoTag when FUNC_CAMPAIGN_SCHEME is on.  So there is
+    nothing to parse beyond the identity envelope.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json PresentListResp {
+    doc "The user's present box — every present row, claimed and unclaimed, from the user_presents table."
+
+    field presents type="[UserPresentInfo]" {
+        key "sEA41vFK"
+        doc "Present box contents."
+    }
+}
+
+json PresentReceiptNode {
+    doc "Single node of the present-claim group (o6uWU0Z7)."
+
+    field receipt_type type="i32::str" {
+        key "i1WQkh4G"
+        doc "UserState::getReceiptType — echoed back from the listing entry being claimed."
+    }
+
+    field present_id type="str" {
+        key "S1B82FHK"
+        doc "UserState::getPresentID — which present to claim."
+    }
+}
+
+json PresentReceiptReq {
+    doc """
+    Claim one present.
+
+    Wire: {\"o6uWU0Z7\":[{\"i1WQkh4G\":<receiptType>,\"S1B82FHK\":\"<presentId>\"}]}
+    per PresentReceiptRequest::createBody (0x13ABC7C).  Note i1WQkh4G is added
+    via the addParam(..., int) overload and S1B82FHK via the string overload.
+    """
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field nodes type="[PresentReceiptNode]" {
+        key "o6uWU0Z7"
+        doc "The present being claimed."
+    }
+}
+
+json PresentReceiptResp {
+    field guild_members type="[GuildMemberInfo]" {
+        key "csIuech30"
+        optional #true
+        doc "guild members; see enclosing packet for binary evidence."
+    }
+
+    doc """
+    Result of a claim: the refreshed present box plus the updated HUD currency,
+    so the client re-renders the list and the header in one pass — and, for
+    whatever the claim actually paid, the client cache that payout changed.
+
+    The present scenes have no local apply path.  Nothing reachable from
+    PresentTopScene / PresentReceiptScene calls a warehouse mutator
+    (GameUtils::incWarehouseItem, UserWarehouseInfo::setItemNum,
+    UserWarehouseInfoList::addObject) or adds a unit, and HomeInfo (NiYWKdzs)
+    rebuilds only the header and the roster.  So any block below that is not
+    sent leaves its screen stale until the next UserInfo — a relaunch, in
+    practice.
+
+    The optional blocks are sent only when a claim in THIS request changed
+    that state, and each is the complete current list (or singleton), because
+    every one of their readers replaces rather than merges.
+    """
+
+    field presents type="[UserPresentInfo]" {
+        key "sEA41vFK"
+        doc "Present box after the claim — the claimed row now carries is_receipt 1."
+    }
+
+    field teamInfo type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Refreshed zel/karma/gem totals after the grant."
+    }
+
+    field medalInfo type="[UserBraveMedalInfo]" {
+        key "6C0kzwM5"
+        doc """
+        Refreshed medal balances after the grant — the same idea as teamInfo,
+        for the currency that does not live on the HUD.
+
+        Needed because present_type 12 pays MEDALS, and without this the
+        counter never updates: getResponseObject maps 6C0kzwM5 to
+        UserBraveMedalInfoResponse, whose readParam does removeAllObjects
+        (@0x13FD270) and rebuilds the list, but nothing sends that key on a
+        claim.  Claiming 120 medals therefore credited the account and left the
+        Brave Slots machine still showing the old number until some later call
+        happened to carry UserInfo.
+        """
+    }
+
+    field unit_info type="[UserUnitInfo]" {
+        key "qC2tJs4E"
+        doc """
+        Units created by unit presents (type 6) in this claim, as returned by
+        gme::addUserUnit.  qC2tJs4E is insert-if-absent (see UnitMixResp),
+        which is exactly right for brand-new user_unit_ids.
+        """
+        optional #true
+    }
+
+    field unit_dictionary type="[UserUnitDictionary]" {
+        key "GV81ctzR"
+        doc "The COMPLETE unit dictionary whenever a unit present was paid, never a partial list: this response rebuilds the reference list the summon lineup reads.  See UserUnitDictionary."
+        optional #true
+    }
+
+    field warehouse_info type="[UserWarehouseInfo]" {
+        key "9wjrh74P"
+        doc "Complete positive inventory after an item/material/sphere present (types 4/5/7).  UserWarehouseInfoResponse::readParam @0x14060E0 clears before adding, so this is always the whole warehouse."
+        optional #true
+    }
+    field item_favorite type="[ItemFavorite]" {
+        key "VSRPkdId"
+        doc """
+        The complete lock set, whenever this reply carries the warehouse.
+        GameResponseParser::parseBodyTag @0x139B3E8 re-derives every row's lock
+        from ItemFavoriteList (UserWarehouseInfoList::setFavorite) after BOTH
+        VSRPkdId and 9wjrh74P, so the two together settle on the server's set
+        in either order.  Without it, a copy the client locked under its craft
+        placeholder (INT_MAX - itemId) came back under its real id unlocked
+        until the next UserInfo.  A zero-row array never reaches readParam, so
+        an empty set changes nothing.
+        """
+        optional #true
+    }
+
+    field item_dictionary_info type="[UserItemDictionaryInfo]" {
+        key "bd5Rj6pN"
+        doc "Every item species ever stacked, sent with warehouse_info.  A full resend is safe: readParam @0x13FFCBC never clears, and UserItemDictionaryList::addObject @0x12979D0 skips an id that getObjectWithItemID already finds."
+        optional #true
+    }
+
+    field dungeon_key_info type="[UserDungeonKeyInfo]" {
+        key "eFU7Qtb0"
+        doc "Key inventory after a dungeon-key present (type 9).  UserDungeonKeyInfoResponse::readParam @0x13FDD00 opens with removeAllObjects, so every row goes out, built by gme::dungeonKeyState exactly as UserInfo builds it."
+        optional #true
+    }
+
+    field summoner_info type="[UserSummonerInfo]" {
+        key "n5mdIUqj"
+        doc "The Summoner singleton after a Summoner SP present (type 17).  readParam @0x144EAD0 init()s the object before reading, so this is the one full row UserInfo sends, from the same builder."
+        optional #true
+    }
+
+    field summoner_arm_info type="[UserSummonerArmsInfo]" {
+        key "dhMmbm5p"
+        doc "Every owned arm after a Summoner Arm present (type 18).  readParam @0x144E824 calls removeAllObjects first, so this is the full list."
+        optional #true
+    }
+
+    field selector_ticket_info type="[UnitSelectorGachaUserInfo]" {
+        key "CGHaOZda"
+        doc "The selector inventory after a Unit Selector ticket present (type 8005; PresentCommon::createPresentName @0x11C37F4 matches its target_id to UnitSelectorGachaMst::getTicketId).  A full replace, so every catalog ticket goes out with its count; see UnitSelectorGachaUserInfo."
+        optional #true
+    }
+
+    field summon_ticket_v2_user type="[SummonTicketV2UserInfo]" {
+        key "a3d5d12i"
+        doc "The V2 summon-ticket inventory after a summon-ticket present (type 8001; createPresentName @0x11C3A2C names it from SummonTicketV2MstList).  A full replace -- see SummonTicketV2UserInfo, and note the plain ticket (type 8000) needs nothing here because it rides team_info."
+        optional #true
+    }
+
+    field event_token_info type="[EventTokenInfo]" {
+        key "l234vdKs"
+        doc "The event-token balances after a token present (type 8004; createPresentName @0x11C3AF8 formats target_id into EVENT_TOKEN_%04d_NAME).  A full replace -- see EventTokenInfo."
+        optional #true
+    }
+}
+
+json MysteryBoxInfo {
+    doc """
+    One Mystery Chest, keyed d0ajLeRi (MysteryBoxResponse).
+
+    Field map decoded 2026-08-21 from MysteryBoxResponse::readParam @0x1C6B11C.
+    Every setter on this class is an ordinary exported call, so the mapping is
+    direct evidence rather than slot arithmetic.
+
+    The response is a FULL REPLACE with no operation code: readParam calls
+    MysteryBoxList::removeAllObjects() on the first field of the first row and
+    addObject() at the end (handbook 6.20).  Sending the complete set is a clean
+    swap; an empty list is a truthful "no chests" and is what the screen already
+    renders, because MysteryChestScene::initConnect clears the list before it
+    sends.
+    """
+
+    field box_id type=str {
+        key "rEFRefr8"
+        doc "setMysteryBoxId.  This is the id MysteryBoxClaimRequest echoes back to claim the chest."
+    }
+
+    field reward_date type="i32::str" {
+        key "6HEchexu"
+        doc "setMysteryBoxRewardDate.  Unix epoch SECONDS, stored at +0x30."
+    }
+
+    field expiry_date type="i32::str" {
+        key "guHur3dr"
+        doc """
+        setMysteryBoxExpiryDate.  Unix epoch SECONDS, stored at +0x34.
+
+        This is the one the countdown reads: getPresentTimeLeftType @0x1CB30B4
+        computes (expiry - ServerTimeInfo::getCurrentServerTimeEpoch()) / 86400
+        and returns 0 once it goes non-positive, so a chest in the past renders
+        as expired.
+        """
+    }
+
+    field reward_date_str type=str {
+        key "peV7drec"
+        doc "setMysteryBoxRewardDateStr.  Preformatted display copy of reward_date; the int is the one that drives behaviour."
+    }
+
+    field expiry_date_str type=str {
+        key "PUgeth6p"
+        doc "setMysteryBoxExpiryDateStr.  Preformatted display copy of expiry_date."
+    }
+
+    field rank type=str {
+        key "swUtH8de"
+        doc "setMysteryBoxRank."
+    }
+
+    field skin type=str {
+        key "PUFr8swe"
+        doc "setMysteryBoxSkin.  Selects the chest artwork."
+    }
+
+    field box_type type=str {
+        key "4rUdradr"
+        doc "setMysteryBoxType."
+    }
+
+    field text type=str {
+        key "mejaw5Ca"
+        doc "setMysteryBoxText.  Body copy shown on the chest tile."
+    }
+
+    field name type=str {
+        key "s35idar9"
+        doc "setMysteryBoxName.  Title shown on the chest tile."
+    }
+}
+
+json MysteryBoxRewardInfo {
+    doc """
+    One prize from a claimed Mystery Chest, keyed CoAp2aph
+    (MysteryBoxRewardResponse::readParam @0x1C6B79C).
+
+    Also a full-replace list with no op code, over MysteryBoxRewardList.
+    """
+
+    field item_id type="i32::str" {
+        key "kixHbe54"
+        doc "setMysteryBoxRewardItemId.  Same key item_mst uses for its own id."
+    }
+
+    field present_type type="i32::str" {
+        key "30Kw4WBa"
+        doc """
+        setMysteryBoxRewardPresentType.  THE SHARED present_type hash - the same
+        one CampaignReceipt, the present box and daily_task.kdl dispatch on:
+        3 = zel, 8 = gem, 6 = unit, 4/5/7 = item/material/sphere.  Chest rewards
+        reuse that vocabulary; do not give them their own switch (handbook 7.13).
+        """
+    }
+
+    field target_id type="i32::str" {
+        key "TdDHf59J"
+        doc "setMysteryBoxRewardTargetId.  Rewarded entity, interpreted per present_type."
+    }
+
+    field target_cnt type="i32::str" {
+        key "wJsB35iH"
+        doc "setMysteryBoxRewardTargetCount.  Quantity."
+    }
+
+    field description type=str {
+        key "qp37xTDh"
+        doc "setMysteryBoxRewardDescription."
+    }
+}

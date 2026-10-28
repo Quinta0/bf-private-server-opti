@@ -1,0 +1,54 @@
+// Skill side-tables: the per-level skill parameter table and the leader-skill
+// catalog.  Both ported in the handbook §8.37 pass; wired 2026-08-05.  The
+// main F_SKILL_MST schema lives in mst/skill.kdl (SkillMst, 33,381 rows).
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (33381/1812 rows).
+//
+// SkillLevelMst has exactly the same row count as SkillMst and joins on the
+// same skill_id hash, so it is a 1:1 sidecar rather than a level ladder.
+
+json SkillLevelMst {
+    doc "Per-skill level parameters (wrapper hash 3ktU0D2e).  33,381 rows — one per SkillMst row."
+    hash "3ktU0D2e"
+
+    field skill_id type="i32::str" {
+        key "nj9Lw7mV"
+        doc "Skill this row parameterises (1000..1400003322) — SkillMst.skill_id.  Same hash/name as unit.kdl/skill.kdl."
+    }
+
+    field level_info type="str" {
+        key "Kn51uR4Y"
+        doc "// UNVERIFIED shape: colon-packed \"<a>:<b>:<c>\" (\"1:100:0\"), but some rows additionally embed comma, at and pipe separators.  Kept PACKED for that reason — and note the same hash carries a pipe-joined animation manifest in UnitCgsMst (mst/unit_ext.kdl), so this hash is a generic packed-payload slot."
+    }
+}
+
+json LeaderSkillMst {
+    doc "Leader skill catalog (wrapper hash 2bGtP7vV).  1812 rows."
+    hash "2bGtP7vV"
+
+    field leader_skill_id type="i32::str" {
+        key "oS3kTZ2W"
+        doc "Leader skill id (1..8960278).  Same hash/name as net/unit.kdl."
+    }
+
+    field name type="str" {
+        key "dJPf9a5v"
+        doc "Skill name — Japanese (\"剣神\", \"反撃\") or English.  Free text: a plain string, since some names embed colons."
+    }
+
+    field process_id type="[i32::str]::sep(at)" {
+        key "hjAy9St3"
+        doc "Effect processor ids — at-separated, one per chained effect (elements 1..11009).  Same hash/name as passive_skill.kdl."
+    }
+
+    field process_param type="[str]::sep(comma)" {
+        key "2Smu5Mtq"
+        doc "Effect parameters — comma list whose elements embed ':' and '@' sub-structure, so elements stay strings.  Same hash/name as passive_skill.kdl.  NOTE the outer separator differs from `process_id` above: comma here, at there."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Skill blurb — Japanese or English free text containing commas (\"... 10% damage reduction & 20% boost to critical hit rate\"), hence a plain string and NOT a comma list.  Same hash/name as item.kdl."
+    }
+}

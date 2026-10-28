@@ -1,0 +1,343 @@
+// Unit side-tables: type definitions, per-unit extras, EP3 costs, animation
+// manifests, flavour comments, and the Frontier Evolution (FE) skill tree.
+// All ported in the handbook §8.37 pass; wired 2026-08-05.  Wrapper keys are
+// each struct's `hash`.
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (6/8/31/2292/2282/5124/2041 rows).
+//
+// Most display strings in these tables are localisation KEYS
+// ("MST_UNITTYPES_1_NAME", "MST_UNITCOMMENT_51367_DESCRIPTION") rather than
+// text — the client resolves them against its own string bundle, so an empty
+// look on the wire is expected.
+
+json UnitTypeMst {
+    doc "Unit type (Lord/Anima/Breaker/Guardian/Oracle) modifiers (wrapper hash LBY10TPU).  6 rows."
+    hash "LBY10TPU"
+
+    field unit_type_id type="i32::str" {
+        key "nBTx56W9"
+        doc "Type id 1..6.  Same hash/name as net/unit.kdl."
+    }
+
+    field name type="str" {
+        key "Z3ocmb5J"
+        doc "Localisation key for the type name — \"MST_UNITTYPES_1_NAME\" .. \"_6_NAME\"."
+    }
+
+    field unk1 type="[i32::str]::sep(comma)" {
+        key "76IHLVsz"
+        doc "// UNVERIFIED: comma pair, elements 0..15."
+    }
+
+    field unk2 type="[i32::str]::sep(comma)" {
+        key "2M4mQZgk"
+        doc "// UNVERIFIED: comma pair, elements 0..3."
+    }
+
+    field unk3 type="[i32::str]::sep(comma)" {
+        key "Sj9zR38K"
+        doc "// UNVERIFIED: comma pair, elements -3..3 — the signed stat bias this type applies."
+    }
+
+    field unk4 type="[i32::str]::sep(comma)" {
+        key "6D3YN9rc"
+        doc "// UNVERIFIED: comma pair, elements -3..4."
+    }
+
+    field appearance_rate type="str" {
+        key "ChD5b0jR"
+        doc "Percent chance this type is rolled when a unit is acquired without a fixed type.  // RENAMED FROM: unk5 (whose doc guessed the range as \"0.00\"..\"10.00\").  The six rows read 23.00, 23.00, 22.00, 22.00, 10.00, 0.00 — they SUM TO EXACTLY 100, which is what identifies this as a distribution rather than a multiplier, and Rex's 0.00 matches the game never handing Rex out from a normal drop.  MissionArchiver uses these weights when a mission's unit_drop_type is 0 (\"random\").  Kept a decimal string: there is no float scalar in the type vocabulary."
+    }
+
+    field unk6 type="str" {
+        key "7N1smiod"
+        doc "// UNVERIFIED: a DECIMAL string (\"0.50\" / \"0.75\") — kept as a string for the same reason."
+    }
+}
+
+json UnitExtMst {
+    doc "Per-unit extra parameters (wrapper hash 0H1hV6iD).  Only 8 rows — a sparse override table, not a per-unit row."
+    hash "0H1hV6iD"
+
+    field unit_id type="i32::str" {
+        key "pn16CNah"
+        doc "Unit this override applies to (10452..60812).  Same hash/name as unit.kdl."
+    }
+
+    field param_up_ext type="[i32::str]::sep(colon)" {
+        key "VS7df4oH"
+        doc "CONFIRMED setParamUpExt (UnitExtMstResponse::readParam @0x13F5B94).  HP:ATK:DEF:REC quad; non-zero exactly on the five imps (10452 0:20:0:0, 20442 0:0:20:0, 30432 0:0:0:20, 40432 50:0:0:0, 50612 150:60:60:60)."
+    }
+
+    field double_sphere_trigger type="i32::str" {
+        key "FKVRt01T"
+        doc """
+        CONFIRMED setDoubleSphereTrigger(bool) (same readParam).  1 only on
+        20302 Sphere Frog.  Besides opening the second sphere slot, the client
+        counts it as 10 enhancement SP once the base ALREADY has that slot:
+        UserState::getUserUnitListEfPoint @0x1247888 adds 10 when the base's
+        second frame is not "-1" and this flag is set.
+        """
+    }
+
+    field extra_skill_flg type="i32::str" {
+        key "dyFUE5fN"
+        doc "CONFIRMED setExtraSkillFlg (same readParam).  1 on 50792, 2 on 60812, 0 elsewhere."
+    }
+}
+
+json UnitEp3Mst {
+    doc "Episode 3 unit unlock costs (wrapper hash XFD1gtfo).  31 rows.  Pairs with MissionEp3Mst in mst/mission_ep3.kdl."
+    hash "XFD1gtfo"
+
+    field unit_id type="i32::str" {
+        key "pn16CNah"
+        doc "Unit unlocked (10202..60334).  Same hash/name as unit.kdl."
+    }
+
+    field process_id type="i32::str" {
+        key "hjAy9St3"
+        doc "// UNVERIFIED: 1 or 2 — the unlock kind.  Same hash/name as passive_skill.kdl."
+    }
+
+    field value type="i32::str" {
+        key "gg69JHMH"
+        doc "CONFIRMED setValue (readParam).  1..2000 (a quantity or threshold)."
+    }
+
+    field zel type="i32::str" {
+        key "Najhr8m6"
+        doc "Zel cost (832..500000).  Same hash mission.kdl/raid.kdl use for zel amounts."
+    }
+}
+
+json UnitCgsMst {
+    doc "Per-unit animation manifests (wrapper hash 07bx6EXN).  2292 rows."
+    hash "07bx6EXN"
+
+    field unit_id type="i32::str" {
+        key "pn16CNah"
+        doc "Unit (1..87602603).  Same hash/name as unit.kdl."
+    }
+
+    field anime_files type="str" {
+        key "Kn51uR4Y"
+        doc "// UNVERIFIED shape: PIPE-joined \"<slot>:<file.sam>\" entries — \"1:unit_anime_60584.sam|2:unit_anime_60584.sam|...\".  Kept packed: the outer separator is '|' and the inner is ':', and the same hash carries a completely different colon-triple shape in SkillLevelMst (mst/skill_ext.kdl)."
+    }
+}
+
+json UnitCommentMst {
+    doc "Unit flavour text (wrapper hash gkVH5p8r).  2282 rows — all five text columns are localisation keys or blank."
+    hash "gkVH5p8r"
+
+    field unit_id type="i32::str" {
+        key "pn16CNah"
+        doc "Unit (10011..87602603).  Same hash/name as unit.kdl."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Localisation key — \"MST_UNITCOMMENT_51367_DESCRIPTION\", or blank.  Same hash/name as item.kdl.  A plain string: free text elsewhere contains commas."
+    }
+
+    field comment_mix type="str" {
+        key "gb0qGa1W"
+        doc "CONFIRMED setCommentMix (readParam).  blank or a single space on every captured row."
+    }
+
+    field comment_evo type="str" {
+        key "0pMem1xg"
+        doc "CONFIRMED setCommentEvo (readParam).  blank or a single space on every captured row."
+    }
+
+    field comment_skill type="str" {
+        key "fBg92Ki7"
+        doc "CONFIRMED setCommentSkill (readParam).  empty string in all 2282 rows."
+    }
+
+    field comment_summon type="str" {
+        key "ZEzhmS53"
+        doc "CONFIRMED setCommentSummon (readParam).  blank or \"0\"."
+    }
+}
+
+json UnitFeSkillMst {
+    doc "Frontier Evolution skill nodes (wrapper hash kXes8fSi).  5124 rows — the per-unit FE tree.  The skills themselves (SP cost, series, level) are F_FE_SKILL_MST — FeSkillMst below."
+    hash "kXes8fSi"
+
+    field unit_id type="i32::str" {
+        key "pn16CNah"
+        doc "Unit this node belongs to (10017..861008).  Same hash/name as unit.kdl."
+    }
+
+    field category_id type="i32::str" {
+        key "VgU78CYj"
+        doc "FE category 1..11 — UnitFeCategoryMst.category_id."
+    }
+
+    field display_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Node order within the category (1..25).  Same hash/name as banner.kdl."
+    }
+
+    field skill_id type="i32::str" {
+        key "ri6D9yBi"
+        doc "CONFIRMED: the FeSkillMst id the node grants (1..1900000002).  UnitDetailVirtuallyInfoScene::touchSkill resolves it with FESkillMstList::getObjectFeID, and FeSkillGet sends the chosen one back under the same key.  Every node's id is present in F_FE_SKILL_MST Ver618."
+    }
+
+    field term_skill type="str" {
+        key "FHThxDv4"
+        doc "CONFIRMED setTermSkill (readParam); decoded from UnitDetailVirtuallyInfoScene::skillTermCheck @0x1BE21E8: '/'-separated entries of `type@value`; type 1 = the unit must already own FE skill `value` (isFeSkill).  In the shipped data every entry is type 1: 353 nodes have one (\"1@140000\"), one node has two (\"1@a/1@b\"), the rest none."
+    }
+
+    field description type="str" {
+        key "7XYkj2EU"
+        doc "Node effect text — Japanese (\"「攻撃ＢＢの威力をアップ」習得\") or English; free text containing commas and quotes, hence a plain string."
+    }
+}
+
+json FeSkillMst {
+    doc """
+    F_FE_SKILL_MST — the SP enhancement skills themselves (2,899 rows).  No
+    response class carries it: the client downloads it as
+    /mst/Ver618_2h9r3yEY.dat (file key 2h9r3yEY, encode key w3Z9EeUR) and
+    reads it through FESkillMstList.  The server keeps a decrypted copy,
+    deploy/mst/fe_skill_mst.json, written by scripts/gen_fe_skill_mst.py from
+    that same served file, so FeSkillGet prices a skill exactly as the
+    client's Enhancements screen does.  Setters: FESkillMst::setFeSkillID,
+    setFeSkillName, setSeries, setLv, setNeedBP, setEffectType,
+    setProcessType, setProcessParam, setDescription.
+    """
+    hash "2h9r3yEY"
+
+    field id type="i32::str" {
+        key "ri6D9yBi"
+        doc "setFeSkillID — joined by UnitFeSkillMst.skill_id and sent by FeSkillGet."
+    }
+
+    field name type="str" {
+        key "yRlCNyvk"
+        doc "setFeSkillName (Japanese in this table; the client shows its own text)."
+    }
+
+    field series type="i32::str" {
+        key "9PsmH7tz"
+        doc "setSeries — skills of one series are levels of one enhancement (isFeSkillLvCheck compares series and lv)."
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "setLv — 1..11 within the series."
+    }
+
+    field need_bp type="i32::str" {
+        key "G5wFDad6"
+        doc "setNeedBP — the SP the skill costs (5..100).  skillTermCheck @0x1BE21E8 requires fe_bp >= need_bp and fe_used_bp + need_bp <= fe_max_usable_bp."
+    }
+
+    field effect_type type="str" {
+        key "jeR2rN3V"
+        doc "setEffectType — '@'-joined when the skill has several effects."
+    }
+
+    field process_type type="str" {
+        key "hjAy9St3"
+        doc "setProcessType — battle process ids, '@'-joined."
+    }
+
+    field process_param type="str" {
+        key "2Smu5Mtq"
+        doc "setProcessParam — per-process parameters, '@'-joined, comma lists inside."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "setDescription."
+    }
+}
+
+json UnitFeCategoryMst {
+    doc "Frontier Evolution categories (wrapper hash kvSPgNAk).  2041 rows.  Every column after display_order is zero in the shipped data — the table reuses UnitEvoMst's material/flag hashes but never populates them."
+    hash "kvSPgNAk"
+
+    field unit_id type="i32::str" {
+        key "pn16CNah"
+        doc "Unit (10017..861008).  Same hash/name as unit.kdl."
+    }
+
+    field category_id type="i32::str" {
+        key "VgU78CYj"
+        doc "Category id 1..11 — joined by UnitFeSkillMst.category_id."
+    }
+
+    field name type="str" {
+        key "XLSB42ED"
+        doc "Category name — Japanese, e.g. \"スパーク系\" (Spark), \"特殊\" (Special)."
+    }
+
+    field display_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Order within the unit (1..8).  Same hash/name as banner.kdl."
+    }
+
+    field zel type="i32::str" {
+        key "Rs7bCE3t"
+        doc "// UNVERIFIED: constant 0.  This hash is the zel cost in UnitEvoMst."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "// UNVERIFIED: constant 0.  Same hash/name as mission.kdl."
+    }
+
+    field unk1 type="i32::str" {
+        key "Xyt6rhx2"
+        doc "// UNVERIFIED: constant 0 (constant 1 in UnitEvoMst)."
+    }
+
+    field unk2 type="i32::str" {
+        key "0tna4Idu"
+        doc "// UNVERIFIED: constant 0."
+    }
+
+    field unk3 type="i32::str" {
+        key "6GwnugW3"
+        doc "// UNVERIFIED: constant 0."
+    }
+
+    field unk4 type="i32::str" {
+        key "hdF8ND2H"
+        doc "// UNVERIFIED: constant 0."
+    }
+
+    field unk5 type="i32::str" {
+        key "nB7pFdR0"
+        doc "// UNVERIFIED: constant 0."
+    }
+
+    field material_1 type="i32::str" {
+        key "85X6JHQA"
+        doc "// UNVERIFIED: constant 0 here; a material unit id in UnitEvoMst."
+    }
+
+    field material_2 type="i32::str" {
+        key "wh3YRU08"
+        doc "// UNVERIFIED: constant 0 here."
+    }
+
+    field material_3 type="i32::str" {
+        key "7MxucW2J"
+        doc "// UNVERIFIED: constant 0 here."
+    }
+
+    field material_4 type="i32::str" {
+        key "j7fTS3ca"
+        doc "// UNVERIFIED: constant 0 here."
+    }
+
+    field material_5 type="i32::str" {
+        key "Hb8yfmv7"
+        doc "// UNVERIFIED: constant 0 here."
+    }
+}

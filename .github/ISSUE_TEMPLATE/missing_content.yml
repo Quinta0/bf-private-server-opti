@@ -1,0 +1,69 @@
+name: Missing content
+description: A quest, unit, event, item or game table the server does not serve yet, or serves wrongly.
+title: "[Content]: "
+labels: ["missing-content", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for game content that is missing or incomplete. **Do not attach game
+        files, art or APKs.** This repository is code only: link to a public source for the data
+        instead, such as a community wiki page or a public preservation archive.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of content
+      options:
+        - Quest or dungeon
+        - Unit, evolution or skill
+        - Event, Vortex or Frontier Gate
+        - Summon banner
+        - Item, sphere or material
+        - Exchange, shop or reward
+        - Game mode (Arena, Colosseum, Raid, Summoner, ...)
+        - Client table (mst)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: The in-game name as the client shows it.
+      placeholder: "e.g. Mischief and Malice"
+    validations:
+      required: true
+  - type: input
+    id: ids
+    attributes:
+      label: Ids
+      description: Unit, mission, dungeon or item ids, if known.
+      placeholder: "e.g. quest 540, unit 50040"
+  - type: textarea
+    id: current
+    attributes:
+      label: What happens now
+      description: For example "not available yet" and back to Home, an empty list, wrong rewards, a crash.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the original game did
+      description: Rewards, enemies, schedule or behaviour as you remember or have documented them.
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Public sources
+      description: Links to wiki pages, videos, datamines or archive paths that describe this content. No download links for the client.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this content has not been requested yet.
+          required: true
+        - label: I did not attach or link game files, art or APKs.
+          required: true

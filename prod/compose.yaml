@@ -1,0 +1,88 @@
+# Production stack on the Tokyo server: the game server stays on the private
+# compose network; Caddy is the only thing listening publicly (80/443).
+services:
+  game:
+    image: bf-server:prod
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - bf-data:/data
+      - ./config.json:/app/config.json:ro
+      # Optional overlay folder (balance_root); a folder mount so atomic renames show up inside.
+      - /opt/bf/prod/balance:/app/balance:ro
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9960"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # An optional test game server, served by Caddy as test.example.com. The same image as
+  # game unless BF_TEST_TAG names another local tag (put BF_TEST_TAG=next in
+  # /opt/bf/prod/.env, then recreate this service). Its own save (volume prod_bf-test-data,
+  # for example a copy of a live backup), its own overlay folder, one CPU and a memory cap,
+  # so it cannot starve game.
+  # Nothing depends on it and it depends on nothing: `up -d game` and `restart game` never
+  # touch it, and changing this block never recreates game or caddy.
+  game-test:
+    image: bf-server:${BF_TEST_TAG:-prod}
+    pull_policy: never              # local tags only; never fetch a "bf-server" from a registry
+    restart: unless-stopped
+    user: "10001:10001"             # the image's bf user, stated so another tag cannot run as root
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    mem_limit: 1536m
+    cpus: 1.0
+    logging:                        # bounded, unlike game's: a test server needs no history
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+    volumes:
+      - bf-test-data:/data
+      # Long form with create_host_path off: until you create them, a missing
+      # file or folder fails this service alone instead of Docker creating a root-owned
+      # folder in its place.
+      - type: bind
+        source: ./config.test.json
+        target: /app/config.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /opt/bf/test/balance
+        target: /app/balance
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9960"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    depends_on:
+      - game
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./tls:/etc/caddy/tls:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  bf-data:
+  bf-test-data:
+  caddy-data:
+  caddy-config:

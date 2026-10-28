@@ -1,0 +1,543 @@
+// Classic Raid Battle (async HTTP co-op) -- slice 1: the entry screens and the
+// solo quick-start room.  Every key/setter pair below comes from the client's
+// own *Response::readParam / *Request::createBody in libgame.so; the full
+// derivation, scene ids and the later-slice keys are in
+// docs/features/RAIDS_SPEC.md.
+//
+// IMPORT ORDER: this file embeds FriendInfo (friends.kdl) and LoginInfoReq
+// (user.kdl), and the generator emits types in import order, so handlers.kdl
+// must import it AFTER both.
+
+json RaidUserInfo {
+    doc "RaidUserInfoResponse (1ry6BKoe), a singleton.  Reader @0x1444ED0 resets OpenFlg/RC/Agreement/login ids/aube BEFORE reading keys, so every key goes out every time.  Also embedded in UserInfo's reply."
+
+    field rc type="i32::str" {
+        key "7x3pPB2C"
+        doc "setRC.  Raid Class 1..7 (RaidRcMst rows 2..7 are the class-ups)."
+    }
+
+    field agreement type="i32::str" {
+        key "dziN1Ha9"
+        doc "setAgreement.  Anything but 1 sends RaidInitScene to the terms screen (1205)."
+    }
+
+    field login_world_id type="str" {
+        key "43hMuY2I"
+        doc "setLoginWorldID.  World of the room the player is still in, else empty."
+    }
+
+    field active_deck type="i32::int" {
+        key "Z0Y4RoD7"
+        doc "setActiveDeckNum + setServeDeckNum.  0-based party deck index."
+    }
+
+    field login_room_id type="str" {
+        key "8VYd6xSX"
+        doc "setLoginRoomID.  Non-empty together with the world makes RaidInitScene RESUME that room through RaidRoomInfo, so only a live room may be named here."
+    }
+
+    field aube type="i32::str" {
+        key "C45mRxnZ"
+        doc "setRaidAube.  Current raid stamina."
+    }
+
+    field aube_max type="i32::str" {
+        key "S92Hcor3"
+        doc "setRaidAubeMax.  DefineMst raid_max_p (3)."
+    }
+
+    field rest_timer type="i32::int" {
+        key "6d2XBDUu"
+        doc "setRaidRestTimer.  Seconds to the next aube point (recover_time_raid = 3600); 0 when full."
+    }
+
+    field open_flg type="i32::str" {
+        key "iFA0fd6Y"
+        doc "setOpenFlg.  1 = raid open; the resume branch requires it."
+    }
+}
+
+json RaidPermitMissionInfo {
+    doc "RaidPermitMissionInfoResponse (2WqoMm4d) row.  The quest list (RaidQuestListScene::setList @0x19A5F54) shows ONLY missions present here, so without rows it is empty."
+
+    field mission_id type="str" {
+        key "j28VNcUW"
+        doc "RaidMissionMst id."
+    }
+
+    field time_limit type="i32::str" {
+        key "qY49LBjw"
+        doc "Seconds; copied from RaidMissionMst.qY49LBjw."
+    }
+}
+
+json RaidClearMissionInfo {
+    doc "RaidClearMissionInfoResponse (8LF2ohCY) row.  Drives the quest_clear_img stamp."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Player user id."
+    }
+
+    field mission_id type="str" {
+        key "j28VNcUW"
+        doc "Cleared RaidMissionMst id."
+    }
+}
+
+json RaidWorldInfo {
+    doc "RaidWorldInfoResponse (taWh0Pr7) row, one per RaidWorldMst."
+
+    field world_id type="str" {
+        key "43hMuY2I"
+        doc "setWorldID.  RaidWorldMst id."
+    }
+
+    field crowded_percent type="i32::str" {
+        key "SyL0XFc6"
+        doc "setCrowdedPercent.  0..100; display only."
+    }
+
+    field open_flg type="i32::str" {
+        key "iFA0fd6Y"
+        doc "setRaidOpenFlg.  Must be 1 or the world is refused and the QUICK row (getTopWorld) disappears."
+    }
+}
+
+json RaidRoomInfo {
+    doc "RaidRoomInfoResponse (8iBuZa3n) row.  RaidUtils::roomInfoUpDate @0x11CC23C takes the top row."
+
+    field room_id type="str" { key "8VYd6xSX"; doc "setRoomID."; }
+    field world_id type="str" { key "43hMuY2I"; doc "setWorldID.  Must exist in RaidWorldMst or errorAll raises RAID_WORLDDATA_NULL."; }
+    field master_user_id type="str" { key "8ZK3w0Np"; doc "setMasterUserID."; }
+    field master_user_name type="str" { key "IAfv98Wd"; doc "setMasterUserName."; }
+    field master_user_lv type="i32::str" { key "6WKvM4o8"; doc "setMasterUserLv."; }
+    field master_leader_unit_id type="str" { key "5bBwEo9f"; doc "setMasterUserLeaderUnitID."; }
+    field master_leader_unit_lv type="i32::str" { key "fZgEP96L"; doc "setMasterUserLeaderUnitLv."; }
+    field master_unit_img_type type="i32::str" { key "i9L42Gx0"; doc "setMasterUnitImgType."; }
+    field playstyle_id type="str" { key "NQR1Vd3t"; doc "setPlaystyleID.  RaidPlaystyleMst id; 1 = Not Specified."; }
+    field target_id type="str" { key "TdDHf59J"; doc "setTargetID."; }
+    field mission_id type="str" { key "j28VNcUW"; doc "setMissionID."; }
+    field mission_start_flg type="i32::str" { key "3tWuc7de"; doc "setMissionStartFlg."; }
+    field member_num type="i32::str" { key "rPIya39u"; doc "setRoomMemberNum."; }
+    field quick_start_flg type="i32::str" { key "GWfpjED4"; doc "setQuickStartFlg.  RaidFieldReady reads it to set QuickQuestFlg."; }
+    field quick_matching_flg type="i32::str" { key "KQA1oWj7"; doc "setQuickMatchingFlg."; }
+    field midway_joinable_flg type="i32::str" { key "1Txpza2u"; doc "setMidwayJoinableFlg."; }
+    field kick_flg type="i32::str" { key "j3sGA1zt"; doc "setKickFlg."; }
+    field min_rc type="i32::str" { key "wYmg52xp"; doc "setMinRC."; }
+    field min_lv type="str" { key "0TfXnP3m"; doc "setMinLv (read as a string)."; }
+    field comment type="str" { key "WDUyI85C"; doc "setComment."; }
+    field password type="str" { key "4WSu1irc"; doc "setPassword."; }
+    field password_flg type="i32::str" { key "XqMsnE89"; doc "setPasswordFlg."; }
+    field dissolve_time type="i32::str" { key "nJ2Qe3wM"; doc "setDissolveTime.  Seconds left before auto-dissolve (unit INFERRED)."; }
+    field mission_joinable_rest_time type="i32::str" { key "4Qf8RePm"; doc "setRoomMissionJoinableRestTime."; }
+    field search_type type="i32::str" { key "ouU5H7qm"; doc "setSearchType."; }
+    field ope_type type="i32::str" { key "mnZ5K4Ii"; doc "setOpeType."; }
+    field enterable_flg type="i32::str" { key "C1vG0iKh"; doc "setEnterableFlg.  0 for a solo room."; }
+    field friend_user_id type="str" { key "gkYiqB40"; doc "Quick-start helper user id."; }
+    field friend_user_name type="str" { key "H5pQK04c"; doc "Helper name."; }
+    field friend_user_lv type="i32::str" { key "usM7W3DS"; doc "Helper level."; }
+    field friend_leader_unit_id type="str" { key "1ctR6GHC"; doc "Helper unit id."; }
+    field friend_leader_unit_lv type="i32::str" { key "8Ix0Soup"; doc "Helper unit level."; }
+    field friend_unit_img_type type="i32::str" { key "JmLLHcDv"; doc "Helper unit image type."; }
+    field ep3_flg type="i32::str" { key "jkldTrhL"; doc "Summoner avatar Ep3Flg."; }
+    field sex type="i32::str" { key "9i2xhMaJ"; doc "Summoner avatar sex."; }
+    field element type="i32::str" { key "iNy0ZU5M"; doc "Summoner avatar element."; }
+    field hair_id type="str" { key "btZizNep"; doc "Summoner avatar hair id."; }
+    field arm_id type="str" { key "RVVgyuor"; doc "Summoner avatar arm id."; }
+}
+
+json RaidRoomUserInfo {
+    doc "RaidRoomUserInfoResponse (uwH62EZy) row.  RaidSceneBase::myRoomInfo finds the player here by user id; roomConnectEndPlay @0x19DC268 ejects them when kicked_flg is 1."
+
+    field room_id type="str" { key "8VYd6xSX"; doc "setRoomID."; }
+    field user_id type="str" { key "h7eY3sAK"; doc "setUserID."; }
+    field user_name type="str" { key "B5JQyV8j"; doc "setUserName."; }
+    field leader_unit_id type="str" { key "F6bPj50Q"; doc "setLeaderUnitID."; }
+    field rc type="i32::str" { key "7x3pPB2C"; doc "setUserRC."; }
+    field user_lv type="i32::str" { key "D9wXQI2V"; doc "setUserLv."; }
+    field aube type="i32::str" { key "C45mRxnZ"; doc "setUserAubeNum."; }
+    field ready type="i32::str" { key "uX87tAZB"; doc "setReadyInfo.  A solo room is always ready."; }
+    field mission_status type="i32::str" { key "j3g5P4cq"; doc "setMissionStatus.  0 = lobby (INFERRED; RaidInitScene::caseGetRoom branches on it)."; }
+    field kicked_flg type="i32::str" { key "D2ZKtGR9"; doc "setKickedFlg."; }
+    field active_status type="i32::str" { key "BY8fZ7M1"; doc "setActiveStatus."; }
+    field sortie_flg type="i32::str" { key "Tq86EG0N"; doc "setSortieFlg."; }
+    field current_room_mission_id type="i32::str" { key "FV6MU5nQ"; doc "setCurrentRoomMissionID."; }
+    field mission_id type="str" { key "j28VNcUW"; doc "setMissionID."; }
+    field unit_img_type type="i32::str" { key "2pAyFjmZ"; doc "setUnitImgType."; }
+    field guild_id type="i32::str" { key "sD73jd20"; doc "setGuildID."; }
+}
+
+json RaidChatLog {
+    doc "RaidGetChatLogResponse (WCA9VhL3) row, one per message.  The client APPENDS every row (UserChatLogInfoList::addObject, no de-duplication), then sorts by log id and trims to 200, so a reply carries only rows newer than the request's pw38qdui.NLKce95n."
+
+    field log_id type="i64::str" { key "NLKce95n"; doc "Log id (raid_chat.log_id, global AUTOINCREMENT).  The client sends the newest it holds back as pw38qdui.NLKce95n."; }
+    field date type="str" { key "ToSxkU34"; doc "Drawn verbatim by RaidChatScene::drawTime: \"HH:MM\" UTC (width INFERRED)."; }
+    field user_id type="str" { key "h7eY3sAK"; doc "Sender user id.  checkSendSuccess @0x1957E7C matches the caller's own row by it."; }
+    field user_name type="str" { key "B5JQyV8j"; doc "Sender name."; }
+    field leader_unit_id type="str" { key "pn16CNah"; doc "Sender's leader unit id (balloon art)."; }
+    field chat_type type="str" { key "8Fj06n3K"; doc "\"2\" stamp, \"5\" member-palette stamp (the only types the server stores); \"1\" balloon text and \"3\"/\"4\" log lines are never sent."; }
+    field content type="str" { key "3kQUaGx0"; doc "StampMst id in decimal, looked up in StampMstList by setChatLogLayout @0x1952A3C."; }
+    field unit_img_type type="i32::str" { key "2pAyFjmZ"; doc "Leader unit image type; always 1 (base artwork)."; }
+}
+
+
+// ---------------------------------------------------------------------------
+// Requests.  Every 8iBuZa3n body the client builds is a subset of the keys in
+// RaidRoomKeyNode, so one node type reads them all; absent keys stay empty.
+// ---------------------------------------------------------------------------
+
+json RaidRoomKeyNode {
+    doc "The 8iBuZa3n request node (RaidRoomFriendGet/QuickStart/Exit/Dissolve/RoomInfo/MissionStart createBody)."
+
+    field world_id type="str" { key "43hMuY2I"; doc "World id."; }
+    field room_id type="str" { key "8VYd6xSX"; doc "Room id; empty in the quick path."; }
+    field master_user_id type="str" { key "8ZK3w0Np"; doc "Room master (MissionStart)."; }
+    field mission_id type="str" { key "j28VNcUW"; doc "Mission id (QuickStart)."; }
+}
+
+json RaidBareReq {
+    doc "Identity-only raid request: RaidUserInfo, RaidAgreement, RaidWorloInfo, and the queued RoonItemEdit/UpDateCash acks."
+
+    field login_info type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+}
+
+json RaidRoomReq {
+    doc "Any raid request that names a room or mission in 8iBuZa3n."
+
+    field login_info type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field room type="[RaidRoomKeyNode]" {
+        key "8iBuZa3n"
+        doc "One node; a list so a missing or empty group still parses."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Responses.
+// ---------------------------------------------------------------------------
+
+json RaidUserInfoResp {
+    doc "Reply to RaidUserInfo / RaidAgreement / RaidExit / RaidRoomDissolve."
+
+    field user type="[RaidUserInfo]::size(1)" { key "1ry6BKoe"; doc "The player's raid state."; }
+    field permit type="[RaidPermitMissionInfo]" { key "2WqoMm4d"; doc "Missions the player may start."; }
+    field clear type="[RaidClearMissionInfo]" { key "8LF2ohCY"; doc "Missions the player has cleared."; }
+    field black_list type="[FriendInfo]" { key "Qazc0Qv8"; doc "The raid blacklist (MULTIPLAYER 4.9; the World screen opens it with no request of its own), omitted while empty."; optional #true; }
+    field item_set type="[UserEquipItemInfo]" { key "Fihk73ZR"; doc "Stored raid item set (raid_equip_items kind 0, CAMP_ITEMS 4.5), omitted while empty."; optional #true; }
+    field item_reserve type="[UserEquipItemInfo]" { key "GvV1w4yM"; doc "Stored reserve (raid_equip_items kind 1), omitted while empty."; optional #true; }
+}
+
+json RaidWorldInfoResp {
+    doc "Reply to RaidWorloInfo (sic).  Permit/clear are re-sent because the world screen is where a returning player lands."
+
+    field worlds type="[RaidWorldInfo]" { key "taWh0Pr7"; doc "One row per RaidWorldMst."; }
+    field permit type="[RaidPermitMissionInfo]" { key "2WqoMm4d"; doc "Missions the player may start."; }
+    field clear type="[RaidClearMissionInfo]" { key "8LF2ohCY"; doc "Missions the player has cleared."; }
+    field black_list type="[FriendInfo]" { key "Qazc0Qv8"; doc "The raid blacklist (MULTIPLAYER 4.9; the World screen opens it with no request of its own), omitted while empty."; optional #true; }
+}
+
+json RaidRoomFriendGetResp {
+    doc "Reply to RaidRoomFriendGet: the helper picker.  ft4zY6Uv's keys are a subset of FriendInfo's (tojMy68W); an empty list shows RAID_NO_FRIEND and the no-helper button."
+
+    field friends type="[FriendInfo]" { key "ft4zY6Uv"; doc "Helper candidates."; }
+}
+
+json RaidRoomResp {
+    doc "Reply to RaidRoomInfo (the 4 s lobby heartbeat).  An empty list never reaches RaidRoomInfoResponse::readParam and leaves the client's rows in place (RAIDS_ROUND2_MULTIPLAYER.md 1.3), so a vanished room is answered with a refusal, never with []."
+
+    field rooms type="[RaidRoomInfo]" { key "8iBuZa3n"; doc "The room, or nothing."; }
+    field members type="[RaidRoomUserInfo]" { key "uwH62EZy"; doc "Its members."; }
+    field chat type="[RaidChatLog]" { key "WCA9VhL3"; doc "Chat rows newer than the poll's pw38qdui.NLKce95n, oldest first (RaidChatResp rules)."; optional #true; }
+    field user type="[RaidUserInfo]" { key "1ry6BKoe"; doc "Raid user state after make/edit/enter: login ids name the room, so a restart resumes it."; optional #true; }
+}
+
+json RaidQuickStartResp {
+    doc "Reply to RaidQuickStart.  The handler splices the chosen helper (ZX7gzQ6s) in verbatim, since it is echoed exactly as the client sent it."
+
+    field rooms type="[RaidRoomInfo]" { key "8iBuZa3n"; doc "The new solo room."; }
+    field members type="[RaidRoomUserInfo]" { key "uwH62EZy"; doc "The player."; }
+    field user type="[RaidUserInfo]::size(1)" { key "1ry6BKoe"; doc "Login ids now name the room, so a restart resumes it."; }
+}
+
+// ---------------------------------------------------------------------------
+// Round 2, band "multiplayer": room list, chat, the player's raid records and
+// the raid blacklist (docs/features/RAIDS_ROUND2_MULTIPLAYER.md 4.4, 4.7-4.9).
+// Requests are read loosely (RaidRequest), so only replies are typed here.
+// ---------------------------------------------------------------------------
+
+json RaidRoomListResp {
+    doc "Reply to RaidRoomList (YF9UQpn6).  Rooms only: the caller is in none of them.  An EMPTY list goes out only for search type 1, whose scenes clear the client list first; an empty array never reaches RaidRoomInfoResponse::readParam (MULTIPLAYER 1.3), so every other type gets one placeholder row instead (gme::raid::searchRooms)."
+
+    field rooms type="[RaidRoomInfo]" { key "8iBuZa3n"; doc "Listed rooms (password always empty), the single auto-join pick, or the 4.4 placeholder."; }
+}
+
+json RaidChatResp {
+    doc "Reply to RaidSendChat (dYIy6Eu8) and RaidGetChatLog (k5pMN68B).  SendChat's reply MUST include the caller's own new row, or the client resends and finally deletes its provisional bubble.  A non-member gets no rows: RaidChatScene answers -4000 by re-entering the raid (scene 1201), so these never refuse."
+
+    field chat type="[RaidChatLog]" { key "WCA9VhL3"; doc "Rows with log id > the request's pw38qdui.NLKce95n, oldest first, at most 50 (the newest 50 when NLKce95n is 0)."; optional #true; }
+}
+
+json RaidUserTeamArchiveInfo {
+    doc "RaidUserTeamArchiveInfoResponse (6nqGvdY1), one node: the caller's own raid records, read by RaidPlayerInfoResultScene 1209.  Every value an int string (kmap of readParam, OBSERVED); stored in raid_user_stat under these same keys, missing rows sent as 0."
+
+    field user_id type="str" { key "h7eY3sAK"; doc "The caller."; }
+    field challenge type="i64::str" { key "T7BvL1kh"; doc "setChallenge.  Runs started."; }
+    field win type="i64::str" { key "8CEu9Kcm"; doc "setWin.  Runs won."; }
+    field rc1_win type="i64::str" { key "58rGsYvL"; doc "setRc1win.  Wins on an RC 1 mission."; }
+    field rc2_win type="i64::str" { key "2dVBPNQ5"; doc "setRc2win."; }
+    field rc3_win type="i64::str" { key "ai0gh9Vo"; doc "setRc3win."; }
+    field rc4_win type="i64::str" { key "UNycbmV0"; doc "setRc4win."; }
+    field rc5_win type="i64::str" { key "x0s78E4G"; doc "setRc5win."; }
+    field rc6_win type="i64::str" { key "y6fVdTch"; doc "setRc6win."; }
+    field item_harvest type="i64::str" { key "Js8Amd2N"; doc "setItemHarvest."; }
+    field crystal_b_max type="i64::str" { key "0LwvAF3H"; doc "setCrystalBMax.  A record (keep max)."; }
+    field crystal_h_max type="i64::str" { key "rQ3TAy6I"; doc "setCrystalHMax.  A record (keep max)."; }
+    field crystal_b type="i64::str" { key "hoG2ieT5"; doc "setCrystalB."; }
+    field crystal_h type="i64::str" { key "6PLsn8xo"; doc "setCrystalH."; }
+    field battle_turn_max_damage type="i64::str" { key "5NRJQ1LU"; doc "setBattleTurnMaxDamage.  A record (keep max)."; }
+    field battle_turn_max_spark type="i64::str" { key "XP06YWdT"; doc "setBattleTurnMaxSpark.  A record (keep max)."; }
+    field overkill_cnt type="i64::str" { key "Wnc6A31E"; doc "setOverkillCnt."; }
+    field battle_damage type="i64::str" { key "kqI45VU1"; doc "setBattleDamage."; }
+    field spark_cnt type="i64::str" { key "kHbYZ9w1"; doc "setSparkCnt."; }
+    field skill_cnt type="i64::str" { key "4vx39EIB"; doc "setSkillCnt."; }
+    field item_mix_cnt type="i64::str" { key "c3Bo97kI"; doc "setItemMixCnt."; }
+    field raid_item_use type="i64::str" { key "1VbdgX76"; doc "setRaidItemUse."; }
+    field escape_cnt type="i64::str" { key "E5S7XgR6"; doc "setEscapeCnt."; }
+    field boss_finish_cnt type="i64::str" { key "bprW7k3f"; doc "setBossFinishCnt.  Kill credits (MULTIPLAYER 5.1)."; }
+    field single_win type="i64::str" { key "D8EZfi4p"; doc "setSingleWin."; }
+    field cooperation_win type="i64::str" { key "nLb68MSq"; doc "setCooperationWin."; }
+    field fastest_playtime type="i64::str" { key "54imIPa2"; doc "setFastestPlaytime.  A record (keep the smallest non-zero; 0 = none yet)."; }
+    field playtime type="i64::str" { key "nbu1dyP5"; doc "setPlaytime."; }
+    field camp_recover type="i64::str" { key "b28wpmvq"; doc "setCampRecover."; }
+    field unk_b5lzj7fy type="i64::str" { key "b5LZj7fy"; doc "In the kmap, setter unresolved (MULTIPLAYER 8.8): always 0."; }
+}
+
+json RaidPlayerInfoResp {
+    doc "Reply to RaidGetPlayerInfo (81zkMjfN).  Never refuses."
+
+    field info type="[RaidUserTeamArchiveInfo]::size(1)" { key "6nqGvdY1"; doc "The caller's records."; }
+}
+
+json RaidBlackListResp {
+    doc "Reply to RaidUpdateBlackList (4igfcyIm): the caller's FULL list.  RaidUserBlackListInfo's reader takes FriendInfo's key set and clears its list on row 0, so a non-empty list replaces the client's copy; an empty one (last row removed) reaches no row and leaves it, which is fine because RaidBlackListDetailScene clears its list itself after a remove (exitSceneConnect @0x1948F08)."
+
+    field list type="[FriendInfo]" { key "Qazc0Qv8"; doc "One row per blocked player (friend type 0), newest first."; }
+}
+
+
+// ---------------------------------------------------------------------------
+// Round 2, band "core": the field, battles, boss HP and mission end.  Keys and
+// reader semantics are in docs/features/RAIDS_ROUND2_CORE.md section 3.
+//
+// IMPORT ORDER: the battle reply embeds BattleGroupMst/MonsterMst/AIMst/
+// MissionNumInfo (net/mission.kdl) and the mission end reply UserTeamInfo
+// (net/user.kdl); handlers.kdl imports both before this file.
+//
+// Requests are read loosely (glz::generic) by the handlers, because several
+// carry optional groups (a pending move, client events) and repeated rows.
+// ---------------------------------------------------------------------------
+
+json RaidRoomMissionInfo {
+    doc "RaidRoomMissionInfoResponse (g97TWISb), single object @0x143FE4C.  questStartInfoCheck needs mission_id == the room's mission."
+
+    field mission_id type="str" { key "j28VNcUW"; doc "setMissionID.  Must resolve in RaidMissionMstList (RAID_QUESTDATA_NULL otherwise)."; }
+    field result type="i32::str" { key "3tWuc7de"; doc "setResult.  1 running, 2 won, 3 lost, 4 time up; 2 and 4 send the field to the result scenes."; }
+    field rest_time type="i32::str" { key "8n7oG4fS"; doc "setRestTime.  Seconds left; the client counts down locally from the receive time."; }
+    field attainment type="str" { key "d8IPTUp6"; doc "setAttalnment (sic).  Clear-condition progress, format UNKNOWN: always empty."; }
+    field point_set_item type="str" { key "de9f4qXb"; doc "setPointSetItem.  Format UNKNOWN: always empty."; }
+}
+
+json RaidMissionUserInfo {
+    doc "RaidMissionUesrInfoResponse (81B4TvEK, the client's spelling), full replace.  Skipped by the client while the avatar walks (isResponseMissionUser)."
+
+    field user_id type="str" { key "h7eY3sAK"; doc "setUserID."; }
+    field user_name type="str" { key "B5JQyV8j"; doc "setUserName."; }
+    field leader_unit_id type="str" { key "k3I8AWLs"; doc "setLeaderUnitID."; }
+    field now_point type="i32::str" { key "pjX27bKB"; doc "setNowPointNum.  Must be a point of the mission's map."; }
+    field dst_point type="i32::str" { key "qbJcuC60"; doc "setDstPointNum."; }
+    field player_rest type="i32::str" { key "fP1r39bd"; doc "setPlayerRest.  Hearts left; DefineMst raid_max_p caps it."; }
+    field camp_flg type="i32::str" { key "MFz8YRS6"; doc "setCampFlg."; }
+    field search_info type="str" { key "zHs17TE2"; doc "setSearchInfo.  \"point:count,...\" harvests done; pickCheck compares count with RaidMissionPointMst.H6k1LIxC."; }
+    field battle_num type="i32::str" { key "EqgF1H8M"; doc "setBattleNum.  Serial of the open battle, 0 = none.  Non-zero at MissionStart sends the client to the battle restart scene."; }
+    field battle_boss_flg type="i32::str" { key "53NMFRL9"; doc "setBattleBossFlg.  1 when the open battle is a boss battle."; }
+    field boss_escape_limit type="i32::str" { key "4rcdJRS6"; doc "setBossEscapeLimit.  Must be 0 to meet the boss."; }
+    field boss_encount_info type="str" { key "5soj5vGI"; doc "setBossEncountInfo.  \"missionBossId:count,...\" read by boss AI conditions."; }
+}
+
+json RaidMissionBossInfo {
+    doc "RaidMissionBossInfoResponse (Ts2zJ6gj).  Every row is merged by mission boss id after the client hides them all, so every boss goes out every time."
+
+    field mission_boss_id type="str" { key "SP29fLtH"; doc "setMissionBossID (RaidMissionBossMst id)."; }
+    field now_hp type="i64::str" { key "4x7IS9Vg"; doc "setBossNowHp.  Main-body HP; the field only tests > 0."; }
+    field current_point type="i32::str" { key "7Ex5mKRP"; doc "setBossCurrentPoint."; }
+    field pos_x type="i32::str" { key "5NAb7ds3"; doc "setBossPosX.  0/0 = standing on its point, which the encounter check needs."; }
+    field pos_y type="i32::str" { key "9P1MbHx5"; doc "setBossPosY."; }
+    field goal_pos_x type="i32::str" { key "hsjMq7i6"; doc "Goal x while walking (movement is a later band)."; }
+    field goal_pos_y type="i32::str" { key "g57HTBUa"; doc "Goal y."; }
+    field visible_flg type="i32::str" { key "7z6dqvuc"; doc "setVisibleFlg."; }
+}
+
+json RaidUserPartyDeckInfo {
+    doc "RaidUserPartyDeckInfoResponse (wc2DiMY1), full replace of EVERY member's rows.  PlayerParty::entryRaid rebuilds the party from the caller's rows at each battle start, so HP and gauges carry over through here."
+
+    field user_id type="str" { key "h7eY3sAK"; doc "Owner."; }
+    field user_unit_id type="str" { key "edy7fq3L"; doc "Owner's user unit id (own units are looked up in UserUnitInfoList by it)."; }
+    field unit_id type="str" { key "pn16CNah"; doc "Unit id."; }
+    field unit_lv type="i32::str" { key "4A6LzBxr"; doc "Unit level."; }
+    field member_type type="i32::str" { key "gr48vsdJ"; doc "0 leader, 1 member, as the client sent it."; }
+    field disp_order type="i32::str" { key "XuJL4pc5"; doc "Disporder."; }
+    field max_hp type="i64::str" { key "3WMz78t6"; doc "setMaxHp."; }
+    field now_hp type="i64::str" { key "e7DK0FQT"; doc "setNowHp (int64 on the client)."; }
+    field bb_gauge type="i32::str" { key "gU2xtQ0V"; doc "setBbGauge."; }
+    field sb_gauge type="i32::str" { key "nIGZ1X9C"; doc "setSbGauge."; }
+    field hel type="i32::str" { key "PWXu25cg"; doc "setHel (heal stat)."; }
+    field friend_id type="str" { key "98WfKiyA"; doc "Empty for an own unit, the helper's user id for the helper."; }
+    field unit_type_id type="str" { key "nBTx56W9"; doc "Unit type."; }
+    field img_type type="i32::str" { key "2pAyFjmZ"; doc "Unit image type."; }
+}
+
+json RaidUserBagInfo {
+    doc "RaidUserBagInfoResponse (UsDq1E6o), full replace.  The harvest scene diffs it against the bag it saved before sending to show what was found."
+
+    field frame_id type="i32::str" { key "n6E8iMf3"; doc "Bag slot."; }
+    field user_id type="str" { key "h7eY3sAK"; doc "Owner."; }
+    field item_id type="str" { key "kixHbe54"; doc "Item id."; }
+    field item_num type="i32::str" { key "wgV86x1q"; doc "Count."; }
+    field diff_type type="i32::str" { key "DbMVG16I"; doc "setDiffType."; }
+    field new_flg type="i32::str" { key "dJNpLc81"; doc "setNewFlg."; }
+    field event_token_id type="str" { key "Slkc395l"; doc "setEventTokenID."; }
+}
+
+json RaidBattleStatus {
+    doc "RaidBattleStatusResponse (yL3Yrf1M), single @0x1436E60."
+
+    field serial type="str" { key "1kisc6IF"; doc "MissionInfo::setMissionSerialID: this battle's serial."; }
+    field next_event_id type="str" { key "Ez52fI60"; doc "RaidMissionClientEventList::setEventID: the next client event id, so ids never repeat after a restart."; }
+}
+
+json RaidEventAck {
+    doc "RaidUserProgressInfoResponse (QP4cwt7n) row: the client drops the named events from its pending list."
+
+    field event_id type="str" { key "o96QPNZn"; doc "Acked event id."; }
+}
+
+json RaidBattleMonsterGroupInfo {
+    doc "RaidBattleMonsterGroupInfoResponse (Fx60pCaU).  MissionScene::updateRaidBossMonsterStatus sets each enemy's HP from the row with its monster id."
+
+    field monster_id type="str" { key "o49dYfpH"; doc "Boss part monster id."; }
+    field body_flg type="i32::str" { key "7Hf3DnVj"; doc "1 = main body."; }
+    field total_recover type="i32::str" { key "jXEdk5J4"; doc "TotalRecover."; }
+    field now_hp type="i64::str" { key "e7DK0FQT"; doc "Part HP persisted on the server."; }
+}
+
+json RaidMissionBattleInfo {
+    doc "RaidMissionBattleInfoResponse (2cBk5WH8), single."
+
+    field room_mission_id type="str" { key "j28VNcUW"; doc "setRoomMisID."; }
+    field point_num type="i32::str" { key "qbJcuC60"; doc "setPointNum."; }
+    field boss_id type="str" { key "tA4T0GXB"; doc "setBossID (mission boss id, empty for a route battle)."; }
+}
+
+json RaidMissionResult {
+    doc "RaidMissionResultResponse (UC8S1AiX), single."
+
+    field first_clear_flg type="i32::str" { key "3fHunNe4"; doc "setFirstClearFlg."; }
+    field boss_finished type="str" { key "6dkEYp04"; doc "setBossFinished: name of the boss that was finished (RaidFieldQuestResultScene::bossLast)."; }
+    field friend_cnt type="i32::str" { key "oFQ3mbS6"; doc "setFriendCnt."; }
+}
+
+json RaidMissionRewardInfo {
+    doc "RaidMissionRewardInfoResponse (4sbU8kdW) row, one per credited reward."
+
+    field present_type type="i32::str" { key "30Kw4WBa"; doc "3 zel, 4 item, 6 unit, 8 gem, 11 karma (shared present vocabulary)."; }
+    field target_id type="str" { key "TdDHf59J"; doc "Rewarded entity."; }
+    field target_cnt type="i32::str" { key "wJsB35iH"; doc "Amount."; }
+    field target_param type="str" { key "37moriMq"; doc "TargetParam."; }
+    field reward_type type="i32::str" { key "IkmC8gG2"; doc "1 clear reward, 3 first clear, 4 RC up."; }
+}
+
+json RaidRcUpInfo {
+    doc "RaidMissionRCUpInfoResponse (awQFCW03), single."
+
+    field rc_up_flg type="i32::str" { key "UJTR1h5r"; doc "setRcUPFlag."; }
+    field rc_before type="i32::str" { key "3Y9cKkuV"; doc "setRcQuestBefore: the RC before the class-up."; }
+}
+
+json RaidFieldResp {
+    doc "The field state block (RAIDS_ROUND2_CORE 4): what MissionStart/MissionInfo/BattleEnd/Harvest/UseItem answer with."
+
+    field rooms type="[RaidRoomInfo]" { key "8iBuZa3n"; doc "The room (mission_start_flg 1 while the run is on)."; }
+    field members type="[RaidRoomUserInfo]" { key "uwH62EZy"; doc "Room members (mission_status, current room mission id)."; }
+    field room_mission type="[RaidRoomMissionInfo]::size(1)" { key "g97TWISb"; doc "The run."; }
+    field mission_users type="[RaidMissionUserInfo]" { key "81B4TvEK"; doc "Every member's field row."; }
+    field bosses type="[RaidMissionBossInfo]" { key "Ts2zJ6gj"; doc "Every boss of the run."; }
+    field party type="[RaidUserPartyDeckInfo]" { key "wc2DiMY1"; doc "Every member's party rows."; }
+    field bag type="[RaidUserBagInfo]" { key "UsDq1E6o"; doc "The caller's mission bag; omitted while empty (a zero-row list never reaches the reader)."; optional #true; }
+    field acks type="[RaidEventAck]" { key "QP4cwt7n"; doc "Client events acknowledged by this reply."; optional #true; }
+    field battle_status type="[RaidBattleStatus]" { key "yL3Yrf1M"; doc "Serial and next event id (battle start/restart only)."; optional #true; }
+    field user type="[RaidUserInfo]" { key "1ry6BKoe"; doc "Raid user state (login ids) when they changed."; optional #true; }
+    field chat type="[RaidChatLog]" { key "WCA9VhL3"; doc "Room chat newer than the request's pw38qdui.NLKce95n (MissionInfo carries the field's chat)."; optional #true; }
+    field item_set type="[UserEquipItemInfo]" { key "Fihk73ZR"; doc "The caller's raid item set (battles read it), omitted while empty."; optional #true; }
+}
+
+json RaidBattleContentResp {
+    doc "The battle half of RaidMissionBattleStart/Restart: the normal MissionStart battle groups for UserState's last mission (the raid mission id, set by RaidUtils::initRaidBattle) plus the boss part HP.  Spliced into the field state reply."
+
+    field battle_groups type="[BattleGroupMst]" { key "pj41dy9g"; doc "One battle (battle order 1)."; }
+    field battle_monster_groups type="[BattleMonsterGroupMst]" { key "75t0sx9z"; doc "Its monsters."; }
+    field monsters type="[MonsterMst]" { key "U0v5IeJo"; doc "Monster rows (boss parts carry their raid sprites)."; }
+    field monster_cgs type="[MonsterCgsMst]" { key "8hoyIF9Q"; doc "Sprite rows for boss parts; omitted for a route battle."; optional #true; }
+    field ais type="[AIMst]" { key "89ausgc4"; doc "AI rows."; }
+    field mission_num type="[MissionNumInfo]::size(1)" { key "Kz7qfSs5"; doc "This battle's serial and drop info."; }
+    field battle_info type="[RaidMissionBattleInfo]::size(1)" { key "2cBk5WH8"; doc "Where the battle is."; }
+    field boss_parts type="[RaidBattleMonsterGroupInfo]" { key "Fx60pCaU"; doc "Persisted boss part HP (boss battle only)."; optional #true; }
+    field battle_skills type="[SkillMst]" { key "8aiBoHg5"; doc "F_SKILL_MST rows of the battle's monster-only skills (permanent / ToZj4zyn \"0\"): the client drops them on every Home (GameUtils::battleTemporaryMstRemove @0x1176238) and GameScene::requestMonsterSummonFiles @0x16433CC dereferences the missing row (SIGSEGV 0x48).  8aiBoHg5 appends (UnitSkillMstResponse(true)), as MissionStartResp sends it.  Omitted when no monster uses such a skill."; optional #true; }
+}
+
+json RaidMissionEndResp {
+    doc "Reply to RaidMissionEnd: result, rewards, RC-up, room and user state, and the header's team info."
+
+    field result type="[RaidMissionResult]::size(1)" { key "UC8S1AiX"; doc "First clear, finished boss."; }
+    field rewards type="[RaidMissionRewardInfo]" { key "4sbU8kdW"; doc "Credited rewards."; optional #true; }
+    field rc_up type="[RaidRcUpInfo]::size(1)" { key "awQFCW03"; doc "Class-up flag and the RC before it."; }
+    field room_mission type="[RaidRoomMissionInfo]::size(1)" { key "g97TWISb"; doc "The finished run."; }
+    field rooms type="[RaidRoomInfo]" { key "8iBuZa3n"; doc "The room."; }
+    field members type="[RaidRoomUserInfo]" { key "uwH62EZy"; doc "Its members."; }
+    field user type="[RaidUserInfo]::size(1)" { key "1ry6BKoe"; doc "Raid user state with the new RC."; }
+    field permit type="[RaidPermitMissionInfo]" { key "2WqoMm4d"; doc "Missions now permitted (RC may have risen)."; }
+    field clear type="[RaidClearMissionInfo]" { key "8LF2ohCY"; doc "Cleared missions, now including this one."; }
+    field team_info type="[UserTeamInfo]::size(1)" { key "fEi17cnx"; doc "Header zel/karma after the payout."; }
+    field badge type="BadgeAchievementCount" { key "h23iRjGN"; doc "The achievement badges after the payout (complete set), so a \"Clear N Raid Quests\" Challenge lights Missions > Challenges at once.  Left out of the copy stored in raid_mission_user.result_json; a retry gets the badge as it is at that moment (gme::withCurrentBadge), since the stored count could re-light a challenge claimed since."; optional #true; }
+}
+
+// ---------------------------------------------------------------------------
+// Round 2, band "camp_items": raid item lists and the raid shop
+// (docs/features/RAIDS_ROUND2_CAMP_ITEMS.md 4, 5).  The set/reserve rows reuse
+// UserEquipItemInfo (user.kdl: kixHbe54 / XuJL4pc5 / wgV86x1q, the same keys
+// RaidEquipItemInfo and RaidRsvItemInfo read).
+// ---------------------------------------------------------------------------
+
+json RaidItemsResp {
+    doc "Reply to the queued RaidItemEdit (DZLI83hx), RaidItemMix (K17JUYR2) and RaidItemDelete (N43JmIf2): the server's authoritative lists, success even when the request changed nothing (a refusal would be shown on a StepScene).  The readers are list-replace on node 0 with no group-start hook, so an EMPTY array clears nothing: a list is omitted rather than sent as []."
+
+    field item_set type="[UserEquipItemInfo]" { key "Fihk73ZR"; doc "RaidEquipItemInfo: the raid item set, slots 0..4 (RaidItemEdit only)."; optional #true; }
+    field bag type="[RaidUserBagInfo]" { key "UsDq1E6o"; doc "The caller's mission bag; emptied stacks go out at 0 (the client keeps them at 0 too, and only a non-empty list replaces its copy)."; optional #true; }
+}
+
+json RaidShopUseResp {
+    doc "Reply to RaidShopUse (4zJ0WmTX): the header's team info, plus the full RaidUserInfo node after an orb refill (type 100; the 1ry6BKoe reader resets every field first) or the field's 81B4TvEK after a heart refill (type 101; RaidFieldScene::initCheck re-reads PlayerRest from it)."
+
+    field team_info type="[UserTeamInfo]::size(1)" { key "fEi17cnx"; doc "Gems after the charge."; }
+    field user type="[RaidUserInfo]" { key "1ry6BKoe"; doc "Type 100: raid state with the refilled aube."; optional #true; }
+    field permit type="[RaidPermitMissionInfo]" { key "2WqoMm4d"; doc "Type 100: permitted missions (sent with the full user node)."; optional #true; }
+    field clear type="[RaidClearMissionInfo]" { key "8LF2ohCY"; doc "Type 100: cleared missions."; optional #true; }
+    field mission_users type="[RaidMissionUserInfo]" { key "81B4TvEK"; doc "Type 101: every member's field row, the caller's hearts refilled."; optional #true; }
+}
+

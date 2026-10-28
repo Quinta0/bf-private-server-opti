@@ -1,0 +1,746 @@
+[
+ {
+  "client_class": "ArenaBattleEndRequest",
+  "path": "/actionSymbol/CnaeP2S9.php",
+  "group_id": "oQNtKU51",
+  "aes_key": "jkgWq1d0"
+ },
+ {
+  "client_class": "ArenaBattleRestartRequest",
+  "path": "/actionSymbol/89f2y1ep.php",
+  "group_id": "NPyXDgV9",
+  "aes_key": "sWofKGMl"
+ },
+ {
+  "client_class": "ArenaBattleStartRequest",
+  "path": "/actionSymbol/wJ68P0at.php",
+  "group_id": "7f1rg92L",
+  "aes_key": "zaMR9o0d"
+ },
+ {
+  "client_class": "ArenaFriendListRequest",
+  "path": "/actionSymbol/WgQX4M7p.php",
+  "group_id": "xkd9H50w",
+  "aes_key": "L3TDhrn2"
+ },
+ {
+  "client_class": "ArenaMatchingRequest",
+  "path": "/actionSymbol/NGc6xk8w.php",
+  "group_id": "82ztj6Iy",
+  "aes_key": "Q53tUIBE"
+ },
+ {
+  "client_class": "ArenaRetireRequest",
+  "path": "/actionSymbol/cn21aFSj.php",
+  "group_id": "eyg8sA32",
+  "aes_key": "93i8EbyM"
+ },
+ {
+  "client_class": "ArenaStartRequest",
+  "path": "/actionSymbol/mfR3I0rx.php",
+  "group_id": "zu6ifpy0",
+  "aes_key": "bGjK4UH1"
+ },
+ {
+  "client_class": "BundleCategoryRefreshRequest",
+  "path": "(inherit)",
+  "group_id": "swarOb4u",
+  "aes_key": "GeJa9uTe"
+ },
+ {
+  "client_class": "BundlePurchaseIapRequest",
+  "path": "(inherit)",
+  "group_id": "kD298bt6",
+  "aes_key": "u45Bi2p0"
+ },
+ {
+  "client_class": "BundlePurchaseRequest",
+  "path": "(inherit)",
+  "group_id": "D3gyT3b3",
+  "aes_key": "a8pE3x39"
+ },
+ {
+  "client_class": "BuyCoinRequest",
+  "path": "/actionSymbol/jKm85va7.php",
+  "group_id": "9o3q7SjN",
+  "aes_key": "DCM60QNb"
+ },
+ {
+  "client_class": "BuyCoinStartRequest",
+  "path": "/actionSymbol/1vMgY8fU.php",
+  "group_id": "kJs6CQq1",
+  "aes_key": "J9P7Bmxa"
+ },
+ {
+  "client_class": "ChallengeArenaBattleEndRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "syX20UG8",
+  "aes_key": "9xk0xi0Y"
+ },
+ {
+  "client_class": "ChallengeArenaBattleStartRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "rbOMSnba",
+  "aes_key": "iVvpULXG"
+ },
+ {
+  "client_class": "ChallengeArenaRankingRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "q\u001b1\u0002",
+  "aes_key": "b'\\xa7\\x1b1\\x02'"
+ },
+ {
+  "client_class": "ChallengeArenaRankingRewardRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "tct1Jogs",
+  "aes_key": "RRxXMpzm"
+ },
+ {
+  "client_class": "ChallengeArenaShopAddItemRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "jtzuog2S",
+  "aes_key": "xMcy25Tx"
+ },
+ {
+  "client_class": "ChallengeArenaShopInfoRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "xfmNcJVl",
+  "aes_key": "Fmv6wzeu"
+ },
+ {
+  "client_class": "ChallengeArenaStartRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "z44LyLr2",
+  "aes_key": "CC8rm3EJ"
+ },
+ {
+  "client_class": "ChallengeArenaTChestReceivedRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "xmzmjcxQ",
+  "aes_key": "L4W9YSex"
+ },
+ {
+  "client_class": "ChallengeArenaTeamEditRequest",
+  "path": "/bf/gme/action.php",
+  "group_id": "sXXX6Ec7",
+  "aes_key": "DcsPPuTG"
+ },
+ {
+  "client_class": "ChallengeMissionStartRequest",
+  "path": "/actionSymbol/yoY5iG38.php",
+  "group_id": "t5wfpZ32",
+  "aes_key": "YSVD0n9K"
+ },
+ {
+  "client_class": "ChallengeRankRewardRequest",
+  "path": "/actionSymbol/dzoV8Z5i.php",
+  "group_id": "m3fr7vxo",
+  "aes_key": "4BuRdgr2"
+ },
+ {
+  "client_class": "ChallengeStartRequest",
+  "path": "/actionSymbol/L2QJTwR6.php",
+  "group_id": "sQfU18kH",
+  "aes_key": "m4sdYv9e"
+ },
+ {
+  "client_class": "CollabRewardRequest",
+  "path": "(inherit)",
+  "group_id": "4aL5upiU",
+  "aes_key": "2a4MeshE"
+ },
+ {
+  "client_class": "ColosseumBattleEndRequest",
+  "path": "/actionSymbol/h3d11xzc.php",
+  "group_id": "fGDPoQI3",
+  "aes_key": "4V6oIoRC"
+ },
+ {
+  "client_class": "ColosseumBattleRestartRequest",
+  "path": "/actionSymbol/I2x8C6Fp.php",
+  "group_id": "ohH9lfDE",
+  "aes_key": "j2bFgyri"
+ },
+ {
+  "client_class": "ColosseumBattleStartRequest",
+  "path": "/actionSymbol/2a851yk0.php",
+  "group_id": "ysP6qYcy",
+  "aes_key": "iFIHAT5V"
+ },
+ {
+  "client_class": "ColosseumDeckEditRequest",
+  "path": "/actionSymbol/zn55lqoy.php",
+  "group_id": "rdZbaKBG",
+  "aes_key": "gY3YK5bD"
+ },
+ {
+  "client_class": "ColosseumFriendListRequest",
+  "path": "/actionSymbol/vOf76DaZ.php",
+  "group_id": "AoBvG2YN",
+  "aes_key": "Wj5fH1HV"
+ },
+ {
+  "client_class": "ColosseumGetRewardInfoRequest",
+  "path": "/actionSymbol/uKV8G1cY.php",
+  "group_id": "jv0dI88o",
+  "aes_key": "d7aPxZWw"
+ },
+ {
+  "client_class": "ColosseumRewardReceiptRequest",
+  "path": "/actionSymbol/Jp1XVctK.php",
+  "group_id": "PN5CVaWy",
+  "aes_key": "YBgVBy5A"
+ },
+ {
+  "client_class": "DebugUpdateRequest",
+  "path": "/actionSymbol/73BP9Mwj.php",
+  "group_id": "Zr37LHNE",
+  "aes_key": "N1kSz2fr"
+ },
+ {
+  "client_class": "FGPlusGuildRankingRequest",
+  "path": "(inherit)",
+  "group_id": "7umuchUg",
+  "aes_key": "sWup7ehu"
+ },
+ {
+  "client_class": "FGPlusGuildRewardClaimRequest",
+  "path": "(inherit)",
+  "group_id": "Sp7umiaY",
+  "aes_key": "thIUXiu5"
+ },
+ {
+  "client_class": "FriendAgreeRequest",
+  "path": "/actionSymbol/9A2PWFEN.php",
+  "group_id": "NYKBH4V6",
+  "aes_key": "8PFVDiUIZyES2vzR"
+ },
+ {
+  "client_class": "FriendFavoriteRequest",
+  "path": "/actionSymbol/bsP1S68Y.php",
+  "group_id": "ps6Vgx4R",
+  "aes_key": "XcE1CK6L"
+ },
+ {
+  "client_class": "FriendGetAgreeRequest",
+  "path": "/actionSymbol/4Yvmz3GP.php",
+  "group_id": "aVqJrR08",
+  "aes_key": "H4zJCK2jPeaskVdf"
+ },
+ {
+  "client_class": "FriendRandomSearchRequest",
+  "path": "/actionSymbol/89HuM6Qw.php",
+  "group_id": "mE5gUQOp",
+  "aes_key": "oK4VaDGF"
+ },
+ {
+  "client_class": "FriendRefuseRequest",
+  "path": "/actionSymbol/cyJ8I31X.php",
+  "group_id": "N5SQd7oA",
+  "aes_key": "fk8YaVy9puJbnLWv"
+ },
+ {
+  "client_class": "FriendSearchRequest",
+  "path": "/actionSymbol/v7PrMJ9h.php",
+  "group_id": "umNt8M7i",
+  "aes_key": "qa3sHuDgKxV5nI1F"
+ },
+ {
+  "client_class": "FrontierGateRankingRequest",
+  "path": "/actionSymbol/z6U4czC4.php",
+  "group_id": "26zW90oG",
+  "aes_key": "yo9eBUJk"
+ },
+ {
+  "client_class": "GRGuardianDetail",
+  "path": "EMPTY_URL",
+  "group_id": "5710Dkla",
+  "aes_key": "f89a2kd7"
+ },
+ {
+  "client_class": "GachaActionRequest_SG",
+  "path": "(inherit)",
+  "group_id": "z3Di1k0e",
+  "aes_key": "be51pQk9c"
+ },
+ {
+  "client_class": "GachaFixActionRequest",
+  "path": "/actionSymbol/Bn52Du5y.php",
+  "group_id": "MFLFP9f2",
+  "aes_key": "484bnJG2"
+ },
+ {
+  "client_class": "GuildMemberGuildInfoRequest",
+  "path": "EMPTY_URL",
+  "group_id": "38bSeq81",
+  "aes_key": "h8TmR1bi"
+ },
+ {
+  "client_class": "GuildQuestClaimRequest",
+  "path": "EMPTY_URL",
+  "group_id": "dsRW32K",
+  "aes_key": "Afs43Dc4"
+ },
+ {
+  "client_class": "GuildRaidQuestObjectiveRequest",
+  "path": "EMPTY_URL",
+  "group_id": "fd54Sey",
+  "aes_key": "F32dfFS"
+ },
+ {
+  "client_class": "GuilldBattleMoveRequest",
+  "path": "(inherit)",
+  "group_id": "8b6DKiqz",
+  "aes_key": "b8akzyk1"
+ },
+ {
+  "client_class": "InvitationReceiptRequest",
+  "path": "/actionSymbol/p2n5mbUd.php",
+  "group_id": "7Zxr9PzB",
+  "aes_key": "7s5Ic3Nx"
+ },
+ {
+  "client_class": "ItemUseTimeLimitRequest",
+  "path": "/actionSymbol/299Pvmh8.php",
+  "group_id": "4eCLR4rq",
+  "aes_key": "1O3NPf93"
+ },
+ {
+  "client_class": "MinigameCardEndRequest",
+  "path": "/actionSymbol/cE783NhK.php",
+  "group_id": "jJKzi0v2",
+  "aes_key": "eHt7ob1v"
+ },
+ {
+  "client_class": "MinigameFriendListRequest",
+  "path": "/actionSymbol/eJ6sQuA2.php",
+  "group_id": "Hjk84giw",
+  "aes_key": "9qg5s7ob"
+ },
+ {
+  "client_class": "MinigameNameEntryRequest",
+  "path": "",
+  "group_id": "oT8OP9Bp",
+  "aes_key": "0xzd3AlK"
+ },
+ {
+  "client_class": "MinigameRankingInfoRequest",
+  "path": "",
+  "group_id": "XrfDHUJo",
+  "aes_key": "cw9sw5y2"
+ },
+ {
+  "client_class": "MinigameStartRequest",
+  "path": "/actionSymbol/aeMz66L5.php",
+  "group_id": "SR7tf9pa",
+  "aes_key": "XBSu90iF"
+ },
+ {
+  "client_class": "MultiGachaIapPurchaseIapRequest",
+  "path": "(inherit)",
+  "group_id": "jk17biw9",
+  "aes_key": "gIT163bi"
+ },
+ {
+  "client_class": "RaidAgreementRequest",
+  "path": "/actionSymbol/Thi9nJX3.php",
+  "group_id": "Cu94xU8j",
+  "aes_key": "Eh5a3yr9"
+ },
+ {
+  "client_class": "RaidCampRestEndRequest",
+  "path": "/actionSymbol/Z2bh0SEw.php",
+  "group_id": "f9Dh4djx",
+  "aes_key": "0TCX6S4R"
+ },
+ {
+  "client_class": "RaidCampRestGetRequest",
+  "path": "/actionSymbol/ZPs40D7i.php",
+  "group_id": "diIe8ux7",
+  "aes_key": "G5uind2r"
+ },
+ {
+  "client_class": "RaidCampRestStartRequest",
+  "path": "/actionSymbol/3y1rmPSp.php",
+  "group_id": "I7nVUv0h",
+  "aes_key": "qy27SYu9"
+ },
+ {
+  "client_class": "RaidEnterRequest",
+  "path": "/actionSymbol/LeQ89GJc.php",
+  "group_id": "yZReG75i",
+  "aes_key": "N0Azw6ob"
+ },
+ {
+  "client_class": "RaidExitRequest",
+  "path": "/actionSymbol/8cPrNSs6.php",
+  "group_id": "jqi71nWu",
+  "aes_key": "PD4ke3Ii"
+ },
+ {
+  "client_class": "RaidFriendRemoveRequest",
+  "path": "EMPTY_URL",
+  "group_id": "u59zdKCi",
+  "aes_key": "0HJ9ShKp"
+ },
+ {
+  "client_class": "RaidFrlendSelectRequest",
+  "path": "/actionSymbol/gRd7eVc1.php",
+  "group_id": "u59zdKCw",
+  "aes_key": "0HJ9ShKg"
+ },
+ {
+  "client_class": "RaidGetChatLogRequest",
+  "path": "/actionSymbol/k5pMN68B.php",
+  "group_id": "k5pMN68B",
+  "aes_key": "cy0oLna7"
+ },
+ {
+  "client_class": "RaidGetPlayerInfoRequest",
+  "path": "/actionSymbol/a7GWtPD4.php",
+  "group_id": "81zkMjfN",
+  "aes_key": "V7M6Bph4"
+ },
+ {
+  "client_class": "RaidItemDeleteRequest",
+  "path": "/actionSymbol/7r4LhzGJ.php",
+  "group_id": "N43JmIf2",
+  "aes_key": "jvm3q24f"
+ },
+ {
+  "client_class": "RaidItemEditRequest",
+  "path": "/actionSymbol/1aF2cKyH.php",
+  "group_id": "DZLI83hx",
+  "aes_key": "3Lxpf5KE"
+ },
+ {
+  "client_class": "RaidItemMixRequest",
+  "path": "/actionSymbol/HUVv5SR7.php",
+  "group_id": "K17JUYR2",
+  "aes_key": "c6wBM9sH"
+ },
+ {
+  "client_class": "RaidLimitedUseItemRequest",
+  "path": "/actionSymbol/HDaw1Nj3.php",
+  "group_id": "SaN7v13E",
+  "aes_key": "btR9Jkw7"
+ },
+ {
+  "client_class": "RaidMissionBattleEndRequest",
+  "path": "/actionSymbol/5F9dYXQb.php",
+  "group_id": "5Ko2BjPA",
+  "aes_key": "gi6B0m2p"
+ },
+ {
+  "client_class": "RaidMissionBattleRestartRequest",
+  "path": "/actionSymbol/f68HNECM.php",
+  "group_id": "La24KGAp",
+  "aes_key": "ecJRzX16"
+ },
+ {
+  "client_class": "RaidMissionBattleStartRequest",
+  "path": "/actionSymbol/w6k9Wc7g.php",
+  "group_id": "8UiQj0uF",
+  "aes_key": "1Jhavqb7"
+ },
+ {
+  "client_class": "RaidMissionEndRequest",
+  "path": "/actionSymbol/q7m1XntM.php",
+  "group_id": "vgin9Mf1",
+  "aes_key": "95ULkowE"
+ },
+ {
+  "client_class": "RaidMissionExitRequest",
+  "path": "/actionSymbol/ko2M0End.php",
+  "group_id": "a12v0RcA",
+  "aes_key": "14GMJFIN"
+ },
+ {
+  "client_class": "RaidMissionHarvestRequest",
+  "path": "/actionSymbol/8t2QvbWV.php",
+  "group_id": "9QdRVwB1",
+  "aes_key": "b1ScyFv9"
+ },
+ {
+  "client_class": "RaidMissionInfoLightRequest",
+  "path": "/actionSymbol/8ViQuXe1.php",
+  "group_id": "Argz1U6B",
+  "aes_key": "1hJrYxs7"
+ },
+ {
+  "client_class": "RaidMissionInfoRequest",
+  "path": "/actionSymbol/0HpahG51.php",
+  "group_id": "BqF2x3EC",
+  "aes_key": "6SyFs0Du"
+ },
+ {
+  "client_class": "RaidMissionSelectRequest",
+  "path": "/actionSymbol/W5hj2DJu.php",
+  "group_id": "8iQL3IKA",
+  "aes_key": "ZBex5ju9"
+ },
+ {
+  "client_class": "RaidMissionStartRequest",
+  "path": "/actionSymbol/83b9tuTk.php",
+  "group_id": "2qDW9NBU",
+  "aes_key": "kY5y1zBj"
+ },
+ {
+  "client_class": "RaidMissionUseItemRequest",
+  "path": "/actionSymbol/as4L6dip.php",
+  "group_id": "o03kCtb1",
+  "aes_key": "Ys8ro9Sq"
+ },
+ {
+  "client_class": "RaidQuickStartRequest",
+  "path": "/actionSymbol/XS3BZKux.php",
+  "group_id": "CWeTY8BQ",
+  "aes_key": "HsVofOJJ"
+ },
+ {
+  "client_class": "RaidRoomDissolveRequest",
+  "path": "/actionSymbol/fbyz9do4.php",
+  "group_id": "H8N1R0TE",
+  "aes_key": "q7dbw29J"
+ },
+ {
+  "client_class": "RaidRoomFriendGetRequest",
+  "path": "/actionSymbol/5J3BSqCu.php",
+  "group_id": "Xe2UB3A8",
+  "aes_key": "9WN8oYBx"
+ },
+ {
+  "client_class": "RaidRoomInfoRequest",
+  "path": "/actionSymbol/9XMuZYd0.php",
+  "group_id": "0VxE6kTW",
+  "aes_key": "cUrw7K6W"
+ },
+ {
+  "client_class": "RaidRoomKickRequest",
+  "path": "/actionSymbol/4VJL0rmY.php",
+  "group_id": "Xbgen5J8",
+  "aes_key": "FrX0T2QJ"
+ },
+ {
+  "client_class": "RaidRoomListRequest",
+  "path": "/actionSymbol/1Z8u0Rd5.php",
+  "group_id": "YF9UQpn6",
+  "aes_key": "c0Qf94Ir"
+ },
+ {
+  "client_class": "RaidRoonItemEditRequest",
+  "path": "/actionSymbol/SfUQu39b.php",
+  "group_id": "bv9xt3m6",
+  "aes_key": "9mKud8kc"
+ },
+ {
+  "client_class": "RaidSendChatRequest",
+  "path": "/actionSymbol/dYIy6Eu8.php",
+  "group_id": "dYIy6Eu8",
+  "aes_key": "x2Fm1LSt"
+ },
+ {
+  "client_class": "RaidShopUseRequest",
+  "path": "/actionSymbol/1P3VapS0.php",
+  "group_id": "4zJ0WmTX",
+  "aes_key": "RSvU7dh6"
+ },
+ {
+  "client_class": "RaidUpDataRoomInfoRequest",
+  "path": "/actionSymbol/n3yefER0.php",
+  "group_id": "52H0dkjv",
+  "aes_key": "9KdeuMX8"
+ },
+ {
+  "client_class": "RaidUpDataUserReadyRequest",
+  "path": "/actionSymbol/01IsDwLd.php",
+  "group_id": "vmdA2GD8",
+  "aes_key": "esR7NZL9"
+ },
+ {
+  "client_class": "RaidUpDateCashRequest",
+  "path": "/actionSymbol/am5WDy83.php",
+  "group_id": "XTban70i",
+  "aes_key": "H5d6B2pi"
+ },
+ {
+  "client_class": "RaidUpdateBlackListRequest",
+  "path": "/actionSymbol/a6N7g37A.php",
+  "group_id": "4igfcyIm",
+  "aes_key": "XIgQ4UHm"
+ },
+ {
+  "client_class": "RaidUpdateProgressRequest",
+  "path": "/actionSymbol/3LZBsYP8.php",
+  "group_id": "7geDL5Vb",
+  "aes_key": "7DkVMG8Y"
+ },
+ {
+  "client_class": "RaidUserInfoRequest",
+  "path": "/actionSymbol/86Bn5hqU.php",
+  "group_id": "jJZ01VQo",
+  "aes_key": "SsQ26dVY"
+ },
+ {
+  "client_class": "RaidWorloInfoRequest",
+  "path": "/actionSymbol/mdvXj26A.php",
+  "group_id": "H7GRp01L",
+  "aes_key": "5JxFp0tD"
+ },
+ {
+  "client_class": "ReinforcementRequest",
+  "path": "/actionSymbol/4tNze3Uu.php",
+  "group_id": "6AqUE0xj",
+  "aes_key": ""
+ },
+ {
+  "client_class": "SGChatLogInfoListRequest",
+  "path": "EMPTY_URL",
+  "group_id": "jVRl14IS",
+  "aes_key": "sxdFrtRW"
+ },
+ {
+  "client_class": "SPChallengeMissionStartRequest",
+  "path": "(inherit)",
+  "group_id": "QZy7cSW1",
+  "aes_key": "qojy81wY"
+ },
+ {
+  "client_class": "SPChallengeRankingRequest",
+  "path": "(inherit)",
+  "group_id": "27rGx1rL",
+  "aes_key": "pTDy82st"
+ },
+ {
+  "client_class": "SPChallengeUserInfoRequest",
+  "path": "(inherit)",
+  "group_id": "G3J9Domt",
+  "aes_key": "6QJwgU3V"
+ },
+ {
+  "client_class": "SetPurchaseInfoRequest",
+  "path": "/actionSymbol/i0q3b4pu.php",
+  "group_id": "u06y2UE4",
+  "aes_key": "c2kjaKv8"
+ },
+ {
+  "client_class": "TieupCampaignInfoRequest",
+  "path": "/actionSymbol/G3j8NIt5.php",
+  "group_id": "nWBLmp53",
+  "aes_key": "h06IDKYb"
+ },
+ {
+  "client_class": "TransferCodeCheckRequest",
+  "path": "/actionSymbol/uY6pa3qV.php",
+  "group_id": "Fn1UzTo3",
+  "aes_key": "A6QiFT7D"
+ },
+ {
+  "client_class": "TransferCodeIssueRequest",
+  "path": "/actionSymbol/b4cQg7KY.php",
+  "group_id": "LK9e0WyX",
+  "aes_key": "B6siV3AT"
+ },
+ {
+  "client_class": "TransferRequest",
+  "path": "/actionSymbol/c34hvwqz.php",
+  "group_id": "I9DyF2aU",
+  "aes_key": "2hp90fZ1"
+ },
+ {
+  "client_class": "TrialDeckEditRequest",
+  "path": "/actionSymbol/2tx3jRI5.php",
+  "group_id": "MbdL5D4K",
+  "aes_key": "Bb1T0qdC"
+ },
+ {
+  "client_class": "TrialDeckGetRequest",
+  "path": "/actionSymbol/tz0q62xK.php",
+  "group_id": "gY63Zvy7",
+  "aes_key": "5QuLx4DG"
+ },
+ {
+  "client_class": "VersionCheckRequest",
+  "path": "",
+  "group_id": "",
+  "aes_key": ""
+ },
+ {
+  "client_class": "VideoAdCompleteRequest",
+  "path": "(inherit)",
+  "group_id": "r234ydi1",
+  "aes_key": "mDqi310y"
+ },
+ {
+  "client_class": "VideoAdSlotsCompleteRequest",
+  "path": "(inherit)",
+  "group_id": "ifL3TZim",
+  "aes_key": "FxYPUrf4"
+ },
+ {
+  "client_class": "VideoAdSlotsStandInfoRefreshRequest",
+  "path": "(inherit)",
+  "group_id": "jwgJVpUP",
+  "aes_key": "sjrlKA3D"
+ },
+ {
+  "client_class": "VideoAdsSlotActionRequest",
+  "path": "(inherit)",
+  "group_id": "AjKpMC9a",
+  "aes_key": "X2esANNz"
+ },
+ {
+  "client_class": "VideoTutorialRequest",
+  "path": "(inherit)",
+  "group_id": "T_VIDEO_MST",
+  "aes_key": ""
+ },
+ {
+  "client_class": "VortexArenaBattleEndRequest",
+  "path": "/actionSymbol/CnaeP2S9.php",
+  "group_id": "89HrE13b",
+  "aes_key": "i4gkTv3a"
+ },
+ {
+  "client_class": "VortexArenaBattleStartRequest",
+  "path": "/actionSymbol/wJ68P0at.php",
+  "group_id": "j3s0iNM1",
+  "aes_key": "uTk8nBdi"
+ },
+ {
+  "client_class": "VortexArenaClaimDailyRequest",
+  "path": "(inherit)",
+  "group_id": "j3cyKi8o",
+  "aes_key": "abI7o6dT"
+ },
+ {
+  "client_class": "VortexArenaClaimRequest",
+  "path": "(inherit)",
+  "group_id": "iwo032Yj",
+  "aes_key": "ab30d5H2"
+ },
+ {
+  "client_class": "VortexArenaLeaderboardRequest",
+  "path": "(inherit)",
+  "group_id": "290aD3iY",
+  "aes_key": "d2l0Bdi8"
+ },
+ {
+  "client_class": "VortexArenaMatchingRequest",
+  "path": "/actionSymbol/NGc6xk8w.php",
+  "group_id": "b5TunM93",
+  "aes_key": "a7GkyuV3"
+ },
+ {
+  "client_class": "VortexArenaRetireRequest",
+  "path": "(inherit)",
+  "group_id": "R34vyqw7",
+  "aes_key": "j8M3a93W"
+ },
+ {
+  "client_class": "VortexArenaTopRequest",
+  "path": "(inherit)",
+  "group_id": "lp3a7bvD",
+  "aes_key": "38ab793G"
+ }
+]

@@ -1,0 +1,252 @@
+// Shop, medal, help-detail and fixed-PvP tables — the last four singletons
+// from the handbook §8.37 port pass, wired 2026-08-05.  Grouped here because
+// none is large enough to justify its own file.  Wrapper keys are each
+// struct's `hash`.
+//
+// Value evidence in field docs was captured from the ported deploy/system
+// files (4/1/180/3 rows).
+
+json ShopItemMst {
+    doc "Gem-shop boost items (wrapper hash 5DXlaudE).  4 rows — the Summoner EXP / weapon EXP multipliers."
+    hash "5DXlaudE"
+
+    field id type="i32::str" {
+        key "T1IxCpTF"
+        doc "Shop entry id 1..4."
+    }
+
+    field cnd_type type="i32::str" {
+        key "29MgiJIQ"
+        doc "// UNVERIFIED: constant 1.  Same hash/name as event.kdl."
+    }
+
+    field target_id type="i32::str" {
+        key "TdDHf59J"
+        doc "Item granted (130000..130011).  Same hash/name as daily_task.kdl."
+    }
+
+    field target_cnt type="i32::str" {
+        key "wJsB35iH"
+        doc "Quantity granted (1..30).  Same hash/name as daily_task.kdl."
+    }
+
+    field priority type="i32::str" {
+        key "yu18xScw"
+        doc "// UNVERIFIED: constant 1.  Same hash/name as gacha.kdl."
+    }
+
+    field need_gems type="i32::str" {
+        key "03UGMHxF"
+        doc "Gem price (1..2).  Same hash/name as gacha.kdl."
+    }
+
+    field display_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Display order (101..202).  Same hash/name as banner.kdl."
+    }
+
+    field start_date type="datetime" {
+        key "qA7M9EjP"
+        doc "Availability start — \"0000-00-00 00:00:00\" on all 4 rows (always on; the sentinel is special-cased in string_to_chrono).  Same hash/name as banner.kdl/gift.kdl.  NOTE this is a DATETIME, not the colon list its \"00:00:00\" tail suggests."
+    }
+
+    field end_date type="datetime" {
+        key "SzV0Nps7"
+        doc "Availability end — \"0000-00-00 00:00:00\" on all 4 rows.  Same hash/name as banner.kdl/gift.kdl."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Entry blurb — \"Multiplies Summoner EXP, weapon EXP, and SP by 2 whenever a Quest is cleared\".  Free text containing commas, hence a plain string and NOT a comma list.  Same hash/name as item.kdl."
+    }
+}
+
+json MedalMst {
+    doc "Medal currency definitions (wrapper hash GHUsyi76).  1 row — the Brave Medal."
+    hash "GHUsyi76"
+
+    field medal_id type="i32::str" {
+        key "8ZSQ5F2V"
+        doc "Medal id — 1.  Same hash/name as net/user.kdl."
+    }
+
+    field name type="str" {
+        key "VPf7t9rK"
+        doc "Medal name — \"Brave Medal\"."
+    }
+
+    field thumbnail_img type="str" {
+        key "M2cv6dum"
+        doc "Medal icon — \"bravemedal_thum.png\".  Same hash/name as dungeon_key.kdl."
+    }
+
+    field possession_limit type="i32::str" {
+        key "N7I9vYZb"
+        doc "Stack cap — 1000.  Same hash/name as item.kdl."
+    }
+
+    field distribute_flag type="i32::str" {
+        key "EK5I6MQ9"
+        doc "Distribution flag — 0.  Same hash/name as item.kdl."
+    }
+
+    field unk1 type="str" {
+        key "fK15a73g"
+        doc "// UNVERIFIED: empty string."
+    }
+
+    field unk2 type="i32::str" {
+        key "zfdw7Ry1"
+        doc "// UNVERIFIED: 0."
+    }
+}
+
+json HelpDetailMst {
+    doc "Help article bodies (wrapper hash a3IgzZ0q).  180 rows — the detail pages behind HelpMst/HelpSubMst in mst/help.kdl."
+    hash "a3IgzZ0q"
+
+    field id type="i32::str" {
+        key "f1LKBoM9"
+        doc "Detail row id (1..800002)."
+    }
+
+    field img type="str" {
+        key "b5VveUd8"
+        doc "// UNVERIFIED: empty string in all 180 rows.  Same hash/name as first_desc.kdl."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Localisation key for the body text — \"MST_HELP_DBB_100001_DESCRIPTION\".  A plain string: some rows embed ':'.  Same hash/name as item.kdl."
+    }
+
+    field help_id type="i32::str" {
+        key "v9dyS8fi"
+        doc "Parent help article (100..900000).  Same hash/name as help.kdl."
+    }
+
+    field sub_id type="i32::str" {
+        key "meg8fhr1"
+        doc "Sub-article this detail belongs to (1..800002).  Same hash/name as help.kdl."
+    }
+}
+
+json PvpFixedSettingMst {
+    doc "Fixed-rule PvP stat scaling (wrapper hash KFJBwYbR).  3 rows — one per ruleset.  Every parameter is a COLON QUAD, one value per rarity/bracket tier.  Source file is F_UNKNOWN_gyY4TCm8, identified per handbook 8.36."
+    hash "KFJBwYbR"
+
+    field id type="i32::str" {
+        key "XIvaD6Jp"
+        doc "Ruleset id 1..3.  Same hash banner.kdl uses for its row ids."
+    }
+
+    field atk_mod type="[i32::str]::sep(colon)" {
+        key "dnqyyMg6"
+        doc "CONFIRMED setAtkMod (readParam).  colon quad, elements 800..1000 (a per-tier percentage)."
+    }
+
+    field def_mod type="[i32::str]::sep(colon)" {
+        key "ZmG6sGxv"
+        doc "CONFIRMED setDefMod (readParam).  colon quad, elements 1000..1100."
+    }
+
+    field hp_mod type="[i32::str]::sep(colon)" {
+        key "sKf4Koy4"
+        doc "CONFIRMED setHpMod (readParam).  colon quad, elements 1000..1550."
+    }
+
+    field rec_mod type="[i32::str]::sep(colon)" {
+        key "y2SlttSX"
+        doc "CONFIRMED setRecMod (readParam).  colon quad, constant 1000."
+    }
+
+    field heart_crystal_rev_rate_mod type="[i32::str]::sep(colon)" {
+        key "4s95TBoj"
+        doc "CONFIRMED setHeartCrystalRevRateMod (readParam).  colon quad, constant 1000."
+    }
+
+    field bb_dmg_mod type="[i32::str]::sep(colon)" {
+        key "absaNyoQ"
+        doc "CONFIRMED setBBDmgMod (readParam).  colon quad, elements 750..1000."
+    }
+
+    field sbb_dmg_mod type="[i32::str]::sep(colon)" {
+        key "PlaeXUOH"
+        doc "CONFIRMED setSBBDmgMod (readParam).  colon quad, elements 900..1050."
+    }
+
+    field ubb_dmg_mod type="[i32::str]::sep(colon)" {
+        key "6luDhf9o"
+        doc "CONFIRMED setUBBDmgMod (readParam).  colon quad, constant 1000."
+    }
+
+    field bb_crystal_rev_rate_mod type="[i32::str]::sep(colon)" {
+        key "b7KUiAfA"
+        doc "CONFIRMED setBBCrystalRevRateMod (readParam).  colon quad, elements 500..1000."
+    }
+
+    field general_bb_fill_rate type="[i32::str]::sep(colon)" {
+        key "OiVfjAUf"
+        doc "CONFIRMED setGeneralBBFillRate (readParam).  colon quad, elements 700..1000."
+    }
+
+    field active_healing_cap type="[i32::str]::sep(colon)" {
+        key "aYJ8ALCR"
+        doc "CONFIRMED setActiveHealingCap (readParam).  colon quad, elements 20000..50000 (an HP or damage cap)."
+    }
+
+    field passive_healing_cap type="[i32::str]::sep(colon)" {
+        key "XNwxUiRr"
+        doc "CONFIRMED setPassiveHealingCap (readParam).  colon quad, elements 20000..30000."
+    }
+
+    field mitigation_cap type="[i32::str]::sep(colon)" {
+        key "EeZ8VYuI"
+        doc "CONFIRMED setMitigationCap (readParam).  colon quad, elements 20..50."
+    }
+
+    field damage_decrease_cap type="[i32::str]::sep(colon)" {
+        key "Pf0mF6gK"
+        doc "CONFIRMED setDamageDecreaseCap (readParam).  colon quad, constant 100."
+    }
+
+    field elem_damage_decrease_cap type="[i32::str]::sep(colon)" {
+        key "2QxsR0hy"
+        doc "CONFIRMED setElemDamageDecreaseCap (readParam).  colon quad, constant 100."
+    }
+
+    field active_reraise_cap type="[i32::str]::sep(colon)" {
+        key "6pXtgtPA"
+        doc "CONFIRMED setActiveReraiseCap (readParam).  colon quad, constant 2."
+    }
+
+    field passive_reraise_cap type="[i32::str]::sep(colon)" {
+        key "CuVhQmOv"
+        doc "CONFIRMED setPassiveReraiseCap (readParam).  colon quad, constant 2."
+    }
+
+    field active_damage_over_time_cap type="[i32::str]::sep(colon)" {
+        key "uFheXxzX"
+        doc "CONFIRMED setActiveDamageOverTimeCap (readParam).  colon quad, constant 100."
+    }
+
+    field passive_damage_over_time_cap type="[i32::str]::sep(colon)" {
+        key "oaKBPw9e"
+        doc "CONFIRMED setPassiveDamageOverTimeCap (readParam).  colon quad, elements 50..100."
+    }
+
+    field bb_reduce_cap type="[i32::str]::sep(colon)" {
+        key "c6oqlnlT"
+        doc "CONFIRMED setBBReduceCap (readParam).  colon quad, elements 50..100."
+    }
+
+    field unit_enabled_parts type="[str]::sep(comma)" {
+        key "0HL6ujld"
+        doc "CONFIRMED setUnitEnabledParts (readParam).  the one non-quad column — a comma list whose elements are themselves colon-joined sextets (\"1,1,1,1,1,1:1,1,1,1,1,1:...\"), so elements stay strings.  Likely a per-slot allow mask."
+    }
+
+    field passive_no_damage_cap type="[i32::str]::sep(colon)" {
+        key "clwU9Ona"
+        doc "CONFIRMED setPassiveNoDamageCap (readParam).  colon quad, elements 25..50."
+    }
+}

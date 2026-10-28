@@ -1,0 +1,272 @@
+// Monster AI archive vocabulary (deploy/archive/ai.json).
+//
+// Every rule below is BINARY-CONFIRMED against the arm64 client (libgame.so)
+// unless it says otherwise; the addresses are the evidence.  The original
+// server's AI rows were never captured, so this grammar is the whole contract.
+//
+// HOW THE CLIENT RUNS AN AI RECORD (BattleUnit::setAiTargetList @0x10FD940)
+//
+//  * Each time a monster acts it walks the record's rows IN WIRE ORDER --
+//    AIMstList::getObjectList @0x13073EC does not sort, and `priority` is only
+//    a resume key (see AiAction.priority).  The first row whose party
+//    conditions AND self conditions all pass, and whose `percent` roll
+//    succeeds, is executed; the walk stops there.  Nothing passing means a
+//    plain attack on a random target.
+//  * A monster takes MonsterMst.min_act_count actions per turn plus one more
+//    for each step up to max_act_count that passes act_rate percent
+//    (MonsterUnit::initTurnChild @0x1159098).  Every action re-walks the rows.
+//  * Per row the client keeps an execution record (BattleUnit::AIExecute,
+//    addAIExecuteList @0x1133EF4): a battle-total count, a this-turn count
+//    that BattleUnit::initTurn zeroes every turn, and the enemy-party turn it
+//    last fired on.  BattleUnit::exitBattle clears them all at wave end.
+//  * The enemy party's turn count starts at 0 and BattleParty::initTurn
+//    @0x10B261C adds one per enemy turn, so the first enemy turn is turn 1.
+//    It belongs to the PARTY: a monster swapped in by a mission script keeps
+//    counting from the battle's first turn.
+
+json SelfCondition {
+    doc """
+    One `term:param` pair about the acting monster, checked by
+    BattleUnit::checkAiActionTerm @0x112BFD0 with target id 0.  All of a row's
+    self conditions must pass (they are AND-ed).  Sent right of the `#` in
+    AIMst.conditions, five slots, padded with `non:0`.
+
+    Terms whose meaning is confirmed (the integer `param` is N):
+
+    * `non`               always true (the padding term).
+    * `skill`             selects skill N of this monster's MonsterMst skill
+                          list (1-based, `F4bQ7r8C` order; 0 = a random one)
+                          as the one an `skill` action casts, and passes when
+                          it can be used.  MonsterUnit::isSkillFree returns
+                          true, so a monster never waits on a BB gauge.
+    * `act`               the enemy-party turn count equals N.
+    * `actbetween`        the enemy-party turn count is a multiple of N
+                          ("every Nth turn": N, 2N, 3N ...).
+    * `hp_pr_under`       HP percent is STRICTLY below N (49.9 passes 50,
+                          50.0 does not).
+    * `hp_pr_over`        HP percent is N or more.
+    * `hp_under`/`hp_over` the same against absolute HP.
+    * `limited_act`       this row has fired fewer than N times this battle.
+                          `limited_act:1` is the once-only phase trigger.
+    * `turn_limited_act`  this row has fired fewer than N times this turn.
+    * `turn_act`          param is `a,b`: at least a and at most b enemy turns
+                          since this row last fired (since turn 0 if never);
+                          50 percent chance inside the window, certain at b,
+                          false once past b.  Only checked while the monster
+                          has taken at most one action this turn.
+    * `flg_on`/`flg_off`  AI flag N (1-50) is non-zero / zero.  Flags are per
+                          monster and are set by Action.flag_changes.
+    * `abnormal_state`    has status ailment N (0 = any ailment).
+
+    LAST-ACTION TERMS -- about what a unit did on its latest action, so they
+    are meant for PARTY conditions on the player's side (target_id 5).  A
+    unit's latest action is BattleUnit +0x1c0 (the type initAction copies
+    from +0x1bc: 0 attack, 1 skill, 3 guard) and +0x240 (the skill, which
+    exitAction @0x110129C stores after a skill action and leaves in place
+    until that unit's next action; initDead @0x10FD6E8 resets both), so in the
+    enemy turn they describe the player's turn just played.  Decoded
+    2026-09-26 from checkAiActionTerm @0x112D2D4..0x112D4C8 and
+    @0x112FB10..0x112FEF4:
+
+    * `ubb_use` / `sbb_use` / `bb_use`  the latest action was a skill and it
+                          was a UBB (BattleUnitSkill::isUltimate) / an SBB
+                          (isExtra) / neither.  `parameters` is not read.
+    * `skill_use` / `skill_unuse`  the unit's used-a-skill byte (+0x4f2,
+                          set by exitAction) is set / clear.
+    * `before_turn_bb`    (the latest action was a skill) == N, so N=1 means
+                          "used a BB/SBB/UBB".  `before_turn_bb_attack` /
+                          `_heal` / `_support` also require UnitSkillMst
+                          skill_type 1 / 2 / 3.
+    * `before_turn_attack` / `before_turn_guard`  latest action type 0 / 3.
+    * `before_turn_over_drive`  the unit's Overdrive byte (+0xa80) is set.
+    * `skill_pr_over` / `skill_pr_under`  BB gauge percent >= N / < N;
+      `s_skill_pr_over` / `s_skill_pr_under` the same for the SBB gauge (only
+      on units that have one); `s_skill_stock` the unit has an SBB at all.
+      None of these COUNTS Brave Bursts across turns.
+
+    The client knows many more terms (buff checks, damage-taken windows,
+    party counts, raid terms, the flg_timer/flg_cntup families); they are
+    listed in checkAiActionTerm and are not yet decoded here.
+    """
+
+    field type type=str {
+        key "type"
+        doc "Condition term, such as skill, actbetween, hp_pr_under or limited_act."
+    }
+
+    field parameter type="u32::int" {
+        key "parameter"
+        doc "The term's integer parameter N (see the doc above)."
+    }
+}
+
+json PartyCondition {
+    doc """
+    Condition checked against a chosen set of units, sent left of the `#` in
+    AIMst.conditions as `target_id:target_parameter:type:parameters`, four
+    slots padded with `0:non:non:non`.  All of a row's party conditions must
+    pass.  The last unit that satisfied one is remembered, and act_target 3/4
+    aim at (or away from) it.
+
+    `target_id` picks the units (checkAiActionTerm's jump table @0x2325362):
+    0/1 the acting monster, 2 the enemy whose monster id is
+    `target_parameter`, 3 the enemy with group order `target_parameter`,
+    4 the monster's own party, 5 the opposing party, 12/13 field-AI lookups;
+    6-11 are not decoded.
+    `target_parameter` `all` requires every chosen unit to pass (`aliveall`:
+    every living one); anything else means any one unit suffices.  `type` and
+    `parameters` use the SelfCondition vocabulary.
+    """
+
+    field target_id type="u32::int" {
+        key "target_id"
+        doc "Which units the term is checked against; see the doc above."
+    }
+
+    field target_parameter type=str {
+        key "target_parameter"
+        doc "Group order for target 3, or all/aliveall; usually non."
+    }
+
+    field type type=str {
+        key "type"
+        doc "Condition term (SelfCondition vocabulary)."
+    }
+
+    field parameters type=str {
+        key "parameters"
+        doc "The term's parameter."
+    }
+}
+
+json Action {
+    doc """
+    Command executed when an AI row is selected, sent as
+    `type@f1,op1,...,f6,op6@counts@move_wait@end_wait` (AIMst.action).
+
+    Types (setAiTargetList @0x10FD940): `attack`, `skill` (casts the skill a
+    `skill:N` self condition selected), `guard`, `wait`, `turn_end` (ends the
+    monster's turn outright) and `script` (hands the action to the mission
+    script).
+
+    ⚠ THE JSON KEYS OF THE THREE TRAILING ARGUMENTS ARE HISTORICAL.  They were
+    written before their meaning was known, and ai.json files produced by the
+    mission builder still use them; the archive loader rejects unknown keys,
+    so renaming a key would empty the whole AI cache.  The C++ members carry
+    the real names.
+    """
+
+    field type type=str {
+        key "type"
+        doc "Action type: attack, skill, guard, wait, turn_end or script."
+    }
+
+    field flag_changes type="[i32::int]" {
+        key "flag_changes"
+        doc """
+        Up to six (flag, op) pairs, padded with -1.  Flag 1-50 names one of
+        the monster's AI flags; 0 means all of them.  Applied when the row is
+        SELECTED: op 1 sets the flag, any other op clears it.  Ops 2 and 3
+        also queue a change for when the action finishes
+        (reserveAIFlgChange, applied in BattleUnit::exitAction): 2 clears,
+        3 sets.  Flags 26-35 are counters (op 1 adds one, others reset),
+        36-40 also reset an attached timer when cleared, and 41-50 use -1
+        as "off".
+        """
+    }
+
+    field counts_as_action type=bool {
+        key "unknown_bool"
+        doc """
+        True when this action uses up one of the monster's actions for the
+        turn.  False makes it a free extra action: loopEndWait @0x10F9F80 only
+        advances the action counter when this is set, so the monster acts
+        again straight after.  This is how a boss casts a buff and still
+        attacks, or fires a burst of the same skill.
+        """
+    }
+
+    field move_wait_frames type="i32::int" {
+        key "unknown_int_1"
+        doc "Frames to wait before moving to act (BattleUnit::loopMoveWait @0x10F9B68)."
+    }
+
+    field end_wait_frames type="i32::int" {
+        key "unknown_int_2"
+        doc "Frames to wait after the action before the next one (loopEndWait @0x10F9F80)."
+    }
+}
+
+json AiAction {
+    doc "One ordered action row belonging to an AI record."
+
+    field priority type="u32::int" {
+        key "priority"
+        doc """
+        Row identity within the record.  It does NOT order evaluation -- wire
+        order does -- but the client's battle-resume data finds a row again by
+        (ai id, priority) (AIMstList::getObject(id, priority) @0x1307260), so
+        it must be unique within a record.
+        """
+    }
+
+    field percent type="f32::int" {
+        key "percent"
+        doc """
+        Chance percent for this row once its conditions pass; a failed roll
+        moves on to the next row.  The client may add a passive bonus
+        (BattleUnitPassive parameter 111) to a `skill` row's chance.
+        """
+    }
+
+    field act_target type="u32::int" {
+        key "act_target"
+        doc """
+        Target pool (BattleUnit::searchAiTarget @0x1131364): 1 the monster's
+        own side, 2 the opposing side, 3 the unit a party condition matched,
+        4 the opposing side minus that unit.  A `skill` action takes its side
+        from the skill's own target type instead.
+        """
+    }
+
+    field search_term type=str {
+        key "search_term"
+        doc "How one target is chosen from the pool: random, hp_min, hp_max, atk_max, def_min, elem_fire and similar."
+    }
+
+    field self_conditions type="[SelfCondition]" {
+        key "self_conditions"
+        doc "Conditions about the acting monster (at most five)."
+    }
+
+    field party_conditions type="[PartyCondition]" {
+        key "party_conditions"
+        doc "Conditions about a chosen set of units (at most four)."
+    }
+
+    field action type=Action {
+        key "action"
+        doc "Command to execute when this row is selected."
+    }
+}
+
+json AiRecord {
+    doc """
+    Server-owned curated AI archive data.
+    """
+
+    field id type="u32::int" {
+        key "id"
+        doc "AI archive id referenced by mission monsters."
+    }
+
+    field name type=str {
+        key "name"
+        doc "Human-readable AI name.  Never sent: AIMst has no name column."
+    }
+
+    field actions type="[AiAction]" {
+        key "actions"
+        doc "Action rows, in the order the client evaluates them."
+    }
+}

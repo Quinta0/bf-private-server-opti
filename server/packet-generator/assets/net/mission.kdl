@@ -1,0 +1,1402 @@
+// Network types for the MissionStart / MissionEnd / MissionBreak handler trio.
+//
+// Sources: captured deploy/log/http_log_jE6Sp0q4_*.log (MissionStart) and
+// http_log_9TvyNR5H_*.log (MissionEnd); IDA dumps in
+// "BraveFrontier IDA readParam and Handler exports and scripts"
+// (readparam_analysis.json + response_mappings.json + typed_responses);
+// F_MISSION_MST_1_Ver1118.json for the server-side mission table (already
+// covered by mst/mission.kdl).
+//
+// Audit caveats:
+// 1. response_mappings.json lists 5 keys for MissionStartInfoResponse but
+//    the typed readParam helper covers only 4. 1VagK32J is reached via a
+//    hand-coded getValue() path (handbook section 3.2).
+// 2. Most rXvA1E5y / 0xgIw1Ns / Kz7qfSs5 fields have no readparam setter
+//    (these are request-only structs the client builds in createBody;
+//    binary-side parsing not exported). Types are inferred from observed
+//    wire values; every undocumented field is marked UNVERIFIED.
+
+// =============================================================================
+//  MissionStart  (group jE6Sp0q4, aes csiVLDKkxEwBfR70)
+// =============================================================================
+
+json MissionStartReqItem {
+    // AUDIT 2026-08-24: REFERENCED BY NOTHING -- MissionStartReq.start_info points
+    // at MissionStartInfo instead.  This models more of the 9Q1Lq5FS group (8
+    // fields vs 5) but names h7eY3sAK user_id, which is WRONG: createBody
+    // @0x13AAEC0 fills it from UserState::getReinforcementUserID, the helper.
+    // If these are ever consolidated, keep MissionStartInfo naming.
+    doc "Inner item in MissionStart 9Q1Lq5FS array. Only mission_id and active_deck are server-meaningful; the other 6 are tutorial/event flags the server acknowledges but does not act on."
+
+    field user_id type=str {
+        key "h7eY3sAK"
+        doc "Always \"0\" in captured player requests. Distinct from IKqx1Cn9.h7eY3sAK (real user UUID). // UNVERIFIED purpose."
+    }
+
+    field friend_point type="i32::str" {
+        key "J3stQ7jd"
+        doc "setFriendPoint.  Confirmed by the 9Q1Lq5FS readParam audit (handbook §8.27, which corrected an earlier \"account_id\" reading) and by the same hash already being named friend_point in MissionStartInfo below, net/user.kdl and net/reinforcement_info.kdl.  Always \"0\" in captured requests."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "Mission ID being started. Cross-refs F_MISSION_MST.id (see MissionMst in mst/mission.kdl). Quoted on wire."
+    }
+
+    field ep3_flg type="i32::str" {
+        key "jkldTrhL"
+        doc "Episode 3 flag — the same hash is already named ep3_flg in net/frontier_gate.kdl and net/handlers.kdl, and mst/item.kdl carries it as a constant 0 column.  Always \"0\" in captured requests.  // UNVERIFIED against a readparam setter: no response class in the export names this hash."
+    }
+
+    field active_deck type="i32::str" {
+        key "Z0Y4RoD7"
+        doc "Squad/deck index 0-9 the player selected. Server UPDATEs userinfo.active_deck. IDA setter (other response classes): ActiveGuildDeck."
+    }
+
+    field quest_bonus_type type="i32::str" {
+        key "nA95Bdj6"
+        doc "setQuestBonusType (uint32_t) — which event/quest bonus is active for this run.  Setter recovered from the PermitPlace response family (PermitPlace/PermitPlaceSp/PermitPlaceML Response::readParam, readparam_analysis.json), where the same hash carries the per-mission bonus advertised to the client.  Always \"0\" in captured requests = no bonus active."
+    }
+
+    field quest_bonus_rate type=str {
+        key "5Z1LNoyH"
+        doc "setQuestBonusRate — the bonus multiplier paired with quest_bonus_type.  Setter per the PermitPlace response family; note the setter takes std::string (not int) there, so this is typed `str` rather than i32::str even though every captured request value is \"0\"."
+    }
+
+    field unk_u1iPEVUq type="i32::str" {
+        key "u1iPEVUq"
+        doc "Always \"-1\" in captured requests. Sentinel/disabled. // UNVERIFIED."
+    }
+}
+
+json MissionStartReqJzS {
+    doc "Inner item in MissionStart JzS3uxsZ array. Single field seen in every capture. // UNVERIFIED purpose."
+
+    field unk_0b4efi1W type="i32::str" {
+        key "0b4efi1W"
+        doc "Always \"1\" in captured requests. // UNVERIFIED."
+    }
+}
+
+json MissionStartInfo {
+    doc "fEi17cnx[1] sub-element in MissionStart response. Hash key 9Q1Lq5FS per response_mappings MissionStartInfoResponse. All 5 fields decoded from MissionStartInfo::readParam in libgame.so via a private IDA audit of the handler at func_addr 0x13E46D0."
+
+    field reinforce_user_id type=str {
+        key "h7eY3sAK"
+        doc "NOT the caller -- the HELPER whose unit is borrowed.  MissionStartRequest::createBody @0x13AAEC0 fills it from UserState::getReinforcementUserID; the callers own id travels in IKqx1Cn9.  Confirmed 2026-08-24 -- the unused MissionStartReqItem names this user_id, which is wrong.  Currently hardcoded pending a friend system."
+    }
+
+    field friend_point type="i32::str" {
+        key "J3stQ7jd"
+        doc "setFriendPoint. Friend point count for the reinforce slot. Previously misidentified as 'account_id' (5-digit value 42640 in captures) — actually friend-point quantity that the player would pay to use the friend's reinforce."
+    }
+
+    field mission_id type="i32::str" {
+        key "j28VNcUW"
+        doc "setMissionID. Echoes the request mission_id. Bug history: echoing wrong value crashed client on second mission load (handbook section 7.4.1)."
+    }
+
+    field reinforce_info type=str {
+        key "1VagK32J"
+        doc "setReinforceInfo. Free-form string blob carrying reinforce metadata (presumably serialized unit/skill snapshot — captured idle value: empty). Previously sent as 0 / omitted; client appears to tolerate empty. Reachable via hand-coded getValue() path so the readparam_analysis.json typed dump didn't list it (handbook section 3.2)."
+    }
+
+    field deck_num type="i32::str" {
+        key "Z0Y4RoD7"
+        doc "setDeckNum. Deck number used for this mission (0-9). Echoes Z0Y4RoD7 from the request 9Q1Lq5FS[0]. Note this is per-MissionStartInfo (the [1] sub-block); UserTeamInfo at [0] has the same wire key Z0Y4RoD7 mapped to a different setter (setActiveDeck / setActiveGuildDeck per other readparam classes) — same key, different semantic in different response contexts."
+    }
+}
+
+// =============================================================================
+//  MissionEnd  (group 9TvyNR5H, aes oINq0rfUFPx5MgmT)
+// =============================================================================
+
+json MissionEndReqBattleResult {
+    doc "Inner item in MissionEnd rXvA1E5y array. 41 fields per captured request. Most are integer counters with no readparam coverage; only BattleCrystalNum, HeartCrystalNum, MaxTurnDamage have IDA setter names. Inferred type i32::str for all (every observed value parses as quoted integer)."
+
+    field earn_zel type="i32::str" {
+        key "Najhr8m6"
+        doc "Zel earned this battle. Same key as userinfo.zel but here the value is the DELTA. Captured: \"182\"."
+    }
+
+    field earn_karma type="i32::str" {
+        key "HTVh8a65"
+        doc "Karma earned this battle. Captured: \"106\"."
+    }
+
+    field item_drops type=str {
+        key "4T0Q2Bh5"
+        doc "Item drops, comma-separated item_id:count pairs. Captured: \"10300:9,10000:10,10301:2\". Kept as str (inner-pair shape does not fit [i32::str]::sep(comma), see handbook section 3.3)."
+    }
+
+    field unit_drops type=str {
+        key "3MAT6quo"
+        doc "Unit drops, comma-separated triples. Captured: \"30030:1:1,10030:1:1,50030:2:2\". Kept as str per handbook section 3.3."
+    }
+
+    field battle_crystal_num type="i32::str" {
+        key "hoG2ieT5"
+        doc "Battle Crystal drops gathered. IDA setter BattleCrystalNum. Captured: \"143\"."
+    }
+
+    field heart_crystal_num type="i32::str" {
+        key "6PLsn8xo"
+        doc "Heart Crystal drops gathered. IDA setter HeartCrystalNum. Captured: \"32\"."
+    }
+
+    field max_turn_damage type="i32::str" {
+        key "5NRJQ1LU"
+        doc "Highest single-turn damage this battle. IDA setter MaxTurnDamage. Captured: \"28145\"."
+    }
+
+    field max_turn_spark_cnt type="i32::str" {
+        key "XP06YWdT"
+        doc "setMaxTurnSparkCnt — best single-turn spark count.  Setter recovered from ColosseumBattleResultResponse::readParam (readparam_analysis.json), which shares this battle-result stat block with the mission flow.  Captured \"1\"."
+    }
+
+    field spark_cnt type="i32::str" {
+        key "U8uZLA34"
+        doc "setSparkCnt — total sparks this battle.  Setter per ColosseumBattleResultResponse::readParam.  Captured \"2\"."
+    }
+
+    field skill_use_cnt type="i32::str" {
+        key "rZQJF5G9"
+        doc "setSkillUseCnt — number of skill activations.  Setter per ColosseumBattleResultResponse::readParam.  Captured \"4\"."
+    }
+
+    field unk_TW1Mrtp5 type="i32::str" {
+        key "TW1Mrtp5"
+        doc "Captured \"0\". // UNVERIFIED."
+    }
+
+    field unk_13HeZJ0o type="i32::str" {
+        key "13HeZJ0o"
+        doc "Captured \"59\". // UNVERIFIED."
+    }
+
+    field unk_8vHibp6o type="i32::str" {
+        key "8vHibp6o"
+        doc "Captured \"16\". // UNVERIFIED."
+    }
+
+    field unk_B0p2kASC type="i32::str" {
+        key "B0p2kASC"
+        doc "Captured \"55\". // UNVERIFIED."
+    }
+
+    field unk_EcDR3f6M type="i32::str" {
+        key "EcDR3f6M"
+        doc "Captured \"109\". // UNVERIFIED."
+    }
+
+    field bb_ko_cnt type="i32::str" {
+        key "GRCVD1i8"
+        doc "setBBKoCnt — kills landed with a Brave Burst.  Setter per ColosseumBattleResultResponse::readParam.  Captured \"5\"."
+    }
+
+    field unk_Uy15wSJd type="i32::str" {
+        key "Uy15wSJd"
+        doc "Captured \"3\". // UNVERIFIED."
+    }
+
+    field unk_EfwspXXo type="i32::str" {
+        key "EfwspXXo"
+        doc "Captured \"0\". // UNVERIFIED."
+    }
+
+    field unk_C2aU1feD type="i32::str" {
+        key "C2aU1feD"
+        doc "Captured \"45998\". Large value, possibly total damage. // UNVERIFIED."
+    }
+
+    field unk_vELiH4Q1 type="i32::str" {
+        key "vELiH4Q1"
+        doc "Captured \"2\". // UNVERIFIED."
+    }
+
+    field monsters_killed type=str {
+        key "L16VDrk5"
+        doc "Comma-separated monster_id:count pairs of every monster killed. Captured: \"30352:3,40352:1,10352:3,50352:2,20352:1,40401:1\". // UNVERIFIED, kept as str per handbook section 3.3."
+    }
+
+    field element_kills type=str {
+        key "Fw2dr06x"
+        doc "Comma-separated element:count pairs. Captured: \"3:3,4:2,1:3,5:2,2:1\". // UNVERIFIED."
+    }
+
+    field units_killed type=str {
+        key "1CxU2MPn"
+        doc "Comma-separated unit_id:count pairs. Captured: \"30030:3,40030:1,10030:3,50030:2,20030:1,40031:1\". // UNVERIFIED."
+    }
+
+    field unk_Lu0pAk1R type=str {
+        key "Lu0pAk1R"
+        doc "Comma-separated integer list. Captured: \"2,1,2,1,1\". // UNVERIFIED."
+    }
+
+    field unk_32edsbP0 type="i32::str" {
+        key "32edsbP0"
+        doc "Captured \"1783\". // UNVERIFIED."
+    }
+
+    field unk_CwN87TyL type="i32::str" {
+        key "CwN87TyL"
+        doc "Captured \"15967\". // UNVERIFIED."
+    }
+
+    field unk_xFH5i4o8 type="i32::str" {
+        key "xFH5i4o8"
+        doc "Captured \"6\". // UNVERIFIED."
+    }
+
+    field unk_J3EBd90b type="i32::str" {
+        key "J3EBd90b"
+        doc "Captured \"3\". // UNVERIFIED."
+    }
+
+    field unk_2z8kTtBy type="i32::str" {
+        key "2z8kTtBy"
+        doc "Captured \"0\". // UNVERIFIED."
+    }
+
+    field unk_TNtQBS49 type="i32::str" {
+        key "TNtQBS49"
+        doc "Captured \"0\". // UNVERIFIED."
+    }
+
+    field unk_e6BKoYy9 type="i32::str" {
+        key "e6BKoYy9"
+        doc "Captured \"27535\". Also appears in UserTeamArchive, possibly total damage or score. // UNVERIFIED."
+    }
+
+    field unk_VJzlXxyM type=str {
+        key "VJzlXxyM"
+        doc "Comma-separated unit_id:count pairs. Captured: \"10105:6,10011:5\". // UNVERIFIED."
+    }
+
+    field unk_XOlcsuRn type=str {
+        key "XOlcsuRn"
+        doc "Single unit_id:count pair. Captured: \"10011:5\". // UNVERIFIED."
+    }
+
+    field unk_zbPlgZU6 type=str {
+        key "zbPlgZU6"
+        doc "Single unit_id:count pair. Captured: \"10105:3\". // UNVERIFIED."
+    }
+
+    field unk_2IHBUL5i type="i32::str" {
+        key "2IHBUL5i"
+        doc "Captured \"3\". // UNVERIFIED."
+    }
+
+    field unk_GFu2Oh2N type="i32::str" {
+        key "GFu2Oh2N"
+        doc "Captured \"1\". // UNVERIFIED."
+    }
+
+    field unk_qF71DLEw type="i32::str" {
+        key "qF71DLEw"
+        doc "Captured \"0\". // UNVERIFIED."
+    }
+
+    field unk_dx1NV0tP type="i32::str" {
+        key "dx1NV0tP"
+        doc "Captured \"0\". // UNVERIFIED."
+    }
+
+    field unk_BJNh3g2I type=str {
+        key "BJNh3g2I"
+        doc "Comma-separated colon-pair list. Captured: \"3:1,1:1,5:1\". // UNVERIFIED."
+    }
+
+    field unk_vgBY76Ky type=str {
+        key "vgBY76Ky"
+        doc "Comma-separated colon-pair list. Captured: \"1:1,3:1,5:1,2:1,4:1\". // UNVERIFIED."
+    }
+
+    field unk_6Xd2b0Iy type="i32::str" {
+        key "6Xd2b0Iy"
+        doc "Captured \"0\". // UNVERIFIED."
+    }
+}
+
+json MissionEndReqDeckMember {
+    doc "Inner item in MissionEnd 0xgIw1Ns array. Deck composition the player actually fielded. Matches UserPartyDeckInfo leader/sub encoding."
+
+    field user_unit_id type="i32::str" {
+        key "edy7fq3L"
+        doc "user_units.id of the unit in this slot. // CAPTURED FROM http_log_9TvyNR5H_*.log."
+    }
+
+    field member_type type="i32::str" {
+        key "gr48vsdJ"
+        doc "0=leader, 1=member. Same encoding as UserPartyDeckInfo.member_type."
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Position 0-5 within the squad."
+    }
+}
+
+json MissionEndReqMissionInfo {
+    doc "Inner item in MissionEnd Kz7qfSs5 array. Identifies which battle is ending. // UNVERIFIED no readparam coverage."
+
+    field battle_serial type=str {
+        key "k9cxD7Ba"
+        doc "Captured \"58844709\". Possibly battle session id/serial. Same key appears in MissionBreakInfo. // UNVERIFIED."
+    }
+
+    field result_code type="i32::str" {
+        key "j3g5P4cq"
+        doc "Captured \"2\". Possibly result code (win) or wave count. // UNVERIFIED."
+    }
+}
+
+json MissionReward {
+    doc "MissionRewardResponse (response key F5Vs19mb). Drives the 'Quest Clear Reward' screen and the post-mission level-up animation. All 19 fields decoded from MissionRewardResponse::readParam pseudocode at func_addr 0x13E3C34 in libgame.so (arm64 APK) via a private IDA audit. See gimuserver/gme/MissionEnd.cpp for the audit story.  SUPERSEDED: MissionEnd sends MissionRewardInfo (below), whose clear_mission_id / clear_dungeon_id / clear_area_id docs record the decoded first-clear-only semantics; the field notes here are the older reading."
+
+    field clear_bonus type=str {
+        key "92ms7J5M"
+        doc "setClearBonus. First-clear bonus indicator. Treated as std::string by readParam. // UNVERIFIED format — captured idle value is empty string."
+    }
+
+    field lvup_flg type="i32::str" {
+        key "wPb5uMR9"
+        doc "setLvupFlg. Level-up animation flag. 0=no animation; non-zero plays the 'You reached Lv N' animation from before_lv up to UserTeamInfo.level. Combined with before_lv, this is the actual control surface for the level-up cascade — earlier MissionEnd code left it at 0 with before_lv=0, which made the client animate from 0 up to whatever team_info.level said (the 'Lv 1, 2, 3, then 900' bug)."
+    }
+
+    field before_lv type="i32::str" {
+        key "81CsGAR9"
+        doc "setBeforeLv. The player's level BEFORE this mission. Paired with lvup_flg to drive the level-up animation: the client animates from before_lv to UserTeamInfo.level when lvup_flg is set. Always pass the player's pre-mission level here; on no-level-up missions, lvup_flg should be 0 and before_lv should equal team_info.level."
+    }
+
+    field inc_exp type="i32::str" {
+        key "d96tuT2E"
+        doc "setIncExp. 'XP Obtained' value displayed on the result screen. This is NOT a cascade trigger (the cascade comes from lvup_flg + before_lv); send the actual exp gained this mission so the player sees a real number."
+    }
+
+    field rein_req_state type="i32::str" {
+        key "0egM9p7I"
+        doc "setReinReqState. Reinforce-request state code. // UNVERIFIED meaning; idle value 0 — likely tracks the reinforce/friend-request UI prompt at result screen."
+    }
+
+    field clear_dungeon_id type=str {
+        key "4sQ8vBXm"
+        doc "setClearDungeonID. The dungeon ID of the mission just cleared. The result-screen header reads from this to render 'Adventurer's Prairie' / 'St. Lamia Palace' / etc. Server should populate from F_MISSION_MST lookup by mission_id, but mission_mst.json isn't decoded yet — currently sent empty so the client falls back to its cached current-dungeon state."
+    }
+
+    field clear_area_id type=str {
+        key "NgPQbA46"
+        doc "setClearAreaID. Area ID of the cleared mission. Same source as clear_dungeon_id (F_MISSION_MST lookup, currently empty)."
+    }
+
+    field clear_mission_id type=str {
+        key "mauD5qZ1"
+        doc "setClearMissionID. Mission ID of the cleared mission. Needs MissionStart to persist active_mission_id to userinfo first so MissionEnd can read it back. Currently empty — the client uses its own cached mission state."
+    }
+
+    field reward_units type=str {
+        key "3MAT6quo"
+        doc "setRewardUnits. Comma-separated unit-drop list (unit_id:rarity:flag triples). Echoed from MissionEndReqBattleResult.unit_drops in the request. Same wire format as the request's 3MAT6quo."
+    }
+
+    field zel type="i32::str" {
+        key "Najhr8m6"
+        doc "setZel. 'Zel Obtained' on the result screen. Set from MissionEndReqBattleResult.earn_zel. IDA setter previously documented in readparam_analysis as 'ActualZel'."
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "setKarma. 'Karma Obtained' on the result screen. Set from MissionEndReqBattleResult.earn_karma. IDA setter previously documented in readparam_analysis as 'ActualKarma'."
+    }
+
+    field exp_up_type type=str {
+        key "3vXLQFjt"
+        doc "setExpUpType. Exp-bonus type indicator (string, e.g. multiplier code or boost-source tag). // UNVERIFIED format; idle value is empty string. Likely populated during event campaigns to show 'x2 EXP' style badges next to the obtained value."
+    }
+
+    field zel_up_type type=str {
+        key "k6MynZkg"
+        doc "setZelUpType. Zel-bonus type indicator. Same shape as exp_up_type."
+    }
+
+    field karma_up_type type=str {
+        key "J1MwgxCL"
+        doc "setKarmaUpType. Karma-bonus type indicator. Same shape as exp_up_type."
+    }
+
+    field exp_guild type="i32::str" {
+        key "b8D18b7e"
+        doc "setExpGuild. Guild-membership exp bonus (additive). 0 when not in a guild — current server has no guild system."
+    }
+
+    field karma_guild type="i32::str" {
+        key "7adBa819"
+        doc "setKarmaGuild. Guild-membership karma bonus. Same as exp_guild."
+    }
+
+    field zel_guild type="i32::str" {
+        key "gzs3Bw10"
+        doc "setZelGuild. Guild-membership zel bonus. Same as exp_guild."
+    }
+
+    field e_token type="i32::str" {
+        key "03fFk30f"
+        doc "setEToken. Event token reward (event-currency drops). 0 when no event is active. Ties into F_ET_MISSION_MST when the event system is implemented."
+    }
+
+    field repeat_clear_bonus type=str {
+        key "S2ChOKo6"
+        doc "setRepeatClearBonus. Bonus payload for repeat clears (e.g. first-clear vs replay rewards differ for some campaign missions). // UNVERIFIED format — idle value empty string. The same hash also appears as a placeholder field in MissionMst (mst/mission.kdl) with idle empty value, suggesting the response copies through some MST-stored bonus string."
+    }
+}
+
+// =============================================================================
+//  MissionBreak  (an interrupted battle, and the offer to resume it)
+// =============================================================================
+//
+// The whole subsystem, end to end:
+//
+//  1. A squad wipes.  MissionGameOverScene offers CONTINUE for DefineMst
+//     continu_dia_cnt (QW3HiNv8, 1 gem), and initContinue @0x17FB3C0 fires
+//     MissionContinue -- tracked as the analytics event "Revival in Quest" /
+//     "Gems", which is what pins down what this request IS.  It carries the
+//     battle's freshly built suspend blob.
+//  2. If the player instead quits, or the client dies, the server record of
+//     that blob is the only thing that remembers the battle happened.
+//  3. At the NEXT LOGIN the server sends this block.  LoginScene::
+//     changeNextScene @0x174C544 reads getState(): zero means nothing pending
+//     and login proceeds normally; NON-ZERO calls SaveData::setLoginState(5),
+//     checks DataMstManager::existBattleMstFiles for the serial, and changes to
+//     scene 0x53 -- MissionRestartScene -- when the battle assets are still
+//     cached (0x3b6 mid-tutorial, Home otherwise).
+//  4. MissionRestartScene::initialize @0x17FC7A8 then reads the blob back out
+//     of its OWN SaveData (existMissionSuspendData / decodeMissionSuspendData),
+//     feeds THAT to setMissionBreakInfo, and fires MissionRestart.
+//
+// So the battle state is CLIENT-AUTHORITATIVE, exactly like Grand Quest's
+// campaignEncodeSuspendData: the server stores and echoes the blob but the
+// client reloads its own copy.  What the server owns is the TRIGGER -- without
+// a non-zero state at login the resume screen is never reached at all.
+//
+// The client degrades gracefully when the two disagree: no local suspend data
+// means UserState::setMissionRestartFlg(false) and the scene carries on without
+// restarting, so a stale record costs a wasted screen rather than a wedged
+// login.
+
+json MissionBreakInfo {
+    doc "MissionBreakInfoResponse (response key 5PR2VmH1), readParam @0x13E20B4 -- a SINGLETON (MissionBreakInfo::shared(), no list operations), so send one full row.  The interrupted battle the client should be offered at login."
+
+    field mission_serial_id type=str {
+        key "k9cxD7Ba"
+        doc "setMissionSerialID. Battle session serial. Same wire key appears in MissionEndReqMissionInfo as battle_serial — they're the same opaque token. Treat as a session-scoped string."
+    }
+
+    field state type="i32::str" {
+        key "j0Uszek2"
+        doc """
+        setState -- the RESUME TRIGGER, and the earlier "0=paused, 1=cleared"
+        reading was backwards.
+
+        CONFIRMED at both readers: LoginScene::changeNextScene @0x174C548
+        branches on `cbz w0` -- zero means nothing is pending and login goes to
+        Home, anything non-zero diverts to the restart screen.
+        MissionBreakInfo::isMissionBreak @0x1265FB4 is literally `state != 0`,
+        and MissionScene::isRestart @0x180B300 ands the same test with
+        UserState::getMissionRestartFlg.
+
+        Nothing compares it against a specific value, so what goes back is the
+        MissionStatus the interruption carried: MissionContinueRequest sends 4
+        normally and 6 under Quest Repeat's auto-continue, MissionRestartRequest
+        sends 5.  0 is this server's "no open battle".
+        """
+    }
+
+    field mission_break_info type=str {
+        key "K2gIYm0h"
+        doc "setMissionBreakInfo. The opaque blob MissionScene::createSuspendData builds; the server stores and echoes it unchanged and never parses it.  Its only visible grammar constraint is MissionBreakInfo::isEnableBreakInfo @0x1265FC4, which asks whether the string contains an '@' that is neither its first nor its last character -- so an empty blob is not a resumable one.  The client prefers its own SaveData copy anyway (see the note above)."
+    }
+}
+
+// MissionContinue (p8B2i9rJ / G3FwvQfy5hcxHMen) -- "Revival in Quest".
+//
+// createBody @0x13A7528 sends two groups: Kz7qfSs5 with the serial and a
+// MissionStatus of 4 (or 6 when Quest Repeat auto-continue is on), and
+// 5PR2VmH1 with the serial and the suspend blob.
+//
+// No MissionContinueResponse class exists in the binary, so this is an
+// acknowledge-and-refresh reply in the ShopUse mould.  Nothing client-side
+// deducts the gem -- UserTeamInfo has no setDia/decDia caller anywhere in the
+// binary -- so the charge is the server's, and team_info is the only way the
+// HUD learns about it.
+//
+// THE REPLY DECIDES THE REVIVAL.  When a request finishes, GameScene::update
+// @0x1601470 calls the scene's checkConnectResult (slot +0x310) before
+// clearing the in-flight bit; MissionGameOverScene inherits GameScene's, which
+// shows any error through checkResponseMessage.  With no error, loopContinue
+// @0x17FB474 calls MissionScene::requestContinue and pops the scene: an
+// ordinary reply IS the revival.  An error with GmeErrorCommand::Retry (2)
+// shows its message as notice -4000, and MissionGameOverScene::noticeOK
+// @0x17FB62C sends the scene back to initContinueConfirm -- the client's own
+// refusal path (Close would exit the app, ReturnToGame abandon the battle).
+// That the scene does not run loopContinue under the notice is inferred from
+// that handler, not traced through the scene manager.
+//
+// RETRY IDENTITY.  The body is built once (BaseRequest::create -> createBody)
+// and both retry paths re-send that same object (WrapAsyncHttpConnector::retry
+// @0x1005ED8 re-serialises it, NetworkManager::OnErrorRetryPressed @0xF5DCCC
+// re-sends the CCHttpRequest), so a retry repeats serial, status and blob byte
+// for byte; a later revival carries a new blob (turn counters, HP, logs).
+// There is no nonce: the signal key is the server's own echoed token and
+// F4q6i9xe.aV6cLn3v a per-process object counter handlers never see.  The
+// server keeps a receipt per run and revival (SHA-256 of "status:blob") in
+// user_mission_continue_receipts -- see gme/handlers/MissionBreak.cpp.
+
+json MissionContinueReq {
+    doc "MissionContinue (p8B2i9rJ) request -- the revival tap, carrying the battle to be remembered."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field mission_num type="[MissionNumInfo]::size(1)" {
+        key "Kz7qfSs5"
+        doc "The serial being continued and the MissionStatus for it -- 4, or 6 under auto-continue."
+    }
+
+    field mission_break type="[MissionBreakInfo]::size(1)" {
+        key "5PR2VmH1"
+        doc "The suspend blob for that battle.  Sent up here and handed back at the next login; see MissionBreakInfo."
+    }
+}
+
+json MissionContinueResp {
+    doc "MissionContinue response, sent only for a revival the server accepted (or a repeat of one): the client revives on any ordinary reply.  No response class exists for it, so this carries only the refreshed header -- the gem the revival cost has already left the balance and team_info is the client's only way to see that.  A refused revival gets a GmeErrorCommand::Retry error instead."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key echoed back."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Post-charge header state."
+    }
+}
+
+// MissionRestart (IP96ys7T / 0Zy3G9eD) -- the resume screen's own request.
+//
+// createBody @0x13AABF8 sends one group, Kz7qfSs5, with the serial taken out of
+// MissionBreakInfo and a MissionStatus of 5.  The battle itself is rebuilt from
+// the client's local suspend data, so there is nothing for the reply to carry;
+// MissionRestartScene::checkConnectResult @0x17FEAF8 only looks for an error
+// and offers RETRY_CONTINUE_MISSION when it finds one.
+
+json MissionRestartReq {
+    doc "MissionRestart (IP96ys7T) request -- resume the battle named by the login's MissionBreakInfo."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key request block."
+    }
+
+    field mission_num type="[MissionNumInfo]::size(1)" {
+        key "Kz7qfSs5"
+        doc "The serial being resumed, with MissionStatus 5."
+    }
+}
+
+json MissionRestartResp {
+    doc "MissionRestart response -- an acknowledgement.  Carries the signal key and the header so the resumed battle starts from a current HUD."
+
+    field signalKey type="[SignalKey]::size(1)" {
+        key "6FrKacq7"
+        doc "Signal key echoed back."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "Current header state."
+    }
+}
+
+json MissionNumInfo {
+    doc "Mission serial state required by the battle scene."
+
+    field serial_id type="u32::str" {
+        key "k9cxD7Ba"
+        doc """
+        The BATTLE's serial, not the mission id.  MissionNumResponse::readParam
+        @0x13E39C8 stores it (MissionInfo::setMissionSerialID) and the client
+        only ever echoes it: MissionEnd, MissionContinue and the raid requests
+        send it back, MissionScene::initBattle @0x18040AC seeds BattleState's
+        RNG from it, and the start scenes tag the saved battle files and helper
+        record with it; the mission travels separately
+        (UserState::getLastMissionID).  MissionStart issues a fresh one per
+        battle from 1000000001 up (gimuserver/gme/common/MissionRuns.hpp); a
+        value below that is the mission id an older server sent.
+        """
+    }
+
+    field drop_info type="str" {
+        key "LE6JkUp7"
+        doc """
+        Packed waves: battleOrder|unitDrops|treasureDrops, separated by '@'.
+        Treasure entries split on '-' then '/' @0x1266644:
+        monsterOrder/chestType/params. isMimic @0x12699DC is chestType != 1;
+        the emitter uses 1 for ordinary rewards and 2 for Mimics.
+        Mimic params split on ':' in BattleTreasure::create @0x10E7AAC.
+        [0] is BattleMonsterGroupMst group id. A single token is valid and
+        leaves capture unset. If more than one token is present, the client
+        unconditionally reads [3] unit id, [4] level, [5] type: lengths 2-5
+        are unsafe. Slots [1]/[2] are not read there; [6] is optional extra skill.
+        MonsterParty::entryMimic @0x10C218C enters this group separately from
+        the ordered waves and flags its first monster as a Mimic.
+        Server emits six tokens only on a successful capture roll, otherwise one. Slots 1/2 are authored zero placeholders, unused by this consumer. APPX spawn/warning confirmed; capture still requires client confirmation.
+        """
+    }
+
+    field mission_status type="i32::str" {
+        key "j3g5P4cq"
+        doc "REQUEST ONLY (MissionEnd, createBody @0x13A7998): UserState::getMissionState — 2 when the battle was won.  A Frontier Gate battle ends with MissionEnd win or lose (FrontierGateBattleEndScene), so this is how the server tells a floor cleared from a run lost."
+        optional #true
+    }
+}
+
+json MissionBattleResultInfo {
+    doc "Client-reported mission reward/result values sent when a mission ends."
+
+    field use_item_log type="str" {
+        key "47cJBUxz"
+        doc "Battle item usage log."
+    }
+
+    field zel type="u32::str" {
+        key "Najhr8m6"
+        doc "Zel earned during the mission."
+    }
+
+    field karma type="u32::str" {
+        key "HTVh8a65"
+        doc "Karma earned during the mission."
+    }
+
+    field item_rewards type="str" {
+        key "4T0Q2Bh5"
+        doc "APK BattleRewardList::getItemCsv @0x10DFA24: comma-separated itemId:count. MissionEndRequest sends it under 4T0Q2Bh5 @0x13A7AE4."
+    }
+
+    field unit_rewards type="str" {
+        key "3MAT6quo"
+        doc "APK BattleRewardList::getUnitCsv @0x10DFBA4: comma-separated unitId:level:type, optionally followed by extra skill. MissionEndRequest emits 3MAT6quo @0x13A7B18. Mimic capture attaches BattleDropUnit @0x10C2314; initDead forwards that attachment through BattleItemList::setUnit @0x10FD514. Current Mimic emitter leaves extra skill unset."
+    }
+
+    field battle_crystal_num type="i32::str" {
+        key "hoG2ieT5"
+        doc "Battle crystals that appeared THIS BATTLE -- BattleLog::getBattleCrystalNum.  Archive setBCrystal, trophy 100310 累計バトルクリスタル出現数: CUMULATIVE, so the server sums it."
+    }
+
+    field heart_crystal_num type="i32::str" {
+        key "6PLsn8xo"
+        doc "Heart crystals that appeared THIS BATTLE -- BattleLog::getHeartCrystalNum.  Archive setHCrystal, trophy 100320 累計ハートクリスタル出現数: CUMULATIVE."
+    }
+
+    // ---------------------------------------------------------------------
+    // TROPHY COUNTERS (added 2026-08-24 by the audit campaign).
+    //
+    // These six keys were already on the wire and already modelled on the
+    // parallel MissionEndReqBattleResult struct, which no handler references --
+    // so MissionEnd parsed rXvA1E5y through THIS struct and never saw them.
+    // Verified present with real values in a captured request
+    // (deploy/log/http_log_9TvyNR5H_20260823_165415.log).
+    //
+    // Every one is byte-identical with a UserTeamArchive setter key, and each
+    // comes from BattleLog -- i.e. THIS BATTLE's value, not a running total, so
+    // the server accumulates.  Whether a counter sums or maxes is taken from
+    // its trophy label in deploy/mst/trophy_mst.json, not from its name:
+    // 累計/総合 ("cumulative"/"total") sums, 最大 ("maximum") maxes.
+    // ---------------------------------------------------------------------
+
+    field max_turn_damage type="i32::str" {
+        key "5NRJQ1LU"
+        doc "Highest damage dealt in a single turn THIS BATTLE -- BattleLog::getMaxTurnDamage.  Archive setBattleTurnMaxDamage, trophy 100330 戦闘1ターン最大ダメージ数: a MAXIMUM, so the server keeps the greater of old and new."
+    }
+
+    field max_turn_spark_cnt type="i32::str" {
+        key "XP06YWdT"
+        doc "Highest spark count in a single turn THIS BATTLE -- BattleLog::getMaxTurnSparkCnt.  Archive setBattleTurnMaxSpark, trophy 100340 戦闘1ターン最大スパーク回数: a MAXIMUM."
+    }
+
+    field spark_cnt type="i32::str" {
+        key "U8uZLA34"
+        doc "Sparks this battle -- BattleLog::getSparkCnt.  Archive setBattleSparkCnt, trophy 100350 累計スパーク回数: CUMULATIVE, so the server sums it."
+    }
+
+    field skill_use_cnt type="i32::str" {
+        key "rZQJF5G9"
+        doc "Brave Bursts used this battle -- BattleLog::getSkillUseCnt.  Archive setBattleSkillCnt, trophy 100360 累計BB使用回数: CUMULATIVE."
+    }
+
+    field mimic_cnt type="i32::str" {
+        key "TW1Mrtp5"
+        doc "Mimics that appeared this battle -- BattleLog::getMimicCnt.  Archive setQuestMimicCnt, trophy 200040 総合ミミック出現数: CUMULATIVE."
+    }
+
+    field one_attack_damage type="i32::str" {
+        key "e6BKoYy9"
+        doc "Highest single-unit damage THIS BATTLE -- BattleLog::getOneAttackDamage.  Archive setTurnMaxUnitDamage, trophy 100325 ユニット単体最大ダメージ数: a MAXIMUM."
+    }
+}
+
+
+json MissionRewardInfo {
+    // AUDIT 2026-08-24: readParam @0x13E3C34, dispatch strcmp @0x139285C,
+    // singleton.  19 fields and this KDL matches the map exactly.  Two of them
+    // are UNREAD despite confident docs (wPb5uMR9, 0egM9p7I), and 92ms7J5M is a
+    // structured triple list rather than the "flags" it was documented as.
+    //
+    // getBeforeExp has 4 consumers but NO setter in readParam -- it is derived
+    // client-side.  Do not add it as a field.
+    //
+    // Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    doc "Mission reward values consumed by the result scenes."
+
+    field clear_bonus type="str" {
+        key "92ms7J5M"
+        doc """
+        NOT FLAGS -- a DELIMITED LIST OF TRIPLES, "<type>:<a>:<b>" per element.
+
+        MissionResultBaseScene::getRewardBonusZel @0x18B9780 takes this as a
+        STRING, runs CommonUtils::parseList @0x18B9804, splits each element on
+        ":" @0x18B9850, requires exactly 3 parts @0x18B98A4, StrToInts them and
+        selects on the first field: cmp #3 @0x18B98C8.  Its siblings select
+        different constants -- getRewardBonusKaruma @0x18B9998 uses #0xb, and
+        getRewardBonusSp @0x18B9B80 uses #0x11.
+
+            type 3  = zel
+            type 11 = karma
+            type 17 = summoner SP
+
+        Those are the SAME numbers as the present box's 30Kw4WBa present_type
+        (3 zel, 11 karma, 17 summoner sp) -- a reward-entity enum shared across
+        subsystems.  Do not invent a private one.
+
+        We send this empty, which is correct: getRewardBonusZel early-outs on
+        the length check @0x18B97BC, so no bonus is displayed.
+        """
+    }
+
+    field lvlup_flag type="i32::str" {
+        key "wPb5uMR9"
+        doc "UNREAD.  setLvupFlg @0x13E3D40 stores it and MissionRewardInfo::getLvupFlg has ZERO call sites.  (The previous doc claimed it signalled a player level-up; nothing reads it -- the result screen derives level-up from 81CsGAR9 setBeforeLv instead, which has 14 consumers.)"
+    }
+
+    field before_level type="i32::str" {
+        key "81CsGAR9"
+        doc "Player level BEFORE the mission.  setBeforeLv @0x13E3D6C; 14 consumers, top MissionResultScene::updateEvent and CampaignResultScene::main.  This is what the result screen uses to detect a level-up -- see wPb5uMR9, which is unread."
+    }
+
+    field inc_exp type="i32::str" {
+        key "d96tuT2E"
+        doc "EXP gained by this mission.  setIncExp @0x13E3D98; 7 consumers incl. CampaignResultScene::getRewaedExe."
+    }
+
+    field reinforcement_request_state type="i32::str" {
+        key "0egM9p7I"
+        doc "UNREAD.  setReinReqState @0x13E3DC4 stores it and getReinReqState has ZERO call sites.  (The previous doc claimed it was the friend/reinforcement request state shown after the mission.)"
+    }
+
+    field clear_dungeon_id type="str" {
+        key "4sQ8vBXm"
+        doc """
+        The dungeon this result COMPLETED for the first time, else "".
+        setClearDungeonID @0x13E3E58.  MissionResultFriendRequestScene::
+        changeNextScene @0x18C301C plays that dungeon's end script whenever
+        GameUtils::existDungeonEvent(id, "1") holds (map1-ending.txt on dungeon
+        80), with no once-only check, and GameUtils::getAppearDungeon @0x1196FE4
+        animates DungeonMstList::getNext of it on the dungeon list.  "" is the
+        client's own empty value: GameUtils::deleteAppearDungeon @0x1197188
+        writes it after the animation.  MissionRewardInfo::init leaves the field
+        alone, so an omitted key keeps the PREVIOUS result's id.
+        """
+    }
+
+    field clear_area_id type="str" {
+        key "NgPQbA46"
+        doc """
+        The area of a first clear that OPENED another story area (85 -> Morgan),
+        else "0".  setClearAreaID @0x13E3EFC; read by changeNextScene and
+        CoopRaidResultScene::initialize.  Anything but the one-character "0" --
+        an empty string included -- makes changeNextScene reset UserState's last
+        area (setLastAreaID("")), so the map opens on the new area; "0" is the
+        only neutral value.
+        """
+    }
+
+    field clear_mission_id type="u32::str" {
+        key "mauD5qZ1"
+        doc """
+        The mission this result cleared for the FIRST time, else 0.
+        setClearMissionID @0x13E3FA0; read only by changeNextScene, which
+        offers the Randall presentation for "12" and otherwise PLAYS the
+        mission's end script whenever GameUtils::existMissionEvent(id, "1")
+        holds -- unconditionally, so a repeat clear must not name it.  Mission
+        10's script (map1-dungeon0-1end.txt, the Farm announcement) ends on
+        script op 41 = 0: return point 0, which MissionEventScene::updateEvent
+        maps to HomeScene2.  Sending it on every clear replayed that scene and
+        sent the player Home after each repeat (2026-10-02).  Mission row 0
+        has no script, so 0 is neutral.  With all three ids neutral a story
+        result goes to scene 61, DungeonSelectScene2 (the area's dungeon list).
+        """
+    }
+
+    field reward_units type="str" {
+        key "3MAT6quo"
+        doc "setRewardUnits @0x13E4044; read by MissionResultSummonerDropScene::setUnitList and the MissionResultUnitScene / CoopRaidResultUnitScene ctors."
+    }
+
+    field zel type="u32::str" {
+        key "Najhr8m6"
+        doc "Zel earned from the mission."
+    }
+
+    field karma type="u32::str" {
+        key "HTVh8a65"
+        doc "Karma earned from the mission."
+    }
+
+    field exp_up_type type="str" {
+        key "3vXLQFjt"
+        doc "setExpUpType @0x13E4140; 3 consumers, all MissionResultScene::updateEvent."
+        optional #true
+    }
+
+    field zel_up_type type="str" {
+        key "k6MynZkg"
+        doc "setZelUpType @0x13E41E4; 3 consumers, all MissionResultScene::updateEvent."
+        optional #true
+    }
+
+    field karma_up_type type="str" {
+        key "J1MwgxCL"
+        doc "setKarmaUpType @0x13E4288; 3 consumers, all MissionResultScene::updateEvent."
+        optional #true
+    }
+
+    field guild_exp type="i32::str" {
+        key "b8D18b7e"
+        doc "setExpGuild @0x13E42C4; 5 consumers, MissionResultScene::updateEvent / guildBonusDraw."
+    }
+
+    field guild_karma type="i32::str" {
+        key "7adBa819"
+        doc "setKarmaGuild @0x13E42F0; 7 consumers, MissionResultScene::guildBonusDraw."
+    }
+
+    field guild_zel type="i32::str" {
+        key "gzs3Bw10"
+        doc "setZelGuild @0x13E431C; 7 consumers, MissionResultScene::guildBonusDraw."
+    }
+
+    field event_token type="i32::str" {
+        key "03fFk30f"
+        doc "setEToken @0x13E4348; read by MissionResultScene::scoreDraw."
+    }
+
+    field repeat_clear_bonus type="str" {
+        key "S2ChOKo6"
+        doc "setRepeatClearBonus @0x13E43DC; read by MissionResultRepeatingBonusScene::initialize."
+    }
+}
+
+json BattleGroupMst {
+    doc """
+    This represent a single stage of the dungeon.
+
+    It references a battle monster group ID, which
+    points to a collection of all battle monster
+    groups assigned to this specific stage.
+    """
+
+    field battle_group_id type="u32::str" {
+        key "ZSf8e1MG"
+        doc "Transient battle group id."
+    }
+
+    field battle_monster_group_id type="u32::str" {
+        key "Qzhp8B40"
+        doc "Transient battle monster group id referenced by this stage."
+    }
+
+    field mission_id type="u32::str" {
+        key "j28VNcUW"
+        doc "Mission id that owns this battle group."
+    }
+
+    field battle_order type="u32::str" {
+        key "VETu07N6"
+        doc "One-based order of this stage within the mission."
+    }
+
+    field first_attack_rate type="u32::str" {
+        key "5aetPz3C"
+        doc "Chance that monsters in this battle group attack before the player."
+    }
+
+    field boss_flag type="bool::str" {
+        key "etM5TCb9"
+        doc "Whether this battle group is the boss stage."
+    }
+}
+
+json BattleMonsterGroupMst {
+    doc """
+    Describes a single monster within a single stage.
+    """
+
+    field battle_monster_group_id type="u32::str" {
+        key "Qzhp8B40"
+        doc "Transient battle monster group id."
+    }
+
+    field monster_id type="u32::str" {
+        key "o49dYfpH"
+        doc "Monster id referenced by this placement row."
+    }
+
+    field group_order type="u32::str" {
+        key "hZtF1s8B"
+        doc "Zero-based order of this monster within the group."
+    }
+
+    field position type=str {
+        key "3g8PW6x0"
+        doc "Battlefield position formatted as x:y."
+    }
+
+    field unit_drop type=str {
+        key "hw3L0uVj"
+        doc "Encoded unit drop data for this monster."
+    }
+}
+
+json MonsterMst {
+    doc "Describes the mechanics of a single monster."
+
+    field monster_id type="u32::str" {
+        key "o49dYfpH"
+        doc "Monster id."
+    }
+
+    field base_name type=str {
+        key "3evIn0zZ"
+        doc "Base display name for this mission-local monster."
+    }
+
+    field hp type="u32::str" {
+        key "e7DK0FQT"
+        doc "Monster hp for this mission."
+    }
+
+    field atk type="u32::str" {
+        key "67CApcti"
+        doc "Monster atk for this mission."
+    }
+
+    field def type="u32::str" {
+        key "q08xLEsy"
+        doc "Monster def for this mission."
+    }
+
+    field element type="u32::str" {
+        key "iNy0ZU5M"
+        doc "Monster element id."
+    }
+
+    field effect_frame type=str {
+        key "eyUo6a8c"
+        doc "Effect frame data."
+    }
+
+    field damage_frame type=str {
+        key "6Aou5M9r"
+        doc "Damage frame data."
+    }
+
+    field drop_check_count type="u32::str" {
+        key "n9h7p02P"
+        doc "Drop check count."
+    }
+
+    field exp type="u32::str" {
+        key "d96tuT2E"
+        doc """
+        EXP this monster contributes.  setExp @MonsterMstResponse::readParam
+        0x13E548C (arm64 libgame.so).  Optional because the LIVE SERVER NEVER
+        SENT IT: the captured mission-10 rows in deploy/log carry 37 keys and
+        this is one of the two the client reads but the server omitted.  Left
+        nullopt so Glaze drops it from the wire and we keep matching the
+        capture byte for byte; set it only if a future capture shows otherwise.
+        Setter takes int; typed u32 like its sibling counters since EXP is
+        never negative.
+        """
+        optional #true
+    }
+
+    field amount type="u32::str" {
+        key "Rs7bCE3t"
+        doc """
+        setAmount @0x13E54B8.  Semantics unconfirmed — no live row ever carried
+        it.  Optional for the same reason as `exp` above.  NOTE the hash is
+        overloaded (Rule Zero, handbook 6.3): the same `Rs7bCE3t` is `zel` on
+        MissionMst and a ticket count on SummonTicketV2UserInfo.
+        """
+        optional #true
+    }
+
+    field img_a type=str {
+        key "2EF0d6ue"
+        doc """
+        Sprite-sheet FILENAME for a monster with no backing unit, e.g.
+        "monster_anime_0001.png" (the Juggernaut).  setImgA @0x13E554C.
+
+        This is half of how a non-obtainable boss is drawn.  GameUtils::
+        getMonsterAnmImage @0x117DB00 asks UnitMstList for this row's unit_id:
+        when it RESOLVES the client derives "unit_anime_<unit_id>.png" and
+        ignores this field; when it MISSES it returns this string verbatim and
+        GameScene::requestMonsterFiles @0x160F648 fetches it from /monster/img/
+        instead of /unit/img/.  So a special boss is not a flag — it is a
+        monster whose unit_id deliberately fails to resolve, plus these
+        filenames.
+
+        Empty on every one of the 168 captured live rows (all ordinary
+        re-skinned units).  Corroborated by F_RAID_BOSS_PARTS_MST, which
+        carries this same hash filled with "monster_anime_raid02.png".
+        """
+    }
+
+    field anm_cgg type=str {
+        key "QqfI9mM4"
+        doc """
+        Frame-geometry FILENAME, e.g. "monster_cgg_0001.csv".  setAnmCgg
+        @0x13E55F0.  Same branch as `img_a`: GameUtils::getMonsterCgg
+        @0x1EAFBF8 returns UnitMst::getAnmCgg() when the unit resolves and this
+        string when it does not.  Empty on all live rows.
+        """
+    }
+
+    field unit_id type="u32::str" {
+        key "pn16CNah"
+        doc "Unit id backing this monster's stable client MST data."
+    }
+
+    field description type=str {
+        key "qp37xTDh"
+        doc """
+        Localisation KEY, not display text — MonsterMst::getDescription
+        @0x1334A0C runs it through TextManager::getText.  setDescription
+        @0x13E5738.  Empty on all live rows.
+        """
+    }
+
+    field move_speed type="i32::str" {
+        key "J2hPXGo5"
+        doc "Monster movement speed."
+    }
+
+    field attack_move_type type="i32::str" {
+        key "mv4o39Uz"
+        doc "Monster attack movement type."
+    }
+
+    field back_move_type type="i32::str" {
+        key "h2L1YI90"
+        doc "Monster return movement type."
+    }
+
+    field ai_id type="u32::str" {
+        key "i74vGUFa"
+        doc "AI id used by this monster."
+    }
+
+    field after_image type="i32::str" {
+        key "D4Y5bWK7"
+        doc "After-image flag/value."
+    }
+
+    field max_act_count type="u32::str" {
+        key "oMGC3hW0"
+        doc "Maximum action count per turn."
+    }
+
+    field min_act_count type="u32::str" {
+        key "m4EK7Gt6"
+        doc "Minimum action count per turn."
+    }
+
+    field act_rate type="f32::str" {
+        key "6fwL59FT"
+        doc """
+        Action-rate percent.  setActRate @0x13E5920 takes a float — the only
+        float on this class, hence f32::str like AIMst.percent.  Every live row
+        carries "100"; MissionArchiver seeds that default.
+        """
+    }
+
+    field monster_skill_id type=str {
+        key "F4bQ7r8C"
+        doc """
+        The monster's skill list, packed.  setMonsterSkillID @0x13E59B4.  Empty
+        on every live row because mission-10 enemies have no skills.
+
+        FORMAT — decoded from the parser, BattleUnit::setUnitSkill(MonsterMst*)
+        @0x1120CF0:  `<skillId>[:<showName>]` entries joined by `@`.  The two
+        separators are SSO strings built from immediates in that function
+        (#0x4002 -> '@' @0x1120CFC, #0x3a02 -> ':' @0x1120DA8); an entry with
+        no second element is legal and means showName 0 (`cmp x8,#2 / b.lo`
+        @0x1120E70).  The second element ends up in
+        BattleUnitSkill::setSkillNameDispFlg as `!= 0`.
+
+        ⚠ THE ID JOINS TO THE ORDINARY SKILL TABLE, NOT A MONSTER ONE.
+        BattleUnit::setSkillParam @0x1120684 resolves it through
+        UnitSkillMstList and UnitSkillLevelMstList — deploy/mst/skill_mst.json,
+        33 381 rows, the table player units already use.  No new master data
+        is needed, BUT a skill whose row has ToZj4zyn "0" (every monster-only
+        skill) is gone from the client's list by the time a battle loads (see
+        MissionStartResp.battle_skills), so MissionStart must re-send its row;
+        MissionArchiver does that for every authored skill.
+
+        // CORRECTION.  This field previously read "joins this monster to a
+        // MonsterSkillMst row ... the block it points at is NOT YET EMITTED".
+        // That block (m9Ada1PN) is DEAD, not missing: MonsterSkillMstList has
+        // exactly one reader, GameUtils::getMonsterCutinImage @0x117DCC4, and
+        // that function has ZERO callers anywhere in libgame.so.  Emitting it
+        // would feed nothing.  See archive/mission.kdl MonsterSkill, which
+        // records the full 15-key layout so the finding is not lost.
+
+        ⚠ Skill LEVEL is not settable.  setSkillParam takes
+        MonsterMst::getSkillLevel() as its level, and setSkillLevel @0x1334D48
+        has zero callers — no response sets it — so every monster in the game
+        uses the constructor's default.
+        """
+    }
+
+    field skill_move_type type="i32::str" {
+        key "XE7Yi5c3"
+        doc "Skill movement type."
+    }
+
+    field bad_state_resists type=str {
+        key "CEeqs63b"
+        doc """
+        Ailment resistances, six colon-separated percentages ("0:0:0:0:0:0" on
+        every live row).  setBadStateResists @0x13E5A84.  BattleUnit stores the
+        string verbatim (initializeBaseStatus @0x10F0B00 assigns it) and indexes
+        it when an ailment lands.
+
+        Authored per monster through archive/mission.kdl's AilmentResists
+        object, which names the six slots so the order lives in one place.
+
+        THE SIX AILMENTS ARE CERTAIN: the client ships exactly six
+        (DESC_BADSTATE_POISON / _WEAK / _SICK / _INJURY / _CURSE / _PARA).
+        The slot ORDER is binary-confirmed: BattleUnit::judgeBadCondition
+        @0x1101310 reads slot [ailment id - 1], and the ids are poison 1,
+        weakness 2, sick 3, injury 4, curse 5, paralysis 6 (searchAiTarget's
+        ailment search terms).
+        """
+    }
+
+    field max_zel_drop type="u32::str" {
+        key "Najhr8m6"
+        doc "Maximum zel dropped by this monster."
+    }
+
+    field zel_drop_count type="u32::str" {
+        key "9FN0GAei"
+        doc "Number of zel drop rolls."
+    }
+
+    field max_karma_drop type="u32::str" {
+        key "HTVh8a65"
+        doc "Maximum karma dropped by this monster."
+    }
+
+    field karma_drop_count type="u32::str" {
+        key "vNk2sI4X"
+        doc "Number of karma drop rolls."
+    }
+
+    field hp_disp_pos type=str {
+        key "3BpHN6VD"
+        doc """
+        HP-bar offset, "x,y".  setHpDispPos @0x13E5BD8.  Empty on live rows,
+        where every enemy is unit-sized; a boss sprite is several times larger
+        and is expected to need a real value here.
+        """
+    }
+
+    field passive_process_id type=str {
+        key "hjAy9St3"
+        doc "setPassiveProcessID @0x13E5C7C.  Empty on all live rows."
+    }
+
+    field passive_process_param type=str {
+        key "2Smu5Mtq"
+        doc "setPassiveProcessParam @0x13E5D20.  Empty on all live rows."
+    }
+
+    field move_offset type=str {
+        key "CYk84E3W"
+        doc """
+        Movement offset, "x,y".  setMoveOffset @0x13E5DC4.  Every live row
+        carries "0,0"; MissionArchiver seeds that default.
+        """
+    }
+
+    field debuff_resist type=str {
+        key "Y6bd4fXp"
+        doc """
+        Debuff resistances, three comma-separated values.  setDebuffResist
+        @0x13E5E68.  Every live row carries "0,0,0"; MissionArchiver seeds that
+        default.  Slot order UNVERIFIED for the same reason as
+        `bad_state_resists`.
+        """
+    }
+
+    field damage_resist type=str {
+        key "jm6JSK2D"
+        doc "setDamageResist @0x13E5F0C.  Empty on all live rows."
+    }
+
+    field wait type="i32::str" {
+        key "9pXSKmn1"
+        doc "Wait value."
+    }
+
+    field cursor_disp_pos type=str {
+        key "Lkh6gYkT"
+        doc "Cursor display position."
+    }
+}
+
+json MonsterCgsMst {
+    doc """
+    Per-animation-state sprite sheet for a monster that has NO backing unit.
+
+    Wire block `8hoyIF9Q` -> MonsterCgsMstResponse::readParam @0x13E4E20
+    (arm64 libgame.so), 3 keys, list is a FULL REPLACE via
+    MonsterCgsMstList::removeAllObjects.
+
+    This is the third piece of a non-obtainable boss, alongside MonsterMst's
+    `img_a` and `anm_cgg`.  GameUtils::getMonsterCgs @0x1EAFD74 resolves an
+    animation the same way the image does, but the two halves read DIFFERENT
+    tables:
+
+      unit_id resolves  -> UnitCgsMstList::getObject(unit_id, cgs_type)
+      unit_id misses    -> MonsterCgsMstList::getObject(MONSTER id, cgs_type)
+
+    Note the key change: this table is keyed on the MONSTER id, not the unit
+    id.  MonsterCgsMstList stores rows under "<monster_id>&<cgs_type>"
+    (@0x1333600).  With no row the getter returns an empty string and the
+    boss renders but never animates.
+
+    GameScene::requestMonsterFiles @0x160F648 asks for cgs_type 1, 2, 3 and 4
+    on every monster, so a complete boss wants up to four rows.
+    """
+
+    field monster_id type="u32::str" {
+        key "o49dYfpH"
+        doc "Monster id this animation belongs to.  setMonsterID bl@0x13E4F10."
+    }
+
+    field cgs_type type="u32::str" {
+        key "fpc3rbs7"
+        doc """
+        Animation state.  setCgsType bl@0x13E4F4C.  The four values the client
+        requests are hard-coded in requestMonsterFiles as immediates 1..4
+        (mov w1,#1 @0x160FD2C; #2 @0x160FDF4; #3 @0x160FEBC; #4 @0x160FF84).
+
+        Their meaning comes from the unit-side sibling table, whose single
+        packed column spells the mapping out — every F_UNIT_CGS_MST row reads
+        "1:unit_idle_cgs_N.csv|2:unit_move_cgs_N.csv|3:unit_atk_cgs_N.csv|
+        4:unit_atk_cgs_N.csv":
+
+          1 = idle    2 = move    3 = attack    4 = skill (reuses attack)
+
+        Most special monsters ship only idle and attack art (110 idle csvs and
+        110 atk csvs against 9 move csvs under content/monster/cgs), so type 2
+        is usually omitted and types 3 and 4 point at the same file.
+        """
+    }
+
+    field anm_cgs type=str {
+        key "0QxL2is7"
+        doc """
+        Animation FILENAME, read verbatim and fetched from /monster/cgs/, e.g.
+        "monster_idle_cgs_0001.csv" for the Juggernaut.  setAnmCgs
+        bl@0x13E4FE0.
+
+        Same hash and same literal-filename usage in two live tables we have
+        decoded — F_RAID_BOSS_PARTS_MST ("monster_idle_cgs_raid02.csv") and
+        F_MINIGAME_SMASH_MONSTER_MST ("unit_idle_cgs_10130.csv") — which is
+        where the field semantics are confirmed from production data rather
+        than inferred.
+        """
+    }
+}
+
+json AIMst {
+    doc "Client AI MST action row."
+
+    field ai_id type="u32::str" {
+        key "4eEVw5hL"
+        doc "AI id referenced by MonsterMst."
+    }
+
+    field priority type="u32::str" {
+        key "yu18xScw"
+        doc "Priority/order of this AI action."
+    }
+
+    field name type=str {
+        key "L8PCsu0K"
+        doc "FICTIONAL -- absent from BOTH client binaries (raw byte search over arm64 libgame.so and x86 BraveFrontier.Windows.exe).  AIMstResponse::readParam reads 7 keys and this is not one of them.  Inert; left in place like the other eight dead keys."
+    }
+
+    field conditions type=str {
+        key "q7Nit8JW"
+        doc "Encoded party and self condition string parsed by AIMst."
+    }
+
+    field act_target type="u32::str" {
+        key "4xctV8gF"
+        doc "Target pool before applying search_term."
+    }
+
+    field search_term type=str {
+        key "VBj9u0ot"
+        doc "Client target search term."
+    }
+
+    field action type=str {
+        key "Hhgi79M1"
+        doc "Encoded AI action command."
+    }
+
+    field percent type="f32::str" {
+        key "ug9xV4Fz"
+        doc "Chance percent for this AI action."
+    }
+}

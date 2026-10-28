@@ -1,0 +1,237 @@
+json PermitPlace {
+    doc """
+    The Grand Gaia progression gate -- what the player may enter.  readParam
+    @0x13E8E28, dispatch strcmp @0x1392A00, clears its slice with
+    removeNormalObjects @0x126C9B0.  11 keys.
+
+    ⚠ DELIBERATELY A STUB -- do not "fix" this into a flat struct.
+
+    The five entity-id keys are MUTUALLY EXCLUSIVE DISCRIMINATED VARIANTS, not
+    five fields.  Each calls setType with its OWN constant and then setPlaceID,
+    so the key that is present IS the entity kind:
+
+        VjCY7rX4 -> type 1  Area     (isArea     @0x126B494 cmp #1)
+        MHx05sXt -> type 2  Dungeon  (isDungeon  @0x126B4A4 cmp #2)
+        j28VNcUW -> type 3  Mission  (isMission  @0x126B4B4 cmp #3)
+        9C64Qwe0 -> type 4  Land     (isLand     @0x126B484 cmp #4)
+        0Cq2AlXW -> type 5  Gate     (isGate     @0x126B474 cmp #5)
+
+    readParam is called once per (row, field), so an object carrying all five
+    would fire setType/setPlaceID five times and THE LAST KEY WOULD WIN.  One
+    entry = exactly one id key.  That is why gimuserver/gme/common/PermitPlace.cpp
+    hand-assembles this block as raw JSON and splices it over a "yXNM8kL3":[]
+    placeholder instead of serializing a struct.
+
+    The six non-id keys, all optional:
+        qY49LBjw setTimeLimit    -- DEFAULTS TO 0, and getRemainingTime
+                                    @0x126B548 returns -1 when < 1, so 0 reads as
+                                    PERMANENT.  ⚠ OPPOSITE POLARITY to
+                                    PermitRecipeInfo::getRemainingTime @0x126D4CC,
+                                    where 0 means EXPIRED.
+        C1vG0iKh setEnterableFlg -- DEFAULTS TO TRUE (ctor mov w8,#1; strb
+                                    [x19,#0x78] @0x126B3BC).  Sending "0" LOCKS
+                                    the place; isEnterable @0x126B660 has 35
+                                    consumers incl. two isLockDungeon predicates.
+                                    ⚠ NEVER lock a KEY-GATED dungeon (a Vortex
+                                    parade) to mean "closed".  In
+                                    AreaSPSelectScene::touchEnded a locked
+                                    dungeon goes to MissionFlgConfirmScene
+                                    (+0x848, "Opening Conditions" — it lists
+                                    need_mission_id quests only) BEFORE the key
+                                    branch at +0xa1c, which reads
+                                    getRemainingTime (+0xa68): >= 1 enters, < 1
+                                    opens the key prompt (+0xce8).  A closed
+                                    parade is enterable with no qY49LBjw.
+        s2gM3deu setPeriodText, nA95Bdj6 setQuestBonusType,
+        5Z1LNoyH setQuestBonusRate (StrToFloat), 5ry19G4Y setQuestBonusTimeLimit
+                                 -- campaign bonus display; we send none, and 0 /
+                                    empty correctly reads as "no bonus".
+
+    No accumulation despite re-sending all ~812 entries per UserInfo: readParam
+    does removeObject(getType(), getPlaceID()) @0x13E9478 per row before
+    addObject, on top of the category sweep.
+
+    Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    """
+
+    field mock type="str" {
+      key "INVALID"
+      doc "Placeholder so the struct parses.  Nothing populates it -- see the struct doc: this block is hand-assembled in common/PermitPlace.cpp because its entries are discriminated variants."
+    }
+}
+
+json PermitPlaceML {
+    doc """
+    The ML slice of the same shared PermitPlaceInfoList.  readParam
+    @0x1C6BC54, dispatch strcmp @0x1396C68, clears with removeMLObjects.
+    11 keys, same type constants as PermitPlace.
+
+    ⚠ DELIBERATELY A STUB -- do not "fix" this into a flat struct.
+
+    The five entity-id keys are MUTUALLY EXCLUSIVE DISCRIMINATED VARIANTS, not
+    five fields.  Each calls setType with its OWN constant and then setPlaceID,
+    so the key that is present IS the entity kind:
+
+        VjCY7rX4 -> type 1  Area     (isArea     @0x126B494 cmp #1)
+        MHx05sXt -> type 2  Dungeon  (isDungeon  @0x126B4A4 cmp #2)
+        j28VNcUW -> type 3  Mission  (isMission  @0x126B4B4 cmp #3)
+        9C64Qwe0 -> type 4  Land     (isLand     @0x126B484 cmp #4)
+        0Cq2AlXW -> type 5  Gate     (isGate     @0x126B474 cmp #5)
+
+    readParam is called once per (row, field), so an object carrying all five
+    would fire setType/setPlaceID five times and THE LAST KEY WOULD WIN.  One
+    entry = exactly one id key. This slice currently emits no rows.
+    common/PermitPlace.cpp builds only the normal yXNM8kL3 slice; adding this
+    slice requires its own complete snapshot under the correct outer key.
+
+    The six non-id keys, all optional:
+        qY49LBjw setTimeLimit    -- DEFAULTS TO 0, and getRemainingTime
+                                    @0x126B548 returns -1 when < 1, so 0 reads as
+                                    PERMANENT.  ⚠ OPPOSITE POLARITY to
+                                    PermitRecipeInfo::getRemainingTime @0x126D4CC,
+                                    where 0 means EXPIRED.
+        C1vG0iKh setEnterableFlg -- DEFAULTS TO TRUE (ctor mov w8,#1; strb
+                                    [x19,#0x78] @0x126B3BC).  Sending "0" LOCKS
+                                    the place; isEnterable @0x126B660 has 35
+                                    consumers incl. two isLockDungeon predicates.
+        s2gM3deu setPeriodText, nA95Bdj6 setQuestBonusType,
+        5Z1LNoyH setQuestBonusRate (StrToFloat), 5ry19G4Y setQuestBonusTimeLimit
+                                 -- campaign bonus display; we send none, and 0 /
+                                    empty correctly reads as "no bonus".
+
+    No accumulation despite re-sending all ~812 entries per UserInfo: readParam
+    does removeObject(getType(), getPlaceID()) @0x13E9478 per row before
+    addObject, on top of the category sweep.
+
+    Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    """
+
+    field mock type="str" {
+      key "INVALID"
+      doc "Placeholder so the struct parses. Nothing currently populates this slice; its entries must be discriminated variants."
+    }
+}
+
+json PermitPlaceSP {
+    doc """
+    The SPECIAL (Vortex / Frontier Gate) slice of the same shared
+    PermitPlaceInfoList.  readParam @0x13E9538, dispatch strcmp @0x1392A24,
+    clears with removeSpecialObjects.  10 keys -- it has NO 0Cq2AlXW (Gate).
+
+    ⚠ AND IT REINTERPRETS ONE KEY: 9C64Qwe0 sets type 1 (Area) here
+    @0x13E95B4, not type 4 (Land) as on PermitPlace and PermitPlaceML.
+    Same key, three classes, two meanings.
+
+    ⚠ DELIBERATELY A STUB -- do not "fix" this into a flat struct.
+
+    The five entity-id keys are MUTUALLY EXCLUSIVE DISCRIMINATED VARIANTS, not
+    five fields.  Each calls setType with its OWN constant and then setPlaceID,
+    so the key that is present IS the entity kind:
+
+        VjCY7rX4 -> type 1  Area     (isArea     @0x126B494 cmp #1)
+        MHx05sXt -> type 2  Dungeon  (isDungeon  @0x126B4A4 cmp #2)
+        j28VNcUW -> type 3  Mission  (isMission  @0x126B4B4 cmp #3)
+        9C64Qwe0 -> type 4  Land     (isLand     @0x126B484 cmp #4)
+        0Cq2AlXW -> type 5  Gate     (isGate     @0x126B474 cmp #5)
+
+    readParam is called once per (row, field), so an object carrying all five
+    would fire setType/setPlaceID five times and THE LAST KEY WOULD WIN.  One
+    entry = exactly one id key. This slice currently emits no rows.
+    common/PermitPlace.cpp builds only the normal yXNM8kL3 slice; adding this
+    slice requires its own complete snapshot under the correct outer key.
+
+    The six non-id keys, all optional:
+        qY49LBjw setTimeLimit    -- DEFAULTS TO 0, and getRemainingTime
+                                    @0x126B548 returns -1 when < 1, so 0 reads as
+                                    PERMANENT.  ⚠ OPPOSITE POLARITY to
+                                    PermitRecipeInfo::getRemainingTime @0x126D4CC,
+                                    where 0 means EXPIRED.
+        C1vG0iKh setEnterableFlg -- DEFAULTS TO TRUE (ctor mov w8,#1; strb
+                                    [x19,#0x78] @0x126B3BC).  Sending "0" LOCKS
+                                    the place; isEnterable @0x126B660 has 35
+                                    consumers incl. two isLockDungeon predicates.
+        s2gM3deu setPeriodText, nA95Bdj6 setQuestBonusType,
+        5Z1LNoyH setQuestBonusRate (StrToFloat), 5ry19G4Y setQuestBonusTimeLimit
+                                 -- campaign bonus display; we send none, and 0 /
+                                    empty correctly reads as "no bonus".
+
+    No accumulation despite re-sending all ~812 entries per UserInfo: readParam
+    does removeObject(getType(), getPlaceID()) @0x13E9478 per row before
+    addObject, on top of the category sweep.
+
+    Full audit: tools/SERVER_COMPONENT_AUDIT.md.
+    """
+
+    field mock type="str" {
+      key "INVALID"
+      doc "Placeholder so the struct parses. Nothing currently populates this slice; its entries must be discriminated variants."
+    }
+}
+
+json PermitReceipe {
+  doc """
+  One synthesis recipe the player is allowed to craft.  Emitted in UserInfo
+  under 51yQrDBR (PermitRecipeResponse).
+
+  This list IS the synthesis menu.  MyTownItemListScene::setRecipeList
+  (0x18E9434) and its sphere twin walk PermitRecipeInfoList — never
+  RecipeMstList — and resolve each permitted id against the recipe master, so a
+  missing 51yQrDBR renders an empty Synthesis facility.  The server derives the
+  set from the player's town facility levels via TownFacilityLvMst.release_recipe.
+
+  Setters are PermitRecipeInfo::set* (libgame.so 0x126D388..0x126D50C).
+  """
+
+  field recipe_id type="i32::str" {
+    key "4HqhTf3a"
+    doc """
+    The JOIN KEY.  readParam feeds setRecipeID(string) @0x13E9C60;
+    PermitRecipeInfoList::getObjectWithRecipeID @0x126D840 matches it against
+    RecipeMst::getRecipeID.  Also read by MyTownItemListScene::setRecipeList
+    @0x18E957C / downloadFiles @0x18E8C5C, MyTownSphereListScene::setFilterRecipeList
+    @0x1906530, ItemMixScene::getRecipeList @0x1704F9C, and the NEW-badge flags
+    BadgeInfo::newFlagItemRecipe @0x11F1FA8 / newFlagSphereRecipe @0x11F2384 /
+    newFlagLSSphereRecipe @0x11F262C / newFlagRaidItem @0x11F31BC.
+    """
+  }
+
+  field craft_count type="i32::str" {
+    key "H6k1LIxC"
+    doc """
+    Crafts ALREADY PERFORMED — a tally, not a cap.  Confirmed by arithmetic,
+    not by the setter name:
+
+      * GameUtils::isMixSphereCnt @0x1177604 returns RecipeMst.vtbl[0x28]() >
+        getCnt() — the MST holds the cap, this holds the count.
+      * GameUtils::updatePermitRecipe @0x1177C8C does setCnt(getCnt() + 1)
+        after each craft, so the server reports the persisted total.
+      * MyTownItemListScene::setRecipeList @0x18E96C0 HIDES the recipe once
+        cap <= getCnt().
+
+    Two edge cases in isMixSphereCnt: a cap of -1 means unlimited @0x117761C,
+    and NO PermitRecipeInfo row at all returns 0 = uncraftable @0x1177614 —
+    which is why a missing 51yQrDBR renders an empty Synthesis facility.
+    """
+  }
+
+  field available_seconds type="i32::str" {
+    key "VDKB0Y5h"
+    doc """
+    SECONDS REMAINING in this recipe's availability window, not a craft cap.
+    setLimit @0x126D4A4 stores the value and stamps CommonUtils::getNowUnitxTime();
+    getRemainingTime @0x126D4CC returns -1 unchanged when negative @0x126D4FC,
+    otherwise max(0, limit - elapsed) @0x126D4F4.
+
+    -1 means "permanent" and is what the timeless recipes need
+    (ReceipeMst.availability_end is 9999-12-31 for those).  SENDING 0 HIDES
+    EVERY RECIPE: MyTownItemListScene::setRecipeList discriminates the two
+    explicitly — == -1 keeps the row @0x18E96CC, then < 1 skips it @0x18E96E0.
+    Same epoch-zero trap as handbook 6.12.
+
+    RecipeListBaseScene::setItemLimitTime @0x18FD1A8 draws the countdown label
+    only when >= 1.  The raw accessor getLimit @0x126D49C has ZERO call sites —
+    the value reaches the UI only through getRemainingTime.
+    """
+  }
+
+}

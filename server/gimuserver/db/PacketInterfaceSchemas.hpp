@@ -1,0 +1,496 @@
+#pragma once
+
+#include "PacketInterface.hpp"
+
+namespace db
+{
+
+/*!
+* Database mapping for login/user identity fields stored in user_info.
+*/
+template <>
+inline PacketInterfaceFor<::LoginInfoResp>::Fields
+PacketInterfaceFor<::LoginInfoResp>::fields()
+{
+	return {
+		field<&::LoginInfoResp::user_id>("id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::LoginInfoResp::gumi_live_userid>("gumi_user_id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::LoginInfoResp::handle_name>("username", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::LoginInfoResp::tutorial_status>("tutorial_status", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// sv6BEI8X — reported by the client in every login envelope, stored by
+		// TutorialUpdate, echoed back here.  Was derived from tutorial_status
+		// until 14082026_AddTutorialEndFlag; see that migration for why the
+		// threshold was wrong.
+		field<&::LoginInfoResp::tutorial_end_flag>("tutorial_end_flag", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// nrg19RGe -- bumped by each account transfer onto this user
+		// (gme/handlers/Transfer.cpp).  The client only echoes it back, so
+		// this is bookkeeping; the column has a default, hence read-only.
+		field<&::LoginInfoResp::model_change_count>("model_change_count", {
+			.read = true,
+		}),
+		// The two scenario markers (9yVsu21R special_scenario_info, N4XVE1uA
+		// scenario_info) are OPTIONAL members now and are filled by
+		// gme::getLoginInfo itself: only the login replies may carry them (see
+		// gme::omitClientScenarioMarkers), and this mapping has no optional
+		// support.
+	};
+}
+
+/*!
+* Database mapping for team/account summary fields stored in user_info.
+*/
+template <>
+inline PacketInterfaceFor<::UserTeamInfo>::Fields
+PacketInterfaceFor<::UserTeamInfo>::fields()
+{
+	return {
+		field<&::UserTeamInfo::user_id>("id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::level>("level", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::exp>("exp", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::energy>("energy", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// Fight points.  Mapped as the Hunter Orbs, but ShopHelFightScene shows
+		// they are the ARENA Orbs (SHOP_HEL_FIGHT_TITLE "Arena Orbs", restored
+		// by ShopUse type 4); the Hunter Orbs are ChallengeHeaderInfo Aube,
+		// which ChallengeBase feeds.
+		field<&::UserTeamInfo::fight_point>("fight_point", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::max_fight_point>("max_fight_point", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::max_unit_count>("max_unit_count", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::warehouse_count>("max_warehouse_count", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::active_deck>("active_deck", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// Read-only: DeckEdit writes the column directly.  Without it the
+		// client's arena deck choice reset to deck 0 on every login.
+		field<&::UserTeamInfo::arena_deck_num>("active_arena_deck", {
+			.read = true,
+		}),
+		field<&::UserTeamInfo::zel>("zel", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::karma>("karma", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// The client's gem HUD reads brave_coin (03UGMHxF), so dev wires the gems
+		// column here on purpose (the "BraveCoin" readParam setter name is a red
+		// herring for this client). Do NOT point this at a real brave_coin column
+		// — that zeroed the HUD and broke gems. Kept mapped to `gems` with
+		// paid_gems/free_gems so every gem field the client might read shows gems.
+		field<&::UserTeamInfo::brave_coin>("gems", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::friend_point>("friend_points", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserTeamInfo::summon_ticket>("summon_tickets", {
+			.read = true,
+		}),
+		field<&::UserTeamInfo::rainbow_coin>("rainbow_coins", {
+			.read = true,
+		}),
+		field<&::UserTeamInfo::colosseum_ticket>("colosseum_tickets", {
+			.read = true,
+		}),
+		field<&::UserTeamInfo::brave_points_total>("total_brave_points", {
+			.read = true,
+		}),
+		field<&::UserTeamInfo::current_brave_points>("avail_brave_points", {
+			.read = true,
+		}),
+		field<&::UserTeamInfo::want_gift>("want_gift", {
+			.read = true,
+		}),
+		// ONE WALLET, ONE FIELD.  `gems` used to be mirrored into BOTH
+		// free_gems and paid_gems, on the reasoning that the HUD reads free and
+		// the summon path reads paid.  Half of that was wrong and the result
+		// double-counted: `UserTeamInfo::getTotalGems` @0x12AC62C SUMS the two,
+		// so the Gem Balance screen showed Bonus 4713 + Paid 4713 = 9426 for a
+		// player holding 4713.
+		//
+		// Neither field is a spend path.  getPaidGems and getFreeGems have
+		// three call sites between them — createExpWindow and
+		// UserPiadFreeGemsInfoScene, both DISPLAY.  The real wallet is
+		// brave_coin (03UGMHxF) above, whose getter has 132 call sites and is
+		// what every purchase, revive, heal and summon actually reads.
+		//
+		// So the balance goes entirely to FREE, which is also what it honestly
+		// is: no money changes hands on this server, so every gem is a bonus
+		// gem and Paid is 0.  Total then agrees with the HUD.
+		field<&::UserTeamInfo::free_gems>("gems", {
+			.read = true,
+		}),
+	};
+}
+
+/*!
+* Database mapping for player-owned units stored in user_units.
+*/
+template <>
+inline PacketInterfaceFor<::UserUnitInfo>::Fields
+PacketInterfaceFor<::UserUnitInfo>::fields()
+{
+	return {
+		field<&::UserUnitInfo::user_unit_id>("user_unit_id", {
+			.read = true,
+		}),
+		field<&::UserUnitInfo::received_order>("user_unit_id", {
+			.read = true,
+		}),
+		field<&::UserUnitInfo::user_id>("user_id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::unit_id>("unit_id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::unit_type_id>("unit_type_id", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::unit_lvl>("unit_lvl", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::base_hp>("base_hp", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::base_atk>("base_atk", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::base_def>("base_def", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// base_rec is INTEGER NOT NULL with NO default, so the INSERT must keep
+		// providing it (INSERT OR IGNORE silently drops the row otherwise). Read
+		// stays on the canonical column; addUserUnit writes it.
+		field<&::UserUnitInfo::base_rec>("base_rec", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::ext_hp>("ext_hp", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::ext_atk>("ext_atk", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::ext_def>("ext_def", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::ext_rec>("ext_rec", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::bb_id>("bb_id", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::bb_lvl>("bb_lvl", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::sbb_id>("sbb_id", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::sbb_lvl>("sbb_lvl", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// Extras the read/display path was missing — mapped to the quests mirror
+		// columns the unit handlers write, so units keep full stats/level/element
+		// across a UserInfo reload (previously lost to column defaults).
+		field<&::UserUnitInfo::exp>("exp", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::total_exp>("total_exp", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::add_hp>("add_hp", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::add_atk>("add_atk", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::add_def>("add_def", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::add_rec>("add_rec", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::limit_over_hp>("limit_over_hp", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::limit_over_atk>("limit_over_atk", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::limit_over_def>("limit_over_def", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::limit_over_rec>("limit_over_rec", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::element>("element", { .read = true, .update = true, .insert = true, }),
+		// ⚠ THE LEADER SKILL WAS NEVER MAPPED.  The column exists, the struct
+		// has the member and the client reads it off UserUnitInfo.oS3kTZ2W --
+		// but nothing here bound the two, so every unit serialised a leader
+		// skill of 0 no matter what the row held.  Nothing wrote the column
+		// either (see the grant path in Common.hpp), so the defect was
+		// invisible from the database side as well.
+		field<&::UserUnitInfo::leader_skill_id>("leader_skill_id", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::equipitem_id>("eqip_item_id", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::equipitem_frame_id>("eqip_item_frame_id", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::equipitem_id2>("eqip_item_id2", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::equipitem_frame_id2>("eqip_item_frame_id2", { .read = true, .update = true, .insert = true, }),
+		field<&::UserUnitInfo::is_new>("new", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// The Sphere Frog bit.  Mapped here rather than filled by hand in each
+		// handler so every path that loads a unit carries it -- UserInfo, the
+		// incremental qC2tJs4E updates, party snapshots.
+		field<&::UserUnitInfo::ext_count>("sphere_ext", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// Omni enhancement SP.  Unmapped, all three went out as 0, and the
+		// fusion screen then had no room for SP on any unit -- which greys out
+		// every SP-only material (#25; see net/user.kdl).  Read-only: UnitMix
+		// is the one writer, and a newly granted unit must keep the column
+		// defaults (10 / 0 / 100) rather than the struct's zeroes.
+		field<&::UserUnitInfo::fe_bp>("fe_sp", { .read = true }),
+		field<&::UserUnitInfo::fe_used_bp>("fe_used_sp", { .read = true }),
+		field<&::UserUnitInfo::fe_max_usable_bp>("fe_max_sp", { .read = true }),
+		// The acquired enhancements themselves.  Read-only for the same reason:
+		// FeSkillGet and the ShopUse reset are the only writers, and a granted
+		// unit starts with the column default '' (none).
+		field<&::UserUnitInfo::fe_skill_info>("fe_skill_info", { .read = true }),
+		// Omni+ Boost level (49sa3sld).  Read-only: UnitOmniEvo is the one
+		// writer, and a granted unit starts at the column default 0.
+		field<&::UserUnitInfo::omni_level>("omni_level", { .read = true }),
+		// Written only by UnitFavorite (validated against owned alt art); 0 = base.
+		field<&::UserUnitInfo::unit_img_type>("unit_img_type", { .read = true }),
+		// ELGIF SKILLS (#38).  None of the three Extra Skill keys was mapped,
+		// so every unit went out with 0 in all of them.  The unit's own skill
+		// (extra_passive_skill_id) is MST data and filled by
+		// PacketReadHook<UserUnitInfo> below; these two are per copy.  Insert
+		// so a copy made from a packet keeps them; never update, UnitMix and
+		// the grants are the writers (gme/common/ExtraSkills.hpp).
+		field<&::UserUnitInfo::extra_passive_skill_id2>("extra_passive_skill_id2", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserUnitInfo::add_extra_passive_skill_id>("add_extra_passive_skill_id", {
+			.read = true,
+			.insert = true,
+		}),
+	};
+}
+
+/*!
+* Fills the unit's own Extra Skill (cP83zNsv) from UnitMst on every read.
+* Defined in gme/common/ExtraSkills.cpp, where the MST cache is reachable.
+*/
+template <>
+struct PacketReadHook<::UserUnitInfo>
+{
+	static void apply(::UserUnitInfo& unit);
+};
+
+/*!
+* Database mapping for discovered unit species stored in user_unit_dictionary.
+*/
+template <>
+inline PacketInterfaceFor<::UserUnitDictionary>::Fields
+PacketInterfaceFor<::UserUnitDictionary>::fields()
+{
+	return {
+		field<&::UserUnitDictionary::user_id>("user_id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserUnitDictionary::unit_id>("unit_id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserUnitDictionary::img_type_flag>("img_type_flag", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+	};
+}
+
+/*!
+* Database mapping for owned item stacks stored in user_items.
+*/
+template <>
+inline PacketInterfaceFor<::UserWarehouseInfo>::Fields
+PacketInterfaceFor<::UserWarehouseInfo>::fields()
+{
+	return {
+		field<&::UserWarehouseInfo::instance_id>("instance_id", {
+			.read = true,
+		}),
+		field<&::UserWarehouseInfo::item_id>("item_id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserWarehouseInfo::item_num>("item_num", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		// READ-ONLY, AND THE NAMES DO NOT MATCH ON PURPOSE.  The column is the
+		// lock (user_items.favorite_flg); the MEMBER is the client's NEW badge
+		// (`dJNpLc81` -> UserWarehouseInfo::setNewFlg @0x14060E0), which is a
+		// different thing entirely.  The column is read here only so
+		// loadWarehouseSnapshot can build UserInfoResp.item_favorite from it --
+		// that is how locks survive a reload -- and that function ZEROES the
+		// member immediately afterwards so the lock never reaches the wire as a
+		// NEW badge.  Do not add .update here: ItemFavorite.cpp writes the
+		// column with its own SQL.
+		field<&::UserWarehouseInfo::new_flg>("favorite_flg", {
+			.read = true,
+		}),
+		field<&::UserWarehouseInfo::disp_order>("disp_order", {
+			.read = true,
+			.update = true,
+		}),
+	};
+}
+
+/*!
+* Database mapping for party deck slots stored in user_decks.
+*/
+template <>
+inline PacketInterfaceFor<::UserPartyDeckInfo>::Fields
+PacketInterfaceFor<::UserPartyDeckInfo>::fields()
+{
+	return {
+		field<&::UserPartyDeckInfo::user_unit_id>("user_unit_id", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserPartyDeckInfo::deck_type>("deck_type", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserPartyDeckInfo::deck_num>("deck_num", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserPartyDeckInfo::member_type>("member_type", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserPartyDeckInfo::disp_order>("disp_order", {
+			.read = true,
+			.insert = true,
+		}),
+	};
+}
+
+/*!
+* Database mapping for Vortex dungeon keys stored in user_dungeon_keys.
+*
+* Only the durable columns are declared.  receipt_possible_flg and
+* next_receipt_possible_date are response-only — they are recomputed from the
+* calendar on every request (see gme::dungeonKeyState) and deliberately have no
+* column, so they must not participate in read/insert/update.  cnt is omitted
+* entirely while its semantic is unresolved.
+*/
+template <>
+inline PacketInterfaceFor<::UserDungeonKeyInfo>::Fields
+PacketInterfaceFor<::UserDungeonKeyInfo>::fields()
+{
+	return {
+		field<&::UserDungeonKeyInfo::user_id>("user_id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserDungeonKeyInfo::dungeon_key_id>("dungeon_key_id", {
+			.read = true,
+			.insert = true,
+		}),
+		field<&::UserDungeonKeyInfo::possession>("possession", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserDungeonKeyInfo::last_receipt_day>("last_receipt_day", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+		field<&::UserDungeonKeyInfo::active_type>("active_type", {
+			.read = true,
+			.update = true,
+			.insert = true,
+		}),
+	};
+}
+
+} // namespace db

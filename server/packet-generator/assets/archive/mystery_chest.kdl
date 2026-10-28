@@ -1,0 +1,90 @@
+json MysteryChestReward {
+    doc """
+    One prize inside a Mystery Chest.
+
+    Uses the SHARED reward vocabulary rather than a private one - the same
+    present_type / target_id / target_cnt triple CampaignReceipt, the present
+    box and daily_task.kdl already dispatch on (handbook 7.13).  That is not a
+    coincidence: MysteryBoxRewardResponse carries those exact three keys
+    (30Kw4WBa / TdDHf59J / wJsB35iH), so the client expects the same encoding.
+    """
+
+    field present_type type="u32::int" {
+        key "present_type"
+        doc "3 = zel, 8 = gem, 6 = unit, 4/5/7 = item / material / sphere."
+    }
+
+    field target_id type="u32::int" {
+        key "target_id"
+        doc "Rewarded entity, interpreted per present_type.  Ignored by the currency types, which carry their amount in target_cnt."
+    }
+
+    field target_cnt type="u32::int" {
+        key "target_cnt"
+        doc "Quantity awarded."
+    }
+
+    field description type=str {
+        key "description"
+        doc "Shown on the reward card.  Goes out verbatim as qp37xTDh."
+    }
+}
+
+json MysteryChestDef {
+    doc """
+    An authored Mystery Chest type.
+
+    The live game handed these out as operator giveaways and event drops, and
+    there is no wiki page and no MST for them, so the contents are ours to
+    author - unlike the Daily Spin, whose catalogue the client already holds.
+    What the client renders comes entirely from what we send in
+    MysteryBoxResponse, so these fields ARE the chest.
+    """
+
+    field key type=str {
+        key "key"
+        doc "Stable identifier for this chest type.  Persisted per user, so renaming one orphans the rows that reference it."
+    }
+
+    field name type=str {
+        key "name"
+        doc "Title on the chest tile (s35idar9)."
+    }
+
+    field text type=str {
+        key "text"
+        doc "Body copy on the chest tile (mejaw5Ca)."
+    }
+
+    field rank type=str {
+        key "rank"
+        doc "Chest rank (swUtH8de)."
+    }
+
+    field skin type=str {
+        key "skin"
+        doc "Selects the chest artwork (PUFr8swe)."
+    }
+
+    field box_type type=str {
+        key "box_type"
+        doc "Chest type (4rUdradr)."
+    }
+
+    field lifetime_days type="u32::int" {
+        key "lifetime_days"
+        doc """
+        How long the chest lasts once granted.
+
+        Written into expiry_date as now + lifetime_days * 86400.  The client
+        counts down from it: getPresentTimeLeftType @0x1CB30B4 divides
+        (expiry - server epoch) by 86400 and treats anything non-positive as
+        expired, so a chest whose lifetime has run out simply stops listing.
+        """
+    }
+
+    field rewards type="[MysteryChestReward]" {
+        key "rewards"
+        doc "Everything this chest pays when opened.  All of it, every time - a chest is not a random roll."
+    }
+}

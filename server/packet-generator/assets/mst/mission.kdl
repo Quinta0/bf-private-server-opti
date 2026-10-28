@@ -1,0 +1,262 @@
+// F_MISSION_MST_1 and F_MISSION_MST_2 — main campaign/dungeon mission table.
+// MST_1 covers IDs 0-~1200 (story chapters 1-end-game).
+// MST_2 covers IDs 1005000+ (Uncharted Frontier / late end-game content).
+// Merged into deploy/system/mission_mst.json for server use.
+
+json MissionMst {
+    hash "oXeC1Ak9"
+    doc "F_MISSION_MST — mission master data (parts 1 & 2).  Hash sourced from IDA `response_mappings.json` (response_class=MissionMstResponse, response_key=oXeC1Ak9, is_mst=true).  UNVERIFIED: no decoded `deploy/system/mission_mst.json` available on this branch to cross-check the top-level key against — confirm once the .dat file is decoded via `scripts/mstdec.py`.  Previous KDL used hash `2I9V0o6J` which IDA labels as `CampaignMissionInfoResponse` (a network response, is_mst=false) — wrong category entirely."
+
+    field id type="i32::str" {
+        key "j28VNcUW"
+        doc "Mission ID (primary key; sequential integers starting from 1)"
+    }
+
+    field name_key type=str {
+        key "0iAIR2LP"
+        doc "Localisation key for mission name (e.g. MST_DUNGEONS_MISSION_1_NAME)"
+    }
+
+    field land_id type="i32::str" {
+        key "9C64Qwe0"
+        doc "Land/continent ID this mission belongs to"
+    }
+
+    field area_id type="i32::str" {
+        key "VjCY7rX4"
+        doc "Area/region ID within the land"
+    }
+
+    field dungeon_id type="i32::str" {
+        key "MHx05sXt"
+        doc "Dungeon/node ID within the area"
+    }
+
+    field disp_order type="i32::str" {
+        key "XuJL4pc5"
+        doc "Display sort order within the dungeon"
+    }
+
+    field chapter type="i32::str" {
+        key "24biyLHp"
+        doc "Story chapter number"
+    }
+
+    field battle_count type="i32::str" {
+        key "69vnphig"
+        doc "Number of battles (waves) in the mission.  // RENAMED FROM: stamina_cost — this is NOT the energy cost.  The friendly-key decode of F_MISSION_MST names it missionBattleCount, and the data agrees: the two tutorials carry 3 here and have exactly 3 authored stages, mission 10 carries 5 and its original capture had 5 waves.  The energy cost is energy_use (A8DEK5ob) below."
+    }
+
+    field energy_use type="i32::str" {
+        key "A8DEK5ob"
+        doc "Energy/stamina consumed to enter this mission.  // RENAMED FROM: unknown_A8DEK5ob.  Named missionEnergyUse by the friendly-key decode, and independently confirmed as setUseActionPoint by the Grand Mission readParam audit (the same hash on CampaignMissionMstResponse).  Values agree with the game: 0 for both tutorials (free), 3 for mission 10, 8 for mission 85."
+    }
+
+    field exp_rate type=str {
+        key "2hcq47Cg"
+        doc "EXP multiplier rate (float string, e.g. '1.0')"
+    }
+
+    field exp type="i32::str" {
+        key "d96tuT2E"
+        doc "Base EXP reward for clearing"
+    }
+
+    field zel_rate type=str {
+        key "trA1wi9x"
+        doc "Zel multiplier rate (float string)"
+    }
+
+    field zel type="i32::str" {
+        key "Rs7bCE3t"
+        doc "Base zel reward for clearing"
+    }
+
+    field karma_rate type=str {
+        key "2s8NnYav"
+        doc "Karma multiplier rate (float string)"
+    }
+
+    field karma type="i32::str" {
+        key "HTVh8a65"
+        doc "Base karma reward for clearing"
+    }
+
+    field unknown_PKa13dH7 type=str {
+        key "PKa13dH7"
+        doc "Unknown float-string field"
+    }
+
+    field unknown_EI6HtL9A type=str {
+        key "EI6HtL9A"
+        doc "Unknown float-string field"
+    }
+
+    field unknown_32SaXjQx type=str {
+        key "32SaXjQx"
+        doc "Unknown float-string field"
+    }
+
+    field clear_rewards type=str {
+        key "SiYs27Cj"
+        doc """
+        FIRST-CLEAR rewards, comma-separated `type:id:amount:?:?` entries.
+
+        // RENAMED FROM: unknown_SiYs27Cj ("Unknown string field — usually
+        // empty").  Empty on 2646 of 3433 rows, which is why it read as noise;
+        // the 787 that carry it decode cleanly against the SHARED reward
+        // vocabulary this project already documents on the present box
+        // (30Kw4WBa) and CampaignReceipt:
+        //
+        //     3  zel        8  gem        11 karma      17 summoner SP
+        //     6  unit       4/5/7 item / material / sphere
+        //
+        // Verified by resolving every id in the column against the catalogues:
+        // type 6's 39 ids are ALL units (Burst Frog, Sphere Frog, Garrett) and
+        // types 4/5/7's 93 ids are all items (Frozen Fang, Dandelga).  The
+        // quantity-only types carry id 0.  The commonest value by far is
+        // "8:0:1:0:0" on 455 missions -- one Gem, the classic first-clear
+        // reward.
+        //
+        // TYPE 18 = SUMMONER ARM.  Identified from the client, not guessed:
+        // PresentCommon::createPresentName @0x11C37F4 dispatches
+        // (present_type - 2) through a jump table at 0x2328200, and index 16
+        // (= type 18) lands at 0x11C3E98, whose first call is
+        // SummonerArmMstList::shared().  All 18 ids in this column -- the
+        // multiples of ten from 30 to 190, plus the 8010 outlier -- are rows
+        // of summoner_arm_mst, which has exactly 23.  The same table also
+        // gives type 9 = DungeonKeyMstList (0x11C3EDC) and confirms 4/5/7/19
+        // as items (they share the ItemMstList handler at 0x11C3888).
+        //
+        // Type 18 IS CLAIMABLE as of 2026-09-04.  The subsystem was built:
+        // migration 04092026_CreateUserSummonerArmsTable creates
+        // user_summoner_arms, UserSummonerArmsInfo is filled from
+        // UserSummonerArmsInfoResponse::readParam @0x144E824 (wire dhMmbm5p,
+        // REPLACE semantics), PresentReceipt case 18 validates the id against
+        // SummonerArmMst before granting, and UserInfo emits the owned list.
+        //
+        // Types 17 (summoner SP) and 9 (dungeon key) are still parsed and
+        // queued but have NO PresentReceipt case -- those presents sit in the
+        // box until their subsystems exist.
+        //
+        // The trailing two fields are unread by anything we have found.
+        //
+        // NOTE this is the SOURCE data.  The result screen's own `clear_bonus`
+        // (92ms7J5M on MissionRewardInfo) is a DIFFERENT, narrower thing: a
+        // display-only triple list the client only reads types 3/11/17 out of.
+        """
+    }
+
+    field repeat_clear_bonus type=str {
+        key "S2ChOKo6"
+        doc "setRepeatClearBonus — bonus payload applied on repeat clears.  The same hash is already named repeat_clear_bonus on the MissionReward response (net/mission.kdl), whose doc notes this MST column as the likely source the response copies through.  Empty across every F_MISSION_MST row in the current dataset."
+    }
+
+    field unknown_wHN6nfh9 type=str {
+        key "wHN6nfh9"
+        doc "Unknown nullable string — observed format: '0,0,0:0,0:0'.  Marked optional because mission row 0 (the sentinel) carries `null` here and Glaze rejects null→std::string."
+        optional #true
+    }
+
+    field unknown_jeR2rN3V type="i32::str" {
+        key "jeR2rN3V"
+        doc "Unknown integer — always 0"
+    }
+
+    field unknown_Ke14gCAc type="i32::str" {
+        key "Ke14gCAc"
+        doc "Unknown integer — always 0"
+    }
+
+    field unknown_st0Ep96q type="i32::str" {
+        key "st0Ep96q"
+        doc "Unknown integer — always 0"
+    }
+
+    field battle_group_ids type=str {
+        key "8f4NYKxb"
+        doc "Battle group reference string — colon-separated pairs of order:groupId (e.g. '3:10100,1:10101,0:10102'); null for mission 0.  Marked optional so the loader doesn't reject the sentinel row."
+        optional #true
+    }
+
+    field need_mission_id type="[i32::str]::sep(comma)" {
+        key "HSRhkf70"
+        doc """
+        Missions that must be CLEARED before this one becomes available.
+        0 (or empty) means no prerequisite.
+
+        // IDENTIFIED 2026-08-09 — this was `unknown_HSRhkf70`, documented as
+        "possibly a related mission id pair, no handler reads it".  It is the
+        same hash AreaMst.need_mission_id and DungeonMst.need_mission_id
+        already use, and Mistral's data proves the semantic outright: the
+        dungeon-1..80 chain is strictly linear through this field —
+        mission 1 need 0, 2 need 1, 10 need 2, 11 need 10, 12 need 11,
+        20 need 12, ... 85 need 84 — and the dungeons interlock the same way
+        (dungeon 20 need 12, 30 need 23, 40 need 33).  Area 200 "Morgan"
+        needs 85, the last mission of Mistral.  That is a progression graph,
+        not a "related id" coincidence.
+
+        // REVERTED FROM str: now typed like its two siblings.  The shape
+        matches theirs exactly — 3396 single ints, 36 comma pairs
+        ("666,20067", "10080,10165"), and 1 empty row (the id-0 sentinel,
+        which already carries nulls in several other columns).  The comma
+        pairs are why a bare i32::str fails; the list codec is what the
+        siblings use for the identical data.
+        """
+    }
+
+    field unknown_np4K1xtq type=str {
+        key "np4K1xtq"
+        doc "Unknown string — usually empty"
+    }
+
+    field unknown_sYsa10a3 type=str {
+        key "sYsa10a3"
+        doc "Unknown string — usually empty"
+    }
+
+    field scenario_info type=str {
+        key "N4XVE1uA"
+        doc "Scenario/cutscene script binding, \"<flag>,<script.txt>\".  The same hash is `scenario_info` in mst/area.kdl, mst/arena.kdl, mst/raid.kdl, mst/scenario.kdl and net/user.kdl, and it carries script filenames in every table that populates it (area_mst: \"8thAnniv_Start.txt\"; dungeon_mst: \"0,map101-ending.txt\"; raid_mission_mst: \"0,RC7_Dark_End.txt\").  F_MISSION_MST itself is nearly always \"0,0\" (no cutscene) with a handful of \"0,map1-dungeon0-Nend.txt\" rows.  Null on mission row 0."
+        optional #true
+    }
+
+    field battle_img type=str {
+        key "L8iA9M6c"
+        doc "Battle background image (dungeon_battle_<id>.jpg).  Same hash is `battle_img` in mst/grand_mission.kdl and `img` in mst/area.kdl / mst/raid.kdl; dungeon_mst (299 distinct), grand_mission_spot_mst (144) and raid_point_mst (109) all populate it with dungeon_battle_*.jpg filenames.  Empty in F_MISSION_MST — quest battle backgrounds come from the dungeon row instead.  Null on mission row 0."
+        optional #true
+    }
+
+    field bgm_map type=str {
+        key "3sRN9BPS"
+        doc "Map/field BGM asset name (e.g. 'bf010_map_grass.mp3'); null for mission 0."
+        optional #true
+    }
+
+    field bgm_battle type=str {
+        key "nDf28LtU"
+        doc "Battle BGM asset name (e.g. 'bf006_btl_boss.mp3'); null for mission 0."
+        optional #true
+    }
+
+    field unknown_HeA4I2dN type="i32::str" {
+        key "HeA4I2dN"
+        doc "Unknown integer — always 1"
+    }
+
+    field npc_encounter_id type=str {
+        key "1e6jxQzf"
+        doc "NPC encounter reference — wire format is HETEROGENEOUS: most rows hold a single int as quoted string (3364/3433: \"0\" = no NPC, \"<id>\" otherwise), but 69 rows hold a colon/comma/at-sign-separated list (\"300010:0,300011:1,...\", \"30020:0,,,,,@1\", \"1:0,2:1,2:1,2:1,310200:1,@1\").  The list encoding is order:state pairs with `@N` suffixes — likely a multi-NPC encounter sequence.  // REVERTED FROM i32::str: list-shaped rows fail single-int parse (`expected_quote` at the colon/comma).  // CAPTURED FROM: deploy/system/mission_mst.json rows 934/943/1054.  // UNVERIFIED: precise encoding semantics — references F_MISSION_NPC_UNIT_MST."
+    }
+
+    field unknown_PYgkvcsy type=str {
+        key "PYgkvcsy"
+        doc "Unknown nullable string — usually empty.  Null on mission row 0."
+        optional #true
+    }
+
+    field description type=str {
+        key "qp37xTDh"
+        doc "Localisation key for mission description"
+    }
+}
