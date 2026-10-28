@@ -49,7 +49,7 @@ alternative that already has numbers gives them to its id):
      templates (Frontier Hunter's levels are calibrated; the Metal Parades not).
 Only hp, atk and def change; unit ids, monster ids, drops, AI, skills and
 positions stay, and every boss (every monster of a boss wave) stays as it is.
-A committed Balance Forge overlay of a changed quest (deploy/balance-overlays/
+A committed overlay file of a changed quest (deploy/balance-overlays/
 */<id>.json, served ahead of the archive once published) whose regulars are on
 the placeholder block takes the same numbers per monster id.
 The run is idempotent: once a quest's regulars carry real numbers it no longer

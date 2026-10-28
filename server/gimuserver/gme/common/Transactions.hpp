@@ -31,8 +31,8 @@ inline constexpr const char* kTakeWriteLock = "UPDATE migration_status SET hash 
 * upgrade (busy_timeout does not apply), so when another process holds the write
 * lock, or has committed since the snapshot, the write fails at once with
 * "database is locked" (SQLITE_BUSY / SQLITE_BUSY_SNAPSHOT) and the player loses
-* the result.  bf-daily-gift writes every 2 minutes and the admin tooling's resets
-* and presents write too: about one MissionEnd in 8 minutes was lost that way
+* the result.  Other processes write the save too (a gift job every 2 minutes,
+* resets and presents): about one MissionEnd in 8 minutes was lost that way
 * (ticket #72).  A transaction's first statement is the one place where
 * SQLite does wait for another writer (busy_timeout, 10 s, main.cpp), and a
 * snapshot taken under the write lock cannot go stale.
@@ -40,7 +40,7 @@ inline constexpr const char* kTakeWriteLock = "UPDATE migration_status SET hash 
 * The server has one SQLite connection (config connection_numbr 1), so its own
 * transactions never overlapped anyway; holding the write lock for the whole
 * transaction only makes those outside writers wait for a gap between two of
-* them (BEGIN IMMEDIATE with a 10 s busy timeout, the admin tooling).
+* them (the other writers use BEGIN IMMEDIATE with a 10 s busy timeout).
 * At prod's load the SQLite thread is idle most of the time, so they get in
 * within milliseconds; only a thread busy without pause could keep them out.
 * With a second connection the lock statement would wait on the other one

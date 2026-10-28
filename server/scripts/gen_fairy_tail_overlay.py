@@ -82,7 +82,7 @@ def main() -> int:
             if path.exists():
                 stale.append(path.name)
             continue
-        # Byte-identical to what Balance Forge publishes (battlemodel.file_bytes).
+        # Byte-identical to a published overlay file (indent 1, UTF-8, trailing newline).
         text = json.dumps(record, indent=1, ensure_ascii=False) + '\n'
         print(f'{mission_id} {record["name"]}: {len(record["stages"])} waves')
         if args.check:

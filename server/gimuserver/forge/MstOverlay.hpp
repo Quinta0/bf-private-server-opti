@@ -10,22 +10,22 @@
 #include <string_view>
 
 /*!
-* Balance Forge MST overlays: <balance_root>/server/mst/<deploy mst file>.
+* MST overlays: <balance_root>/server/mst/<deploy mst file>.
 *
-* The admin tooling writes full rows (or whole groups, or object keys) of one
+* An external tool writes full rows (or whole groups, or object keys) of one
 * deploy/mst table; at boot every mst_root load goes through LoadMst, which
 * merges them onto the image's table at JSON level, checks that every row
 * still has exactly the columns and JSON types the base rows have, and then
 * runs the same typed parse LoadJson does.  A file that fails any check is
 * logged, reported in forgeStatus.php and skipped: the base table loads
-* exactly as it does without the Forge, and boot continues.
+* exactly as it does without an overlay, and boot continues.
 *
-* File format and the per-table keys: the Forge server design, section 1.
+* File format and the per-table keys: BALANCE_FORGE_OVERLAYS.md, section 1.
 */
 namespace forge
 {
 
-/*! The configured balance root ("" = the Forge is off).  Set before the first LoadMst. */
+/*! The configured balance root ("" = overlays are off).  Set before the first LoadMst. */
 void setBalanceRoot(std::string root);
 const std::string& balanceRoot();
 

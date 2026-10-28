@@ -11,13 +11,13 @@
 #include <vector>
 
 /*!
-* Balance Forge rules: <balance_root>/server/rules.json.
+* Overlay rules: <balance_root>/server/rules.json.
 *
 * Squad rules (what a squad may field in a quest), unlock rules (a quest,
 * dungeon, area or banner needs quests cleared first) and schedule windows
 * (a quest, dungeon, area or banner is open only between UTC times, with an
-* optional weekly repeat).  Format, semantics and messages: the Forge server
-* design, section 4.
+* optional weekly repeat).  Format, semantics and messages:
+* BALANCE_FORGE_OVERLAYS.md, section 4.
 *
 * The file is re-read live: rules() stats it at most every 2 s and builds a
 * new immutable snapshot when it changed.  A file that does not read keeps the

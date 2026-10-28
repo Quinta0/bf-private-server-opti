@@ -9,7 +9,7 @@ The server now rolls one enemy per listed slot at MissionStart
 (MissionArchiver::rollVariants); this script lists the alternatives.
 
 SOURCES, per slot of an archive record (never the tutorial, scripted fights or
-missions a Balance Forge overlay replaces, which the server skips anyway):
+missions an overlay file replaces, which the server skips anyway):
   captures  a captured mission whose quest was recorded more than once rolls,
             in each slot, among the enemies seen there across the runs with
             its wave count, weighted by how often each was seen (Dark Metal

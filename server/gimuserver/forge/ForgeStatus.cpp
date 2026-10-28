@@ -81,7 +81,7 @@ Json::Value archiveJson(const ArchiveStatus& s)
 Json::Value rulesJson(const RulesStatus& s, const std::string& balanceRoot)
 {
 	// Present = the file is there now (one stat per request), whatever the
-	// engine made of it: the admin tooling compares it with what it wrote.
+	// engine made of it: a writer compares it with what it wrote.
 	bool present = false;
 	if (!balanceRoot.empty())
 	{

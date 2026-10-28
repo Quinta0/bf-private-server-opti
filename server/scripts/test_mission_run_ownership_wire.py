@@ -23,8 +23,8 @@ MissionContinue (B): only the open battle is charged, marked and recorded;
 stale/unknown/foreign/conflicting bodies are refused with GmeErrorCommand::Retry
 (2) and change nothing -- the client revives on any ORDINARY reply
 (MissionGameOverScene::loopContinue), while Retry sends it back to the Continue
-prompt (noticeOK -4000), so a refusal must not be an ordinary reply (Session 6,
-net/mission.kdl).  A repeat of a paid continue (same serial, status and blob)
+prompt (noticeOK -4000), so a refusal must not be an ordinary reply
+(net/mission.kdl).  A repeat of a paid continue (same serial, status and blob)
 is an ordinary reply that charges nothing, while a second revival (new blob)
 pays; short on gems is refused and records nothing; a failure part way leaves
 nothing; a MissionEnd racing a continue leaves one consistent outcome; restart
@@ -247,7 +247,7 @@ def main():
 
         # Short on gems: refused with Retry -- the client then shows its Continue
         # prompt again instead of reviving -- and nothing is charged, recorded
-        # or marked (Session 6; it used to be a free, recorded revival).
+        # or marked (it used to be a free, recorded revival).
         execute('UPDATE user_info SET gems=0 WHERE id=?', (user,))
         before, marks = info(), continues()
         no_change('B9 no gems', cont(c, issued, 'poor'), before, marks)

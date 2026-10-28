@@ -5,10 +5,10 @@
 #include <optional>
 
 /*!
-* Balance Forge tuning: <balance_root>/server/tuning.json, one flat JSON object
-* of numbers the Forge can change without a rebuild.  A key the file leaves out
+* Tuning overlay: <balance_root>/server/tuning.json, one flat JSON object
+* of numbers an operator can change without a rebuild.  A key the file leaves out
 * keeps its default, and a key this server does not know is ignored (a newer
-* Forge may write more).  The file is re-read when it changes (checked on every
+* writer may add more).  The file is re-read when it changes (checked on every
 * call by inode, size and times); a file that does not read, or a value out of
 * range, keeps the last good values and is logged.
 *

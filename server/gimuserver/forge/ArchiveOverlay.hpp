@@ -18,7 +18,7 @@
 #include <vector>
 
 /*!
-* Balance Forge archive overlays: <balance_root>/server/archive/<file>.
+* Archive overlays: <balance_root>/server/archive/<file>.
 *
 * Two kinds, both applied at boot, both falling back to the image's file:
 * - records by id (gacha.json, event_exchange.json, ai.json): each record is
@@ -28,7 +28,7 @@
 *   boss_drops.json): the loader tries the overlay with strict checks, then
 *   the base file with today's rules.
 *
-* Formats and checks: the Forge server design, section 2.
+* Formats and checks: BALANCE_FORGE_OVERLAYS.md, section 2.
 */
 namespace forge
 {

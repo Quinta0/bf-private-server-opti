@@ -8,11 +8,11 @@
 #include <vector>
 
 /*!
-* What the game server did with the Balance Forge's files, for
+* What the game server did with the overlay files, for
 * GET /bf/gme/forgeStatus.php.
 *
-* The admin tooling writes overlays under <balance_root>/server/ and can only tell
-* a balancer "the game server accepted your change" when this registry says
+* An external tool writes overlays under <balance_root>/server/ and can only
+* tell "the game server accepted this change" when this registry says
 * so for the exact bytes it wrote (sha256).  Every loader in forge/ reports
 * here; nothing else reads it.  It holds file names, counts, hashes and plain
 * reasons only: no paths, no file contents, no secrets, because the endpoint
@@ -67,7 +67,7 @@ struct RuleError
 /*!
 * server/rules.json, filled by the rules engine (forge/Rules.hpp).  `engine`
 * false (a build without it) makes the endpoint say that nothing in the file
-* is enforced, so the admin tooling never reports a rule as live that is not.
+* is enforced, so a writer never reports a rule as live that is not.
 */
 struct RulesStatus
 {
@@ -120,7 +120,7 @@ std::string serverCommit();
 /*! The endpoint's body (format 1). */
 std::string statusJson();
 
-/*! Lowercase hex SHA-256: the hash the admin tooling compares with the file it wrote. */
+/*! Lowercase hex SHA-256: the hash a writer compares with the file it wrote. */
 std::string sha256Hex(std::string_view bytes);
 
 /*! The commit baked in at configure time (forge/BuildInfo.cpp). */

@@ -259,7 +259,7 @@ HANDLEF(UserInfo)
     resp.gacha_info = GachaArchiver::instance().populateAllPackets();
     resp.gacha_categories = theServer()->cache().gachaListRsp().gacha_categories;
     // A Sandbox account (gme/common/Sandbox.hpp) gets the whole rotation pool
-    // and no Forge unlock on its rail.
+    // and no overlay unlock on its rail.
     const bool sandboxed = co_await gme::sandbox::isOn(db, identity.userId);
     {
         // This week's featured banners, as GachaList sends them
@@ -402,7 +402,7 @@ HANDLEF(UserInfo)
     // tiles while unused (gme/common/UnitPick.hpp).
     co_await gme::addUnitPick(db, identity,
         resp.gacha_categories, resp.gacha_info, resp.unit_selector_gacha);
-    // The rail as GachaList filters it: banners the Balance Forge's rules close
+    // The rail as GachaList filters it: banners the overlay rules close
     // or lock (rules.json) leave it.
     if (const auto forgeRules = forge::rules(); forgeRules->hidesGates())
     {

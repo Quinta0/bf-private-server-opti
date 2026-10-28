@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wire test: the Balance Forge starter pack (server/starter.json, the tutorial-completion presents).
+"""Wire test: the overlay starter pack (server/starter.json, the tutorial-completion presents).
 
     PYTHONPATH=<repo>/tools <repo>/.venv/bin/python \
         scripts/test_forge_starter_wire.py [--src wt/forge] [--port 9987] [--assets DIR] [--keep]

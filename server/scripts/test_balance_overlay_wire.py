@@ -1,6 +1,6 @@
 """Unit-balance overlay (balance_root): client table announce/serve + owned-unit stat migration.
 
-python scripts/test_balance_overlay_wire.py [--port 9964] [--name bf-balance]
+python scripts/test_balance_overlay_wire.py [--port 9964] [--name bf-overlay-test]
 
 Runs against the Docker server for THIS checkout (docker/run.sh with SRC set
 to it) and restarts that container itself: the server reads
@@ -53,7 +53,7 @@ UNIT_MST = ROOT / 'deploy' / 'mst' / 'unit_mst.json'
 
 TABLE, FILE_KEY = 'F_UNIT_MST', '2r9cNSdt'
 UNIT_KEY = b'7nL1WTUb'.ljust(16, b'\0')
-# A test-only version: >= 1100 and far above anything the admin tooling will cut.
+# A test-only version: >= 1100 and far above any version an operator will publish.
 VERSION = 9100
 
 UNIT_ID = 10011                 # Fencer Vargas: max_lv 12, ATK 500->700, caps 400:160:80:80
@@ -215,7 +215,7 @@ def basis_row() -> sqlite3.Row | None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--port', type=int, default=9964)
-    ap.add_argument('--name', default='bf-balance')
+    ap.add_argument('--name', default='bf-overlay-test')
     args = ap.parse_args()
     check = Checker()
 

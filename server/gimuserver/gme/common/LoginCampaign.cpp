@@ -20,10 +20,10 @@ namespace
 std::vector<LoginCampaignDayRow> g_days;
 
 /*!
-* The Balance Forge's calendar checks: what the loader and grantLoginCampaignDay
+* The overlay calendar's checks: what the loader and grantLoginCampaignDay
 * would otherwise skip with a warning (an unknown kind, a count below 1, a day
 * with no cell) refuse the whole file instead, so a calendar that would pay
-* less than its editor shows never goes live.
+* less than it lists never goes live.
 */
 std::optional<std::string> forgeCalendarProblem(const std::vector<LoginCampaignDayRow>& days)
 {
@@ -69,7 +69,7 @@ std::optional<std::string> forgeCalendarProblem(const std::vector<LoginCampaignD
 }
 
 /*!
-* <balance_root>/server/archive/login_campaign.json, the Forge's whole-file
+* <balance_root>/server/archive/login_campaign.json, the overlay file's whole-file
 * replacement (same shape as the image's file).  False, with the reason in
 * forgeStatus.php, when there is none or it does not pass.
 */
@@ -90,7 +90,7 @@ bool loadForgeCalendar()
 	std::sort(days.begin(), days.end(),
 		[](const LoginCampaignDayRow& a, const LoginCampaignDayRow& b) { return a.day < b.day; });
 	g_days = std::move(days);
-	LOG_INFO << "LoginCampaign: " << g_days.size() << " calendar day(s) loaded (Balance Forge)";
+	LOG_INFO << "LoginCampaign: " << g_days.size() << " calendar day(s) loaded (overlay)";
 	return true;
 }
 

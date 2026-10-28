@@ -150,7 +150,7 @@ namespace
 {
 
 /*!
-* Why the Forge's summon_rotation.json cannot be used, or nullopt.  The base
+* Why the overlay summon_rotation.json cannot be used, or nullopt.  The base
 * loader's checks, made strict: where it would log and drop a gate, an
 * overlay is refused, so "accepted" means every gate in it rotates.
 */
@@ -184,7 +184,7 @@ std::optional<std::string> forgeRotationProblem(const RotationFile& file)
 	return std::nullopt;
 }
 
-/*! The Forge's rotation when it passes; false (reported) otherwise. */
+/*! The overlay rotation when it passes; false (reported) otherwise. */
 bool loadForgeRotation()
 {
 	const auto overlay = forge::readFileOverlay("summon_rotation.json");
@@ -208,7 +208,7 @@ bool loadForgeRotation()
 	for (const auto& entry : g_rotation.pool)
 		g_poolGates.insert(entry.gate);
 	LOG_INFO << "SummonRotation: " << g_rotation.pool.size() << " gates over "
-		<< g_rotation.slot_tiles.size() << " slots, first week " << g_rotation.first_week << " (Balance Forge)";
+		<< g_rotation.slot_tiles.size() << " slots, first week " << g_rotation.first_week << " (overlay)";
 	return true;
 }
 

@@ -31,8 +31,8 @@
 // does not move it.  The WebView only trusts public certificates and refuses
 // plain http, so nothing is fetched: the page is the URL.
 //
-// The posts live in <balance_root>/news/posts.json, written by Balance Forge's
-// News tab (the admin tooling), re-read whenever the file changes:
+// The posts live in <balance_root>/news/posts.json, written by an operator or an
+// external tool, re-read whenever the file changes:
 //
 //   {"page": {"title": "What's new", "css": "...", "empty": "..."},
 //    "posts": [{"id": 3, "title": "...", "body": "...", "html": "<article>...",
@@ -41,7 +41,7 @@
 //
 // Times are UTC "YYYY-MM-DD HH:MM:SS"; an empty end means "until withdrawn" and
 // an empty published means "at start".
-// `html` is the post as the admin tooling rendered it; without it the server
+// `html` is the post as its author pre-rendered it; without it the server
 // escapes title and body itself.  A file that does not parse keeps the last
 // good copy (and says so in the log) rather than emptying the page.
 
@@ -64,11 +64,11 @@ struct NewsPost
 	int32_t id = 0;
 	std::string title;
 	std::string body;
-	std::string html;               // rendered by the admin tooling, may be empty
+	std::string html;               // pre-rendered by the author, may be empty
 	std::string start;              // UTC, "YYYY-MM-DD HH:MM:SS"
 	std::string end;                // UTC, or empty
 	int32_t priority = 0;           // higher first; ties: newer start first
-	std::string published;          // UTC, first publish (admin tooling), or empty
+	std::string published;          // UTC, first publish, or empty
 };
 
 struct NewsPage

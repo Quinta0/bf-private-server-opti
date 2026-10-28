@@ -192,7 +192,7 @@ json FeatureCheck {
     // new
     field bb_timer type="i32::int" {
         key "bb_timer"
-        doc "Manual burst gesture time limit. APK FUNC_BB_TIMER defaults to 1000; FeatureManager::onFeatureCheckRes @0x1C77D10 stores an integer override without validation. MissionBattleManager::touchEndedChild @0x107B240 requires elapsed clock time / 1000 < this value before dispatching the selected burst. Zero rejects manual bursts while guard and Overdrive activation use separate branches. The server must send a positive value: omitting this field from features.json otherwise serializes a zero-initialized integer. Setting 1000 restored manual burst input in the Windows client (user-confirmed 2026-09-22)."
+        doc "Manual burst gesture time limit. APK FUNC_BB_TIMER defaults to 1000; FeatureManager::onFeatureCheckRes @0x1C77D10 stores an integer override without validation. MissionBattleManager::touchEndedChild @0x107B240 requires elapsed clock time / 1000 < this value before dispatching the selected burst. Zero rejects manual bursts while guard and Overdrive activation use separate branches. The server must send a positive value: omitting this field from features.json otherwise serializes a zero-initialized integer. Setting 1000 restored manual burst input in the Windows client (verified 2026-09-22)."
     }
 
     // 4

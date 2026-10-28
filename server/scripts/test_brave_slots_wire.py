@@ -19,7 +19,7 @@ F. Restart: medals and prizes persist.
 
 The multi-roll LIST's blank tiles are client-side and not tested here:
 RandallSlotResultListScene::downloadFiles requests nothing (0x1A72AB4), so a
-tile shows only artwork the client already holds (see the session handoff).
+tile shows only artwork the client already holds.
 """
 import argparse
 import json

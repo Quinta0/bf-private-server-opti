@@ -52,11 +52,11 @@ struct EventPayout
 */
 void loadEventRotation(const std::string& archiveRoot);
 
-/*! The Balance Forge's event_rotation.json overlay is the live rotation. */
+/*! The event_rotation.json overlay file is the live rotation. */
 bool eventRotationFromForge();
 
 /*!
-* The Forge's rotation was accepted on its own but its Bazaar offers fail the
+* The overlay rotation was accepted on its own but its Bazaar offers fail the
 * exchange catalog's checks: report why and load the image's file instead.
 */
 void fallBackToBaseEventRotation(const std::string& archiveRoot, const std::string& why);

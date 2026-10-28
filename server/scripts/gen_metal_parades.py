@@ -15,8 +15,8 @@ parades, which is exactly the report.
 EXP IS LEFT ALONE.  The game's own mission_mst (the table the quest screen
 shows) says 1000 / 3000 / 5000; the Mega page says 7000.  That is a version
 difference this build's data does not resolve, so the archive keeps agreeing
-with its own MST (validate_missions.py H4) and the page's figure is recorded
-in the session 2 notes instead.
+with its own MST (validate_missions.py H4) and the page's figure is only
+noted here.
 
 AUTHORED -- the pages give tiers and HP but no wave layout.  So stages 1-4 of
 Super and Mega are the normal parade's (100600, left untouched) with every slot

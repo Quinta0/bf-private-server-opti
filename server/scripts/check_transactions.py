@@ -6,7 +6,7 @@ Fails when server code opens a transaction with drogon's own newTransactionCoro(
 newTransaction() or newTransactionAsync() anywhere but gme/common/Transactions.hpp.
 Drogon's "begin" is deferred: such a transaction reads first and only takes SQLite's
 write lock at its first write, which fails at once with "database is locked" whenever
-bf-daily-gift or the admin tooling has written meanwhile (ticket #72).
+another process writing the save has written meanwhile (ticket #72).
 gme::newTransaction takes the write lock with the first statement, where SQLite waits.
 """
 from pathlib import Path

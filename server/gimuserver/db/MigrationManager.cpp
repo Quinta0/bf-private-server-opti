@@ -2065,7 +2065,7 @@ static void RegisterMigrations(MigrationMap& map)
 		);
 	});
 
-	// Unit box rule change (owner, 2026-10-17): 300 base slots (kBaseUnitBoxSlots,
+	// Unit box rule change (2026-10-17): 300 base slots (kBaseUnitBoxSlots,
 	// added on the fly) plus 20 per gem step instead of 5.  max_unit_count holds
 	// only bought slots, every one bought at 5 per gem step, so 20 per step is
 	// exactly four times what each player already has.  Runs once.
@@ -2321,8 +2321,7 @@ static void RegisterMigrations(MigrationMap& map)
 
 	// THE 50-GEM UNIT PICK (gme/common/UnitPick.hpp): one row per account that
 	// has used it.  The primary key is the once-per-account rule; a reset
-	// deletes the row (the admin tooling OWNED_TABLES), which is
-	// what makes the pick available again.  reply_json is the reply that pick
+	// deletes the row, which is what makes the pick available again.  reply_json is the reply that pick
 	// sent, returned as-is if the same pick arrives again (a lost reply).
 	migrate("19102026_CreateUserUnitPick", {
 		p->execSqlSync(
@@ -2339,12 +2338,12 @@ static void RegisterMigrations(MigrationMap& map)
 	});
 
 	// The in-game account reset (gme/common/AccountReset.hpp, ticket #53).
-	// A player's confirmed request waits here until Balance Forge runs the
-	// admin tooling's reset (the admin tooling) and sets state to
-	// done, gone or failed.  Rows stay as the record of who asked and when, so
-	// a reset never deletes them.  the admin tooling's playerdb.py must know this
-	// table before a server with it is deployed: it refuses to reset accounts
-	// while the save holds a table it does not know.
+	// A player's confirmed request waits here until an operator runs the
+	// reset and sets state to done, gone or failed.  Rows stay as the record
+	// of who asked and when, so a reset never deletes them.  Any external tool
+	// that resets accounts must know this table before a server with it is
+	// deployed, and should refuse to reset while the save holds a table it
+	// does not know.
 	migrate("19102026_AccountResetQueue", {
 		p->execSqlSync(
 			"CREATE TABLE IF NOT EXISTS account_reset_queue("
@@ -2408,7 +2407,7 @@ static void RegisterMigrations(MigrationMap& map)
 		p->execSqlSync("ALTER TABLE user_achievement_trades ADD COLUMN period INTEGER NOT NULL DEFAULT 0;");
 	});
 
-	// Item box rule change (owner, 2026-10-21): the unit box's treatment for
+	// Item box rule change (2026-10-21): the unit box's treatment for
 	// items too -- the starting 100 slots become 200 (gme::kBaseItemBoxSlots)
 	// and a gem step grants 20 slots instead of 5.  Unlike the unit box,
 	// max_warehouse_count holds the whole capacity (start + bought), every
@@ -2428,15 +2427,15 @@ static void RegisterMigrations(MigrationMap& map)
 		p->execSqlSync("ALTER TABLE user_units ADD COLUMN source TEXT NOT NULL DEFAULT '';");
 	});
 
-	// THE RACE TO LEVEL 999 (owner, 2026-10-21): the first three accounts to
-	// reach summoner level 999 win gems, paid by the admin tooling
-	// (the admin tooling) for the Discord #leaderboard.  MissionEnd,
+	// THE RACE TO LEVEL 999 (2026-10-21): the first three accounts to
+	// reach summoner level 999 win gems, paid by an operator; the table also
+	// feeds the Discord #leaderboard.  MissionEnd,
 	// the only place a player levels, adds the row in the transaction that
 	// levels them, so `seq` is the order those level-ups committed in, whatever
 	// the bot's poll timing.  One row per account, ever.  Accounts already at
 	// 999 get none: the race counts from this migration on, recorded as
 	// server_state 'level_race_started'.  A reset or delete leaves the table
-	// alone (it is the race's record; the admin tooling).
+	// alone (it is the race's record).
 	migrate("21102026_LevelRace", {
 		p->execSqlSync(
 			"CREATE TABLE IF NOT EXISTS level_race ("
@@ -2454,10 +2453,10 @@ static void RegisterMigrations(MigrationMap& map)
 			gme::unixNow());
 	});
 
-	// THE LEVEL 999 RACE PICK (owner, 2026-10-22): one free pick from every 7★
-	// and Omni unit for the first ten accounts to reach level 999.  The
-	// admin tooling adds the row (playerdb op 'race_pick', INSERT OR IGNORE, so a
-	// retry gives nothing twice); UnitSelectorGachaTicket fills in the pick.
+	// THE LEVEL 999 RACE PICK (2026-10-22): one free pick from every 7★
+	// and Omni unit for the first ten accounts to reach level 999.  An
+	// operator adds the row (INSERT OR IGNORE, so a retry gives nothing
+	// twice); UnitSelectorGachaTicket fills in the pick.
 	// picked_at 0 = not picked yet.  A reset or delete removes the row.
 	migrate("22102026_RacePick", {
 		p->execSqlSync(

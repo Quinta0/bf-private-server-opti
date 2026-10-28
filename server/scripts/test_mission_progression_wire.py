@@ -87,7 +87,7 @@ def main():
     # Farm and Mountain have been rolled and harvested since (2026-10-02 12:44),
     # and a copied period that has not expired yet left this "first clear of
     # 11" with nothing to hand out: a rolled tile behind a closed gate is a
-    # state real play cannot reach (Session 6 handoff, fixture drift).
+    # state real play cannot reach (fixture drift).
     execute("UPDATE user_town_locations SET period_start=0, tap_cnt=0, drop_info=''"
             " WHERE user_id=? AND location_id IN (1, 3)", (user,))
     sphere_lv = (execute('SELECT lv FROM user_town_facilities WHERE user_id=? AND facility_id=1', (user,)).fetchone()

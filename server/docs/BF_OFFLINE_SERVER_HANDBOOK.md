@@ -198,7 +198,7 @@ go in one commit. Stage source, authored data and docs by name; never live saves
 
 | Area | Evidence and remaining limits |
 |---|---|
-| Manual BB radial input | Earlier bb_timer feature correction was user-confirmed. Do not reopen it from an old handoff alone; independently test BB/SBB/UBB/DBB/bonded variants when their prerequisites change. |
+| Manual BB radial input | The earlier bb_timer feature correction was verified on a real client. Do not reopen it from old notes alone; independently test BB/SBB/UBB/DBB/bonded variants when their prerequisites change. |
 | Burst Queen | Isolated encrypted-request tests reach BB10/SBB10 in one eligible fusion and cover boundary cases. Eligibility still controls ultimate skills. |
 | Mystery Frogs | Fixed/random types, level/XP reset, retained upgrades, three Rainbow Crystal presents and subsequent Anima growth passed API/DB tests. Live random odds were unavailable: ordinary weight 1, Rex 0.25 is authored policy. |
 | Merit Exchange | 241 supported offers selected from original records, including Legend Stone. Purchase/stock/payment tests passed. |

@@ -43,7 +43,6 @@ self-hostable service:
   uploading assets, building production images and end-to-end wire tests.
 
 How the pieces talk to each other is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-The project's admin tooling is not included in this repository.
 
 ## Features
 

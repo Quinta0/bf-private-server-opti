@@ -238,7 +238,7 @@ void ServerCache::Setup(const Json::Value& serverObj)
 	if (!m_serverConfig.balanceRoot.empty())
 		LOG_INFO << "balance: overlay root " << m_serverConfig.balanceRoot;
 	// Every mst_root table below loads through forge::LoadMst, which merges
-	// <balance_root>/server/mst/<file> when the Forge wrote one (and loads
+	// <balance_root>/server/mst/<file> when an overlay exists (and loads
 	// exactly what LoadJson would when it did not, or when the file is bad).
 	// Merging here, before every derived index and cached reply is built, is
 	// what lets an overlay reach all of them with no further code.
@@ -299,7 +299,7 @@ void ServerCache::Setup(const Json::Value& serverObj)
 		}
 		m_initrsp.login_campaign_reward = forge::LoadMst<LoginCampaignRewardCache>(mstRoot, "login_campaign_reward_mst.json").data;
 		m_initrsp.progression = forge::LoadMst<UserLevelMstCache>(mstRoot, "user_level_mst.json").data;
-		// Owner's rule (2026-10-20): 20 more friends at every level (10 -> 30 at
+		// Rule change (2026-10-20): 20 more friends at every level (10 -> 30 at
 		// lv 1, 50 -> 70 from lv 81).  Added to the level rows themselves, so the
 		// client's copy (this Initialize reply), team_info and the server's own
 		// capacity checks all agree, and the gem-bought slots on top
@@ -446,7 +446,7 @@ void ServerCache::Setup(const Json::Value& serverObj)
 			}
 		}
 
-		// BALANCE OVERRIDES.  The admin tooling publishes full unit rows to
+		// BALANCE OVERRIDES.  An external tool publishes full unit rows to
 		// <balance_root>/server/unit_mst.json, same wrapper and 60-field shape
 		// as the shipped table.  Each REPLACES the loaded row (shipped or
 		// homebrew) with its id -- unlike homebrew, which may only add.  An id
@@ -577,7 +577,7 @@ void ServerCache::Setup(const Json::Value& serverObj)
 				// indexes below, rather than reviving the whole row cache.
 				if (!mission.clear_rewards.empty())
 					m_missionClearRewards.emplace(mission.id, mission.clear_rewards);
-				// Repeat-clear rewards (S2ChOKo6): only the Balance Forge's
+				// Repeat-clear rewards (S2ChOKo6): only the
 				// mission_mst overlay writes them, and its check already proved
 				// they parse (forge/RepeatClear.hpp).
 				forge::noteRepeatRewards(mission.id, mission.repeat_clear_bonus);

@@ -29,8 +29,8 @@ wiki-era energy (15/20/25/30): this data version halved the energy (MST
 8/10/13/15) but kept the battles.  The Karma figures are the wiki's, per
 level.  Nothing can be caught (authored_capture with chance 0, so the 40%
 capture floor leaves it alone), and the chests opt out of the shared random
-Mimic.  energy_cost, exp, zel and karma are the mission_mst values, as Balance
-Forge requires.
+Mimic.  energy_cost, exp, zel and karma are the mission_mst values, as an overlay
+file requires.
 
 The files go to deploy/balance-overlays/karma-dungeon/<id>.json; publishing
 one = copying it to <balance_root>/server/missions/ (docs/features/
@@ -223,7 +223,7 @@ def main() -> int:
     stale = []
     for mission_id, level_no in MISSIONS.items():
         record = build(records, mst[mission_id], mission_id, level_no)
-        # Byte-identical to what Balance Forge publishes (battlemodel.file_bytes).
+        # Byte-identical to a published overlay file (indent 1, UTF-8, trailing newline).
         text = json.dumps(record, indent=1, ensure_ascii=False) + '\n'
         path = args.out / f'{mission_id}.json'
         print(f'{mission_id} {record["name"]}: {len(record["stages"])} waves, '

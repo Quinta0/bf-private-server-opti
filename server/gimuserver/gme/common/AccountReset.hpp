@@ -14,14 +14,13 @@
 //   1. Search kResetStartCode.  The popup names the account and gives a
 //      random 6-digit code that lasts kResetCodeLifeSec.
 //   2. Search that code.  A row goes into account_reset_queue.
-//   3. Balance Forge (the admin tooling) polls the queue and
-//      runs the admin tooling's own reset: off-site backup, snapshot, erase,
-//      audit lines.  The erase ends the session, so a client still open goes
-//      back to the title; the next start runs the tutorial.
+//   3. An external tool polls the queue and runs the reset itself:
+//      backup, snapshot, erase, audit lines.  The erase ends the session,
+//      so a client still open goes back to the title; the next start runs the tutorial.
 //
 // Nothing here changes the save but the queue row, so a mistake on this side
-// can at worst queue a reset the player asked for; the admin tooling skips an
-// account that is already gone.
+// can at worst queue a reset the player asked for; the tool that runs the
+// reset skips an account that is already gone.
 namespace gme
 {
 

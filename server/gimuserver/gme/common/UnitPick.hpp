@@ -29,15 +29,14 @@
 // an account that has not used the offer is sent one of each of the 24, and an
 // account that has is sent them at 0.  Nothing is stored until the pick:
 // user_unit_pick holds one row per account that has used it, and a reset
-// (the admin tooling OWNED_TABLES) deletes that row.
+// deletes that row.
 //
 // THE LEVEL 999 RACE PICK (owner, 2026-10-22) is a second, free family of the
 // same pickers: the first ten accounts to reach level 999 each get ONE pick
 // from every 7★ and Omni unit (deploy/archive/race_pick.json, written by
 // scripts/gen_race_pick.py with the summon gates' filters).  Twelve pickers,
 // Omni and 7★ per element, on gates of their own, so a gate never carries two
-// selector rows.  The admin tooling grants it (the admin tooling, the
-// playerdb op 'race_pick') by adding a user_race_pick row; its tiles and
+// selector rows.  An operator grants it by adding a user_race_pick row; its tiles and
 // tickets show while that row has no pick yet.
 //
 // THE GEMS ARE TAKEN AT THE PICK.  No shop screen in the client can sell a

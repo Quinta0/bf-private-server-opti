@@ -61,14 +61,14 @@ public:
 		void HandleSummonUnits(const drogon::HttpRequestPtr& rq, std::function<void(const drogon::HttpResponsePtr&)>&& callback);
 
 	/*!
-	* What the server did with the Balance Forge's overlays and rules: per file
+	* What the server did with the overlay files and rules: per file
 	* its sha256, counts, whether it is live and a plain reason when not.  No
 	* paths, contents or secrets, so it is public like summonUnits.php.
 	*/
 	void HandleForgeStatus(const drogon::HttpRequestPtr& rq, std::function<void(const drogon::HttpResponsePtr&)>&& callback);
 
 	/*!
-	* The Forge's difficulty log, per quest: runs, clears, fails, abandons,
+	* The difficulty log, per quest: runs, clears, fails, abandons,
 	* clear time and turns, squad strength (forge/ClearLog.hpp).  Aggregates
 	* only, nothing that names a player, so it is public like forgeStatus.php.
 	*/

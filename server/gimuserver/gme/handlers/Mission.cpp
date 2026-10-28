@@ -128,7 +128,7 @@ constexpr int64_t kMaxGems = 9'999LL;
 // A sixth field names the skill an Elgif reward carries ('6:50792:1:1:1:1030000',
 // ticket #38); extraSkill is 0 everywhere else.
 // The grammar (and the repeat-clear list's daily: prefix) lives in
-// forge/RepeatClear.hpp, shared with the Balance Forge's mission_mst checks.
+// forge/RepeatClear.hpp, shared with the overlay's mission_mst checks.
 using forge::ClearReward;
 using forge::parseClearRewards;
 
@@ -1248,7 +1248,7 @@ HANDLEF(MissionEnd)
 				}
 				else if (!labReplay && !frontierBattle)
 				{
-					// REPEAT-CLEAR REWARDS (Balance Forge, mission_mst S2ChOKo6;
+					// REPEAT-CLEAR REWARDS (overlay, mission_mst S2ChOKo6;
 					// forge/RepeatClear.hpp).  A won clear that is not the first
 					// pays the list as presents; a "daily:N" list pays the first N
 					// repeat clears of a game day (08:00 UTC), counted in the
@@ -1913,7 +1913,7 @@ HANDLEF(MissionStart)
 		if (!req.frontier_run || req.frontier_run->empty())
 			MissionArchiver::instance().applyBossDrops(*missionRecord);
 	}
-	// Last, the Forge's capture rules (forge/Capture.hpp, ticket #155):
+	// Last, the overlay capture rules (forge/Capture.hpp, ticket #155):
 	// which units can be captured here and how often.  No capture.json, no change.
 	forge::applyCaptureRules(*missionRecord, *forge::captureRules(),
 		[](uint32_t unit) { return UnitArchiver::instance().contains(unit); },

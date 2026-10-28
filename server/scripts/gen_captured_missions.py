@@ -59,7 +59,7 @@ def sgtext(folder: pathlib.Path, bundle: str) -> dict:
     """Newest sgtext_<bundle>_<ver>.zip as {key: text}.
 
     Each .csv inside is base64 text; after a header line every row is
-    key^text^... (the same format the admin tooling reads).
+    key^text^... (the format external tools read).
     """
     best = max(folder.glob(f'sgtext_{bundle}_*.zip'),
                key=lambda p: int(p.stem.rsplit('_', 1)[1]))

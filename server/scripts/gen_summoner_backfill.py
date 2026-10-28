@@ -1,7 +1,7 @@
 """#132: one-time Summoner backfill SQL (gme/common/SummonerProgress).
 
 python3 scripts/gen_summoner_backfill.py > summoner_backfill.sql
-sqlite3 SAVE < summoner_backfill.sql      # after bf-backup; one transaction
+sqlite3 SAVE < summoner_backfill.sql      # after a backup; one transaction
 
 Every account gets the Summoner EXP its lifetime player EXP would have paid
 under gme::regularQuestGain: lifetime EXP // 3200 Summoner EXP (about Lv 112

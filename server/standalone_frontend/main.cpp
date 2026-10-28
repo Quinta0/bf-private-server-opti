@@ -78,19 +78,19 @@ int main(int argc, char** argv)
                 auto db = drogon::app().getDbClient();
                 // Wait for other processes' locks instead of failing at once.  Drogon
                 // never rolls back a COMMIT that failed with SQLITE_BUSY, so without
-                // this one outside reader (the hourly bf-backup, the admin tooling's
-                // Accounts tab) overlapping a COMMIT leaves our single connection
+                // this one outside reader (an hourly backup copy, an external tool
+                // reading the save) overlapping a COMMIT leaves our single connection
                 // stuck inside an open transaction until a restart.  The setting
                 // lives on the connection, and SQLite has exactly one (config
                 // connection_numbr 1), opened once for the life of the process.
                 // 10 s, not 5.  Every game transaction takes the write lock with its
                 // first statement (gme::newTransaction, ticket #72), the one
                 // place SQLite waits this long for another writer; in WAL the
-                // admin tooling and bf-daily-gift hold it for milliseconds.
+                // other processes writing the save hold it for milliseconds.
                 const auto busy = db->execSqlSync("PRAGMA busy_timeout = 10000;");
                 LOG_INFO << "SQLite busy_timeout: "
                          << (busy.empty() ? std::string("?") : busy[0][0].as<std::string>()) << " ms";
-                // WAL: a reader (bf-backup's copy, the admin tooling) no longer blocks our
+                // WAL: a reader (a backup copy, an external tool) no longer blocks our
                 // writes and our writes never block it, so only another writer can make
                 // a request wait.  In rollback-journal mode the hourly backup had to hold
                 // the write lock for its whole copy, and every MissionEnd/UnitMix that

@@ -78,7 +78,7 @@ def main() -> int:
         record = records[mission_id]
         overlay = {**{k: record[k] for k in KEYS}, 'stages': build(record)}
         path = args.out / f'{mission_id}.json'
-        # Byte-identical to what Balance Forge publishes (battlemodel.file_bytes).
+        # Byte-identical to a published overlay file (indent 1, UTF-8, trailing newline).
         text = json.dumps(overlay, indent=1, ensure_ascii=False) + '\n'
         print(f'{mission_id} {overlay["name"]}: {len(overlay["stages"])} waves')
         if args.check:

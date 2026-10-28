@@ -1,4 +1,4 @@
-"""Shared harness for the Balance Forge wire tests (scripts/test_forge_*_wire.py).
+"""Shared harness for the overlay wire tests (scripts/test_forge_*_wire.py).
 
 A throwaway server in Docker (container from bf-server-build running
 <src>/out/build-linux-arm64/standalone_frontend/gimuserverw), its save in a fresh

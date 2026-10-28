@@ -9,7 +9,7 @@ BlueStacks hands the game a new ANDROID_ID after a crash or a long session while
 (vid) and altvid stay; the guest login must then keep the account, and move it back when the old id
 returns.  It must still make a new login when altvid differs, when the advertising id is all zeros,
 when two accounts share the pair (a cloned emulator), and when the row's device key changed after the
-hint was stored (a transfer or an admin tooling move).  Writes during the run go through docker exec (WAL
+hint was stored (a transfer or an operator's account move).  Writes during the run go through docker exec (WAL
 on a bind mount: host writes can split from the server's).
 """
 from __future__ import annotations
@@ -110,7 +110,7 @@ def run(src: Path, url: str, container: str) -> None:
     third = login(url, new_android_id(), shared_vid, shared_alt)
     check(third not in (b1['login'], b2['login']), 'a pair shared by two accounts gets a new login')
 
-    # A transfer or an admin tooling move gives the row another phone's key; the old phone's hint must
+    # A transfer or an operator's account move gives the row another phone's key; the old phone's hint must
     # not pull the account back before the new phone has logged in.
     phone = new_android_id()
     write_save(container, 'UPDATE gumi_live_users SET device_key=? WHERE id=?', device_key(phone), a['login'])

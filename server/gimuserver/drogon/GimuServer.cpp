@@ -110,7 +110,7 @@ void GimuServer::initAndStart(const Json::Value& config)
 	gme::loadEventRotation(server["archive_root"].asString());
 	gme::loadExchangeArchive(server["archive_root"].asString());
 
-	// Balance Forge: every loader has had its chance at its overlay.  A file
+	// Overlays: every loader has had its chance at its overlay.  A file
 	// in server/mst or server/archive that none of them read is reported in
 	// forgeStatus.php, so a misnamed table never looks applied.
 	forge::finishMstLoads();

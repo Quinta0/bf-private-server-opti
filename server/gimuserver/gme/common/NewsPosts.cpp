@@ -206,7 +206,7 @@ std::string escapeHtml(const std::string& text)
 	return out;
 }
 
-// A post without admin tooling HTML (posts.json written by hand): escaped, newlines kept.
+// A post without pre-rendered HTML (posts.json written by hand): escaped, newlines kept.
 std::string plainPostHtml(const NewsPost& post)
 {
 	std::string body = escapeHtml(post.body);

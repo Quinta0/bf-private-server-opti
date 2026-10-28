@@ -1,4 +1,4 @@
-"""Wire test: the Forge's capture rules, server/capture.json (ticket #155, forge/Capture.hpp).
+"""Wire test: the capture rules overlay, server/capture.json (ticket #155, forge/Capture.hpp).
 
 python3 scripts/test_capture_wire.py prepare SAVE            # while the server is stopped
 python3 scripts/test_capture_wire.py run --token FILE --balance DIR --container NAME [--url URL]
@@ -17,7 +17,7 @@ Quest 540 Mischief and Malice, read from MissionStart's drop_info (LE6JkUp7):
   drawn     the boss is drawn as Great Sage Mimir (50042) and drops its base form Mimir:
             "enabled": true at 100 on 50042 gives 50042 on every start and Mimir never;
             a rate alone or "enabled": false on 50042 leaves the Mimir drop as it was;
-  chosen    a Forge-built 540 (server/missions/540.json) whose boss joins as Light Lord Mimir
+  chosen    a hand-authored 540 (server/missions/540.json) whose boss joins as Light Lord Mimir
             (50041) at level 12, with "enabled": true on the drawn 50042: exactly 50041 at 12;
   on        C, a unit of 540 that never drops today, "enabled": true at 100: drops every start;
   rejected  a file with a rate of 150 is refused whole: the last good rules (C on) stay;
@@ -40,7 +40,7 @@ ROOT = Path(__file__).resolve().parents[1]
 QUEST = 540
 RUNS = 30
 DRAWN = 50042   # Great Sage Mimir, quest 540's boss, whose capture is its base form Mimir
-CHOSEN, CHOSEN_LV = 50041, 12   # Light Lord Mimir: the form a Forge battle picks under "Joins as"
+CHOSEN, CHOSEN_LV = 50041, 12   # Light Lord Mimir: the form a mission overlay names as the boss's capture form
 
 
 def units_in_archive() -> set[int]:
@@ -97,7 +97,7 @@ def main() -> int:
         else:
             rules_file.write_text(body if isinstance(body, str) else json.dumps(body))
         # Docker Desktop's file sharing shows a changed file's size and time to the container
-        # a moment late; on the VPS the admin tooling and the container share one disk.
+        # a moment late; on the VPS the overlay writer and the container share one disk.
         time.sleep(2)
 
     def starts(n=RUNS, levels=False):

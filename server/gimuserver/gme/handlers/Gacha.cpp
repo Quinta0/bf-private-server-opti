@@ -183,7 +183,7 @@ HANDLEF(GachaAction)
 		co_return HandleResult::error("Invalid gacha request", "This gate is not open");
 	}
 
-	// A banner the Balance Forge's rules close or lock (rules.json schedules and
+	// A banner the overlay rules close or lock (rules.json schedules and
 	// unlocks; forge/Rules.hpp).  The rail no longer lists it, so this is a
 	// rail loaded before the window shut: the reason, then Home.  Every unlock
 	// is open for a Sandbox account (gme/common/Sandbox.hpp).
@@ -452,7 +452,7 @@ HANDLEF(GachaList)
 		gme::hideTutorialGacha(resp.gacha_categories, resp.gacha_info);
 	}
 
-	// Banners the Balance Forge's rules close or lock leave the rail (their
+	// Banners the overlay rules close or lock leave the rail (their
 	// GachaInfo rows stay: a tile is what the player taps).
 	if (const auto forgeRules = forge::rules(); forgeRules->hidesGates())
 	{

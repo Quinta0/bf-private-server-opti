@@ -249,7 +249,7 @@ std::string MissionArchiver::encodeUnitDrop(size_t monsterIdx, const BattleMonst
 		return "";
 	}
 
-	// Every captured unit gets a rolled type, like a summon (owner, 2026-10-18,
+	// Every captured unit gets a rolled type, like a summon (2026-10-18,
 	// ticket #21).  The archive fixes unit_drop_type to 5 (Oracle) on
 	// most drops -- the captured story data as much as the Vortex fill -- so
 	// players only ever caught Oracles.  The stored type is no longer used for
@@ -426,7 +426,7 @@ namespace
 {
 
 /*!
-* Why the Forge's ai.json record cannot be used, or nullopt.  The limits are
+* Why an overlay ai.json record cannot be used, or nullopt.  The limits are
 * the wire encoder's (MissionStart's AI rows): it silently drops conditions
 * and flags beyond them and splits its rows on ':' '@' '#', so a record past
 * them would fight differently from what the balancer wrote.
@@ -524,10 +524,10 @@ void MissionArchiver::setup(const Json::Value& serverObj)
 	}
 
 	// The capture floor is applied per battle at MissionStart (applyCaptureFloor), so the
-	// Forge's tuning.json capture_floor_pct takes effect without a restart (#164).
+	// overlay tuning.json capture_floor_pct takes effect without a restart (#164).
 
-	// The Forge's ai.json records, before the hand-built missions below are
-	// checked against the cache: a battle made in the Forge may name them.
+	// The overlay ai.json records, before the hand-built missions below are
+	// checked against the cache: a hand-built battle may name them.
 	ais = forge::mergeRecords<AiRecord>("ai.json", std::move(ais),
 		[](const AiRecord& r) { return std::to_string(r.id); },
 		[](const std::string& text, AiRecord& out) { return forge::readStrict(out, text); },
@@ -764,7 +764,7 @@ void forEachBoss(MissionRecord& record, Fn&& fn)
 void MissionArchiver::loadBossDrops(const std::string& archiveRoot)
 {
 	bossDrops_ = BossDropPolicy{};
-	// The Forge's replacement first, strictly: an overlay that does not pass
+	// The overlay replacement first, strictly: an overlay that does not pass
 	// is reported and the image's file is read as it always was.
 	bool fromForge = false;
 	if (auto overlay = forge::readFileOverlay("boss_drops.json"))

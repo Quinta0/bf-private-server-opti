@@ -9,7 +9,7 @@
 #include <unordered_map>
 
 /*!
-* Balance Forge capture rules: <balance_root>/server/capture.json, which units
+* Capture rules: <balance_root>/server/capture.json, which units
 * can be captured and how often (ticket #155).  MissionStart applies
 * them to the battle it serves, after the slot rolls and the bosses' base-form
 * captures, so they reach every battle: archive, hand-built and snapshot
@@ -60,7 +60,7 @@ std::shared_ptr<const CaptureRules> captureRules();
 /*!
 * Applies the rules to one served battle; `capturable(unit)` says whether
 * MissionEnd could hand that unit out (UnitArchiver), checked before a unit is
-* made capturable where it was not.  On a `handBuilt` (Forge) record a capture
+* made capturable where it was not.  On a `handBuilt` (hand-authored) record a capture
 * keeps the unit the battle names: a rule on the drawn unit does not replace it.
 *
 * @return How many monsters changed.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wire test: Balance Forge MST and archive overlays, and forgeStatus.php.
+"""Wire test: MST and archive overlays, and forgeStatus.php.
 
     PYTHONPATH=<repo>/tools <repo>/.venv/bin/python \
         scripts/test_forge_overlays_wire.py [--src wt/forge] [--port 9987] [--assets DIR] [--keep]
@@ -366,7 +366,7 @@ def main() -> int:
             check(f'{label}: GachaInfo 18060 shows {GATE_PRICE} gems and "{GATE_NAME}"',
                   (str(info_row.get('03UGMHxF')), info_row.get('4N27mkt1')) == (GATE_PRICE, GATE_NAME), info_row)
 
-        # The login calendar's day 1 was paid at the first UserInfo, from the Forge's file.
+        # The login calendar's day 1 was paid at the first UserInfo, from the overlay file.
         login = archive.get('login_campaign.json', {})
         day_one = sorted((int(r[0]), int(r[1])) for r in db.rows(
             "SELECT present_type, target_cnt FROM user_presents WHERE user_id = ? AND description = 'Login Bonus Day 1'",

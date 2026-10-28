@@ -24,7 +24,7 @@ constexpr uint32_t kTutorialPotionItemId = 20000;
 // exist" is what stops the gifts being queued twice.
 constexpr int32_t kTutorialGiftReceiptType = 1;
 
-// What the completion dialog pays out is the Balance Forge's starter pack
+// What the completion dialog pays out is the overlay starter pack
 // (forge/StarterPack.hpp: <balance_root>/server/starter.json, else the
 // server's own defaults of 5 gems, 10000 zel and 3 potions).  present_type
 // follows the shared reward vocabulary (wire hash 30Kw4WBa, the same one
@@ -80,7 +80,7 @@ HANDLEF(CreateUser)
 	}
 
 	// A stale user id from the client is ignored, as in Initialize: after an account
-	// was reset (admin tooling Accounts tab) or transferred away, the phone may still hold
+	// was reset or transferred away, the phone may still hold
 	// its old id.  CreateUser only runs when this login has no player, which the
 	// check below enforces, so nothing can be overwritten.
 	auto identity = (co_await gme::getUserIdentity(theDb(), req.login_info, true, true)).data;

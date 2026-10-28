@@ -89,7 +89,7 @@ There is no unit-test target; behaviour is checked by wire tests that drive a ru
 way the client does. They need `pycryptodome` and game data.
 
 - `scripts/test_*_wire.py`: per-feature wire tests (for example
-  `python scripts/test_balance_overlay_wire.py --port 9964 --name bf-balance`). Read each script's
+  `python scripts/test_balance_overlay_wire.py --port 9964 --name bf-overlay-test`). Read each script's
   docstring for its setup.
 - `scripts/bf_testkit.py`: helpers that run an isolated server on a backup-API copy of a save, so the
   original is only opened read-only.

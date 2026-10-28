@@ -8,7 +8,7 @@
 #include <vector>
 
 /*!
-* Balance Forge starter pack: <balance_root>/server/starter.json.
+* Starter pack overlay: <balance_root>/server/starter.json.
 *
 * What a player finds in the present box when they finish the tutorial (the
 * "Gifts have been awarded to you" dialog), on top of what CreateUser hands
@@ -38,7 +38,7 @@ struct StarterItem
 	bool operator==(const StarterItem&) const = default;
 };
 
-/*! The defaults are what the server gave before the Forge could change it. */
+/*! The defaults are what the server gave before an overlay could change it. */
 struct StarterPack
 {
 	int32_t gems = 5;

@@ -88,7 +88,7 @@ std::optional<std::string> deriveDeviceHint(const drogon::SafeStringMap<std::str
 * the new key; nothing when the hint does not pick out exactly one account.
 *
 * A row's hint counts only while the row still has the device key it arrived
-* with (device_hint_key): a transfer or an admin tooling move that gives the row
+* with (device_hint_key): a transfer or an operator's move that gives the row
 * another phone's key leaves the old phone's hint behind, and that phone must
 * not pull the account back before the new phone has logged in.  Only a row
 * with a player qualifies, and two of them (a cloned emulator instance, say)

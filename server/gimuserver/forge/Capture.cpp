@@ -39,7 +39,7 @@ struct CaptureOpts : glz::opts
 
 constexpr CaptureOpts kCaptureOpts = [] {
 	CaptureOpts opts{};
-	opts.error_on_unknown_keys = false;   // a newer Forge may write more
+	opts.error_on_unknown_keys = false;   // a newer writer may add more
 	return opts;
 }();
 
@@ -183,7 +183,7 @@ size_t applyCaptureRules(MissionRecord& record, const CaptureRules& rules, bool 
 			// A rule turning on the unit the monster is DRAWN as wins over what it drops
 			// today: a boss's base-form drop (applyBossDrops, #82) or an archive capture of
 			// another form would otherwise hide it (7* Kyo 810187 drops his 6* 810186).
-			// A battle built in the Forge says itself which form a capture joins as ("Joins as"),
+			// A hand-built battle says itself which form a capture joins as ("Joins as"),
 			// so its capture keeps that unit (a 7* chosen over the drawn Omni stays the 7*).
 			const bool chosen = handBuilt && monster.unit_drop_id != 0 && monster.unit_drop_chance != 0;
 			if (!chosen && monster.unit_id != 0 && monster.unit_id != monster.unit_drop_id)

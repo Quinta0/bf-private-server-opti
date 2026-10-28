@@ -249,7 +249,7 @@ drogon::Task<HandleResult> redeemUnitPick(
 
 /*!
 * The level 999 race pick (gme/common/UnitPick.hpp): free, once, and only for an
-* account the admin tooling granted it to (a user_race_pick row with no pick yet).
+* account an operator granted it to (a user_race_pick row with no pick yet).
 *
 * A retry is safe the same way as the unit pick: the claim is an UPDATE guarded
 * on picked_at = 0, so two picks racing cannot both land, and a resent request
@@ -399,7 +399,7 @@ HANDLEF(UnitSelectorGachaTicket)
 		unitType = UnitArchiver::getRandomType();
 	}
 
-	// The level 999 race pick: free, for the accounts the admin tooling granted it to.
+	// The level 999 race pick: free, for the accounts an operator granted it to.
 	if (const auto* offer = gme::racePickOffer(ticketId))
 	{
 		const auto identity = (co_await gme::getUserIdentity(theDb(), req.login_info)).nonEmpty();

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wire test: Balance Forge repeat-clear rewards (mission_mst S2ChOKo6).
+"""Wire test: overlay repeat-clear rewards (mission_mst S2ChOKo6).
 
     PYTHONPATH=<repo>/tools <repo>/.venv/bin/python \
         scripts/test_forge_repeat_clear_wire.py [--src wt/forge] [--port 9985] [--assets DIR] [--keep]

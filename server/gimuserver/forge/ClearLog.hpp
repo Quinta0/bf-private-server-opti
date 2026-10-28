@@ -8,8 +8,8 @@
 #include <string>
 
 /*!
-* The Forge's difficulty log: one line per finished quest run, for
-* GET /bf/gme/forgeClears.php and the admin tooling's Difficulty report.
+* The difficulty log: one line per finished quest run, for
+* GET /bf/gme/forgeClears.php.
 *
 * A run opens at MissionStart (started) and finishes as
 *   clear    MissionEnd with mission_status 2 (or none, read as a win like MissionEnd does);

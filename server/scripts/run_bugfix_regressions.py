@@ -42,8 +42,8 @@ PY = sys.executable
 # Failures accepted on purpose, by exact case.  Each entry names the reason,
 # every FAIL label the suite is expected to print (its Checker label, the text
 # before "  -- "), and how many checks pass beside them.  Anything else from
-# that suite fails the run.  Empty: the delayed-Continue (QC_SESSION_3_REVIEW
-# P2) and ShopUse type-9 reset reproducers both pass since Session 6.
+# that suite fails the run.  Empty: the delayed-Continue and ShopUse type-9
+# reset reproducers both pass.
 #
 #   'test_example_wire.py': {'reason': 'why it is still open, with a doc link',
 #                            'failures': ['exact failing label'], 'passed': 12},

@@ -183,7 +183,7 @@ inline std::vector<StagedMstTable> scanMstRoot(const std::filesystem::path& root
 * Scans `game_content/content/<TABLE>/manifest.json`, then -- when
 * balance_root is configured -- `<balance_root>/content/<TABLE>/manifest.json`
 * the same way.  A table staged in both is offered from balance_root: that is
-* where the admin tooling publishes, and its version supersedes whatever
+* where an operator publishes, and its version supersedes whatever
 * the content mirror carries.
 *
 * Cheap enough to run per Initialize: it is one directory listing plus a small

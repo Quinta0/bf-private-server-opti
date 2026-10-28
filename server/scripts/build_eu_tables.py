@@ -4,14 +4,14 @@
 
 Each table is rebuilt from the newest version found in the --base folders
 (the archive's mst/ for the shipped tables; for prod, the live parts of the
-tables Balance Forge already publishes), with every row of deploy/mst whose
-id that version lacks appended at the end, which is also where the Forge puts
-them (the admin tooling). Nothing else changes.
+tables already published as overlay files), with every row of deploy/mst whose
+id that version lacks appended at the end. Nothing else changes.
 
 Writes <out>/content/<TABLE>/Ver<N>_<key>[_i].dat, then manifest.json last,
 for the server's mstVersions to announce. Parts are at most 400000 bytes of
-JSON, like the Forge's. Versions are fixed below and must be new on the
-target: a client never re-downloads a version number it already has.
+JSON, like the published overlay parts. Versions are fixed below and must
+be new on the target: a client never re-downloads a version number it
+already has.
 FE_SKILL/UNIT_FE_SKILL went 650 -> 651 when Htilit's 70270 became a Light Barrier.
 """
 import argparse

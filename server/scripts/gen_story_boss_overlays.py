@@ -7,7 +7,7 @@ regular and Trial"), as two ai.json AIs plus three battle-builder files.
 Appends AIs 900000140 (Skramya) and 900000141 (Grand Jelly) to deploy/archive/ai.json
 (once) and writes 90.json and 20070.json for
 <balance_root>/server/missions.  Boss HP for Grand Jelly is the wiki's 300,000; the
-other stats are estimates to tune in Balance Forge."""
+other stats are estimates for an operator to tune."""
 import copy, json, sys
 from pathlib import Path
 src, out = Path(sys.argv[1]), Path(sys.argv[2])

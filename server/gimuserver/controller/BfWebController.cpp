@@ -92,7 +92,7 @@ fs::path findMstPartUnder(const fs::path& root, const std::string& name)
 }
 
 /*!
-* An MST part staged by the admin tooling under <balance_root>/content.
+* An MST part staged by an operator under <balance_root>/content.
 *
 * Checked BEFORE the document root, mirroring mstVersions(), where a table
 * staged under balance_root supersedes the content mirror's: the bytes served
@@ -339,7 +339,7 @@ void BfWebController::HandleWebPage(const HttpRequestPtr& rq, std::function<void
 		}
 	}
 
-	// A part the admin tooling published wins over anything at the same
+	// A part an operator published wins over anything at the same
 	// name in the document root, as its manifest does in mstVersions().
 	if (const auto part = findBalanceMstPart(rq->getPath()); !part.empty())
 	{

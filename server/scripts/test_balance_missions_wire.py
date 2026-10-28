@@ -155,7 +155,7 @@ class Folder:
         self.written: set[Path] = set()
 
     def write(self, name: str, payload) -> None:
-        """Atomic like Balance Forge's store.write_atomic: a dotfile temp, then os.replace."""
+        """Atomic like other processes writing overlay files: a dotfile temp, then os.replace."""
         target, tmp = self.path / name, self.path / f'.{name}.wiretest'
         tmp.write_text(payload if isinstance(payload, str) else json.dumps(payload))
         os.replace(tmp, target)

@@ -153,7 +153,7 @@ void GmeController::HandleForgeStatus(const HttpRequestPtr& rq, std::function<vo
 	// Read on every request: the rules engine updates it while running.
 	p->addHeader("Cache-Control", "no-store");
 	// The same throttled look at rules.json every game request takes (at most
-	// once per 2 s), so the admin tooling sees a file it just wrote without first
+	// once per 2 s), so an external tool sees a file it just wrote without first
 	// needing a player to touch the game.
 	forge::rules();
 	// Likewise starter.json (a stat, re-read only when it changed).

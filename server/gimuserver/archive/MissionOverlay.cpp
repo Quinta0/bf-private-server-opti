@@ -2,8 +2,8 @@
 //
 // Each file holds ONE MissionRecord, exactly the shape of one element of
 // archive/mission.json, and replaces (or adds) the archive record with that id
-// while it is there.  Balance Forge's Battles tab writes them; the owner can
-// also drop one in by hand.  The folder is re-read on the main loop every 2 s,
+// while it is there.  An external tool writes them, or an operator drops one
+// in by hand.  The folder is re-read on the main loop every 2 s,
 // so a publish goes live without a restart, and lookup()/archived() never do
 // file IO: they read an immutable snapshot that a refresh swaps in whole.
 //
@@ -245,8 +245,8 @@ std::string unrepresentableName(const fs::path& name)
 }
 
 // Lists the folder with the error_code overloads: a missing folder is an
-// empty listing, any other error abandons the pass.  Dotfiles (Balance
-// Forge's temp files are .<name>.XXXX) are skipped silently, strays reported.
+// empty listing, any other error abandons the pass.  Dotfiles (a
+// writer's temp files are .<name>.XXXX) are skipped silently, strays reported.
 Listing listOverlay(const fs::path& dir, std::set<std::string>& misnamed, std::string& error)
 {
 	Listing listing;

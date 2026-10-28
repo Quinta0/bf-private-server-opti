@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wire test: Balance Forge rules.json (squad rules, unlock rules, schedule windows).
+"""Wire test: the rules.json overlay (squad rules, unlock rules, schedule windows).
 
     PYTHONPATH=<repo>/tools <repo>/.venv/bin/python \
         scripts/test_forge_rules_wire.py [--src wt/forge] [--port 9986] [--assets DIR] [--keep]
