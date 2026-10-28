@@ -118,6 +118,17 @@ json TreasureDrop {
         doc "Reward amount, item count, or crystal count depending on target_type."
     }
 
+    field amount_max type="u32::int" {
+        key "amount_max"
+        doc """
+        Optional top of a ranged amount: the chest gives `amount` to
+        `amount_max` (inclusive), rolled when MissionStart decides the chest
+        ("1-3 Rose Bolt").  Absent, or not above `amount`, keeps the fixed
+        `amount`.
+        """
+        optional #true
+    }
+
     field target_id type=str {
         key "target_id"
         doc "Item id for target_type 4; empty for zel, karma, and crystals."
@@ -340,6 +351,28 @@ json BattleMonster {
         Omit it for an ordinary enemy: MissionArchiver then sends
         "0:0:0:0:0:0", which is what every live row carries and what this
         archiver hard-coded before bosses became authorable.
+        """
+        optional #true
+    }
+
+    field passive_procs type=str {
+        key "passive_procs"
+        doc """
+        Passive effects the enemy has from the start of the battle
+        (ticket #162): passive proc ids in the leader-skill format,
+        joined by '@' ("1@5").  Sent as MonsterMst.passive_process_id
+        (hjAy9St3); MonsterUnit::setPassiveList reads it (with
+        getPassiveProcessParam) like a unit's own passives, as guild guardians
+        use it.  Omit it for none: every live row sends "".
+        """
+        optional #true
+    }
+
+    field passive_params type=str {
+        key "passive_params"
+        doc """
+        The params of passive_procs, one comma list per proc joined by '@'
+        ("50,0,0,0,0@1,30").  Sent as MonsterMst.passive_process_param (2Smu5Mtq).
         """
         optional #true
     }

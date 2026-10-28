@@ -250,9 +250,9 @@ json LoginInfoResp {
 json UserPartyDeckInfo {
     doc "TODO"
 
-    field user_unit_id type="u32::str" {
+    field user_unit_id type="i64::str" {
         key "edy7fq3L"
-        doc "TODO"
+        doc "The unit in this slot.  \"-1\" is the Summoner Avatar itself: UserPartyInfo::isSummoner @0x129DC84 compares this string with \"-1\", and PlayerParty::entry builds a SummonerUnit for that slot (Summoner's Road squads)."
     }
 
     field deck_type type="u32::str" {

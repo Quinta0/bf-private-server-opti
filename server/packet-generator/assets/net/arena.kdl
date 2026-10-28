@@ -479,6 +479,24 @@ json ArenaBattleStartResp {
         key "fEi17cnx"
         doc "HUD with the spent Arena Orb."
     }
+
+    field ais type="[AIMst]" {
+        key "89ausgc4"
+        doc """
+        The unit AI rows (F_AI_MST) for every UnitMst.ai_id, so both sides use
+        their Brave Bursts.  In arena every unit acts on its own:
+        PlayerUnit::checkCmdInput @0x115B9E0 hands it to
+        BattleUnit::autoCmdInput, whose setAiTargetList @0x10FD940 looks up
+        UnitMst.ai_id (i74vGUFa, 100-230) in AIMstList.  No row there means a
+        plain attack every turn.  AIMstResponse::readParam @0x13CAAE8 empties
+        the list on its first row, and MissionStart / raid battles fill it with
+        their monster AI, so the list holds no unit AI unless this reply sends
+        it.  A `skill:0` self term passes when the BB or SBB gauge is full
+        (checkAiActionTerm @0x112CF50, PlayerUnit/RivalUnit::isSkillFree are
+        false), and the `skill` action casts the SBB when it is ready, else the
+        BB (@0x10FE600).
+        """
+    }
 }
 
 json ArenaBattleEndResp {

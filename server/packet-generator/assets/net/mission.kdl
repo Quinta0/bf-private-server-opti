@@ -452,6 +452,23 @@ json MissionReward {
     }
 }
 
+json MissionEp3Reward {
+    doc "MissionEp3RewardResponse (response key M4w9LT7t), readParam @0x13E2540 -- a SINGLETON (MissionEp3RewardInfo::shared()).  What a Chapter 3 quest paid the Summoner Avatar; read by MissionResultBonusScene / MissionResultSummonerTopScene / MissionResultSummonerExpScene.  The before_exp / before_elem_exp / before_arm_exp setters exist but readParam never calls them (the scenes take those from UserSummonerInfo).  Keys read off readParam's strcmp table."
+
+    field lvup_flg type="i32::str" { key "wPb5uMR9"; doc "setLvUpFlg: the Summoner levelled up."; }
+    field before_lv type="i32::str" { key "81CsGAR9"; doc "setBeforeLv: Summoner level before the quest."; }
+    field exp type=str { key "d96tuT2E"; doc "setExp: \"earned,clear_bonus\".  setExp @0x12679A4 splits on ',' into getExp (+0x20) and getExpClearBonus (+0x24)."; }
+    field elem_lvup_flg type="i32::str" { key "eNr2883C"; doc "setElemLvUpFlg: the current element's Summoning Arts levelled up."; }
+    field before_elem_lv type="i32::str" { key "vtVVqaTf"; doc "setBeforeElemLv."; }
+    field elem_exp type=str { key "1xI7xvK3"; doc "setElemExp: \"earned,clear_bonus\", same split as exp."; }
+    field arm_lvup_flg type="i32::str" { key "HLkl9R0G"; doc "setArmLvUpFlg."; }
+    field before_arm_lv type="i32::str" { key "ODJl2WpY"; doc "setBeforeArmLv."; }
+    field arm_exp type=str { key "NqVAPbLC"; doc "setArmExp: \"earned,clear_bonus\", same split as exp."; }
+    field sp type=str { key "iIDqD50O"; doc "setSp: comma list read by getSp(int) @0x1267E08 with a bounds check; one number is the SP the quest paid."; }
+    field exp_guild_summoner type="i32::str" { key "b8D18b7e"; doc "setExpGuildSummoner: guild bonus EXP (guilds pay none here)."; }
+    field boost_item_id type=str { key "YhiqHj06"; doc "setBoostItemID: the Summoner EXP booster used, empty for none."; }
+}
+
 // =============================================================================
 //  MissionBreak  (an interrupted battle, and the offer to resume it)
 // =============================================================================
@@ -691,6 +708,11 @@ json MissionBattleResultInfo {
     field karma type="u32::str" {
         key "HTVh8a65"
         doc "Karma earned during the mission."
+    }
+
+    field clear_turns type="str" {
+        key "Lu0pAk1R"
+        doc "BattleLog::getClearTurnInfo: the turns each wave took, comma-separated (\"2,1,2,1,1\").  Their sum is the clear's turn count, which the \"Cleared in N Turns\" achievements measure (ticket #46).  Empty when absent."
     }
 
     field item_rewards type="str" {

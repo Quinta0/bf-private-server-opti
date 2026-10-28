@@ -85,6 +85,8 @@ import "../net/badge_info.kdl"
 import "../net/frontier_gate.kdl"
 // After user.kdl: the arena envelopes embed LoginInfoReq, UserArenaInfo and UserTeamInfo.
 import "../net/arena.kdl"
+// After arena.kdl: the Colosseum envelopes embed FriendUserArenaInfo and UserArenaInfo.
+import "../net/colosseum.kdl"
 
 json InitializeReq {
     doc "Initialization command"
@@ -1893,16 +1895,26 @@ json UnitFavoriteReq {
 
     field entries type="[UnitFavoriteEntry]" {
         key "3kcmQy7B"
-        doc "List of entries the client is updating in this call"
+        doc "The client's WHOLE favourite list, not a delta: UnitFavoriteRequest::createBody @0x13AEDC8 walks every unit and lists those with getFavorite == 1 or getUnitImgType == 2.  A unit that is not listed is not a favourite.  May be empty (the last favourite was removed)."
     }
 }
 
 json UnitFavoriteResp {
-    doc "Echoed favorite-flag entry.  The IDA-extracted UnitFavoriteResponse::SerializeFields (in exported_handlers/response/UnitFavoriteResponse.hpp) emits a single object value rather than an array under key 3kcmQy7B, so the wire shape is {\"3kcmQy7B\":{\"edy7fq3L\":\"...\",\"5JbjC3Pp\":\"...\",\"2pAyFjmZ\":\"...\"}}"
+    doc "The favourite list as the server now holds it, one row per unit the request listed.  UnitFavoriteResponse::readParam clears UnitFavoriteList at row 0 and adds one UnitFavoriteObj per row, so this is a FULL REPLACE of an array: echoing only the first entry (as a single object, from the old fork's SerializeFields) left the client's list with one unit and the other stars vanished (ticket #39)."
 
-    field entry type="UnitFavoriteEntry" {
+    field entries type="[UnitFavoriteEntry]" {
         key "3kcmQy7B"
-        doc "Echo of the first request entry"
+        doc "Every entry of the request, as applied."
+    }
+    field helper_list type="[ReinforcementInfo]" {
+        key "xZH6EIQ7"
+        doc "The helper picker as FriendGet sends it (gme::buildHelperLists).  Any reply that carries xZH6EIQ7 replaces ReinforcementInfoList (row 0 clears it), so this is always the COMPLETE list, never a partial or id-less row.  Sent because the client only calls FriendGet at login and before a repeat quest: an own favourited unit's card otherwise kept its login-time level."
+        optional #true
+    }
+    field helper_friends type="[FriendInfo]" {
+        key "tojMy68W"
+        doc "The Social rows as FriendGet sends them, including the priority-2 rows that put own cards first. FriendInfoResponse clears FriendInfoList at row 0, so this is always the COMPLETE list."
+        optional #true
     }
 }
 
@@ -1989,12 +2001,20 @@ json UnitEvoResp {
         doc "Updated team info (zel) after the evolution."
     }
 
-    field reinforce type="[UnitReinforceEntry]" {
+    // NO GV81ctzR HERE (ticket #138).  It rode this reply from
+    // 2026-10-23 06:23Z for the Unit Guide (#118); its readParam erases and
+    // re-adds every UserUnitDictionaryList entry, and the only evolutions whose
+    // result the client never applied (it re-sent the same request) came after
+    // it.  The form is recorded server-side and arrives with the next UserInfo.
+
+    field helper_list type="[ReinforcementInfo]" {
         key "xZH6EIQ7"
-        doc """
-        NEVER SET -- same hazard as UnitMixResp.reinforce.  xZH6EIQ7 is the
-        HELPER PICKER list, not an evolution animation payload.  Omitted.
-        """
+        doc "The helper picker as FriendGet sends it (gme::buildHelperLists).  Any reply that carries xZH6EIQ7 replaces ReinforcementInfoList (row 0 clears it), so this is always the COMPLETE list, never a partial or id-less row.  Sent because the client only calls FriendGet at login and before a repeat quest: an own favourited unit's card otherwise kept its login-time level."
+        optional #true
+    }
+    field helper_friends type="[FriendInfo]" {
+        key "tojMy68W"
+        doc "The Social rows as FriendGet sends them, including the priority-2 rows that put own cards first. FriendInfoResponse clears FriendInfoList at row 0, so this is always the COMPLETE list."
         optional #true
     }
 
@@ -2054,28 +2074,14 @@ json UnitMixReq {
 json UnitMixResp {
     doc "UnitMix (Power Fusion) response.  Carries the result record (1ZbHB6Im), a full unit-cache rebuild (4ceMWH6k) and the updated team info (fEi17cnx).  xZH6EIQ7 is the HELPER PICKER list and is never sent from here (see the reinforce field)."
 
-    field reinforce type="[UnitReinforceEntry]" {
+    field helper_list type="[ReinforcementInfo]" {
         key "xZH6EIQ7"
-        doc """
-        NEVER SET.  xZH6EIQ7 is the HELPER PICKER list, not a fusion
-        animation payload: it dispatches to ReinforcementInfoResponse, whose
-        readParam @0x13EB29C calls ReinforcementInfoList::removeAllObjects on
-        row 0 and, on each row's last field, ADDS the row only when its user id
-        (h7eY3sAK) is non-empty -- otherwise the row is autoreleased.
-
-        Until 2026-10-02 fusion and evolution sent one "DecompDev" row with no
-        user id here.  The client parsed it, emptied the helper list, then
-        threw the row away, so the next quest's picker said NO_REINFORCEMENT
-        ("Reinforcements could not be found") until a FriendGet (a battle
-        result or a relaunch) refilled it.  Player report 2026-10-02: "every
-        once in a while" -- i.e. after a fusion or evolution.
-
-        Nothing reads it for fusion either: the result screen draws from
-        UnitOpeResult (1ZbHB6Im) and the unit cards from the 4ceMWH6k roster.
-        The row could never reach a list, so it never drove anything.
-        Optional so the key is omitted; a zero-row array would also be inert,
-        but an absent key cannot be misread.
-        """
+        doc "The helper picker as FriendGet sends it (gme::buildHelperLists).  Any reply that carries xZH6EIQ7 replaces ReinforcementInfoList (row 0 clears it), so this is always the COMPLETE list, never a partial or id-less row.  Sent because the client only calls FriendGet at login and before a repeat quest: an own favourited unit's card otherwise kept its login-time level."
+        optional #true
+    }
+    field helper_friends type="[FriendInfo]" {
+        key "tojMy68W"
+        doc "The Social rows as FriendGet sends them, including the priority-2 rows that put own cards first. FriendInfoResponse clears FriendInfoList at row 0, so this is always the COMPLETE list."
         optional #true
     }
 
@@ -2601,6 +2607,17 @@ json MissionEndResp {
         optional #true
     }
 
+    field ep3_reward type="[MissionEp3Reward]" {
+        key "M4w9LT7t"
+        doc "Sent after a Chapter 3 quest (mission_ep3_mst): what it paid the Summoner, one row (see MissionEp3Reward)."
+        optional #true
+    }
+    field summoner_info type="[UserSummonerInfo]" {
+        key "n5mdIUqj"
+        doc "Sent when the quest paid the Summoner anything: the whole UserSummonerInfo row after it (level, EXP, Summoning Arts, SP).  readParam re-inits the singleton first, so it must be the full row, as UserInfo sends it.  The client never moves these fields itself (only UserSummonerInfoResponse calls setExp/setLevel)."
+        optional #true
+    }
+
 }
 
 
@@ -2758,6 +2775,11 @@ json ShopUseEntry {
         key "edy7fq3L"
         doc "The owned unit a type-9 use acts on.  ShopUseRequest::createBody @0x13AC8C8 adds it only when set, and its one setter caller is UnitDetailVirtuallyInfoScene::resetConnect @0x1BDEBDC (the Enhancements screen's Reset, priced at DefineMst reset_fe_skill_dia_count).  The client sends it only when the reset can do something: resetBtnSet @0x1BE2C88 disables the button while getFeUsedBP() is 0, and resetDialog @0x1BDF278 shows the shortage dialog instead when its gem count is below the price.  The body says nothing about the unit's state and carries no nonce, so a retry and a later genuine reset look the same.  Empty for every other type."
     }
+    field next_summoner_sex type="i32::str" {
+        key "9i2xhMaJ"
+        doc "ShopUseType 12 only (ShopUseRequest::setNextSummonerSex): the gender SummonerUnitMakeScene is changing the Summoner Avatar to."
+        optional #true
+    }
 }
 
 json ShopUseReq {
@@ -2791,6 +2813,11 @@ json ShopUseResp {
     field unit_refresh type="[UserUnitInfo]" {
         key "4ceMWH6k"
         doc "Type 9 (reset a unit's SP enhancements) only: the COMPLETE roster, full-replace.  The client never clears fe_skill_info or moves SP back itself -- setFeBP / setFeUsedBP / setFeSkillInfo are written only by UserUnitInfoResponse::readParam -- and qC2tJs4E cannot update an owned unit, so this is the one way the reset shows.  Safe here: UnitDetailVirtuallyInfoScene re-resolves its unit by id in every function that reads it.  Optional so every other type omits it (an empty full-replace list would clear the roster)."
+        optional #true
+    }
+    field summoner_info type="[UserSummonerInfo]" {
+        key "n5mdIUqj"
+        doc "ShopUseType 12: the whole UserSummonerInfo row with the new gender (readParam re-inits the singleton, so the full row)."
         optional #true
     }
 }

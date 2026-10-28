@@ -200,9 +200,9 @@ json FrontierGatePartyDeckInfo {
         doc "Deck slot number."
     }
 
-    field user_unit_id type="i32::str" {
+    field user_unit_id type="str" {
         key "edy7fq3L"
-        doc "user_units instance id of this member."
+        doc "user_units instance id of this member, or the literal FROGATE_FRIEND_ID on the borrowed helper's slot (its owner is friend_id: a player's friend id, or DCF000xx for a stand-in helper).  A string for that reason: typed as an int, the helper's row failed the whole request parse (parse_number_failure), so the party echoed back lost the helper and every unit after it (ticket #37, prod logs 2026-10-19)."
     }
 
     field friend_id type="str" {
@@ -250,9 +250,9 @@ json FrontierGateUserUnitInfo {
         doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
     }
 
-    field user_unit_id type="u32::str" {
+    field user_unit_id type="str" {
         key "edy7fq3L"
-        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+        doc "The user_units instance id, or FROGATE_FRIEND_ID for the borrowed helper (see FrontierGatePartyDeckInfo.user_unit_id: a string so the helper's row parses)."
     }
 
     field friend_id type="str" {
@@ -405,14 +405,14 @@ json FrontierGateUserUnitInfo {
         doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
     }
 
-    field unit_img_type type="i32::int" {
+    field unit_img_type type="str" {
         key "2pAyFjmZ"
-        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+        doc "A quoted string on this path (\"0\"), unlike UserUnitInfo's JSON number: typed as an int it failed the FrontierGateStart parse at every unit's first 2pAyFjmZ, so only one unit was ever stored and echoed (ticket #37, prod 2026-10-19).  Kept as the client's string."
     }
 
-    field omni_level type="i32::int" {
+    field omni_level type="str" {
         key "49sa3sld"
-        doc "Shared with UserUnitInfo (qC2tJs4E); see net/user.kdl for the full field note."
+        doc "A quoted string on this path (\"0\"), unlike UserUnitInfo's JSON number: typed as an int it failed the FrontierGateStart parse at every unit's first 49sa3sld, so only one unit was ever stored and echoed (ticket #37, prod 2026-10-19).  Kept as the client's string."
     }
 
     field fe_skill_info type="str" {

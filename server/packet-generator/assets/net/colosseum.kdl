@@ -1,0 +1,939 @@
+// Colosseum (async PvP by class).  Wire shapes rebuilt from the v2.19.6
+// client's createBody / readParam (strcmp -> setter pairs); the scene flow,
+// rules and what is still unverified are in docs/features/COLOSSEUM.md.
+// Handlers: gme/handlers/Colosseum.cpp, state: gme/common/Colosseum.{hpp,cpp}.
+//
+// Request values are all strings on the wire, so every request field here is
+// `str` and the handler parses numbers itself (same rule as net/arena.kdl).
+//
+// Registration (GmeControllerHandlers.cpp):
+//   rdZbaKBG ColosseumDeckEdit / gY3YK5bD
+//   ysP6qYcy ColosseumBattleStart / iFIHAT5V
+//   ohH9lfDE ColosseumBattleRestart / j2bFgyri
+//   fGDPoQI3 ColosseumBattleEnd / 4V6oIoRC
+//   AoBvG2YN ColosseumFriendList / Wj5fH1HV
+//   jv0dI88o ColosseumGetRewardInfo / d7aPxZWw
+//   PN5CVaWy ColosseumRewardReceipt / YBgVBy5A
+
+// ---------------------------------------------------------------------------
+// Requests
+// ---------------------------------------------------------------------------
+
+json ColosseumClassEntry {
+    doc "KtSHFZY7 node: the class the request is about (ColosseumCommonInfo::getSelectClassID)."
+
+    field class_id type="str" {
+        key "3mMAn6L5"
+        doc "Class id 1..4."
+        optional #true
+    }
+
+    field duration_id type="str" {
+        key "ZW19nYrU"
+        doc "Season id (ColosseumUserInfo.duration_id); FriendList only."
+        optional #true
+    }
+}
+
+json ColosseumDeckMember {
+    doc "Pgz43hTE row of ColosseumDeckEdit::createBodyPartyDeck: one unit of one of the class's two squads."
+
+    field deck_num type="str" {
+        key "zsiAn9P1"
+        doc "UserPartyDeck deck num: 0 = attack squad, 1 = defence squad."
+        optional #true
+    }
+
+    field deck_type type="str" {
+        key "U9ABSYEp"
+        doc "1 = attack, 2 = defence (createBodyPartyDeck: deck num 1 -> 2, else 1)."
+        optional #true
+    }
+
+    field user_unit_id type="str" {
+        key "edy7fq3L"
+        doc "The unit."
+        optional #true
+    }
+
+    field member_type type="str" {
+        key "gr48vsdJ"
+        doc "0 = leader, 1 = member (npc_mst P_MEMBER_TYPE vocabulary)."
+        optional #true
+    }
+
+    field disp_order type="str" {
+        key "XuJL4pc5"
+        doc "Squad position 0..4."
+        optional #true
+    }
+}
+
+json ColosseumDeckSupport {
+    doc "vAPeUI3X row of createBodySupportInfo: the formation and support of one squad."
+
+    field deck_type type="str" {
+        key "U9ABSYEp"
+        doc "1 = attack, 2 = defence."
+        optional #true
+    }
+
+    field formation_id type="str" {
+        key "peCeLuNq"
+        doc "ColosseumFormationMst id (1xx attack, 2xx defence)."
+        optional #true
+    }
+
+    field support_id type="str" {
+        key "NungTq5g"
+        doc "ColosseumSupportMst id (400/600/700/800)."
+        optional #true
+    }
+}
+
+json ColosseumDeckEditReq {
+    doc "ColosseumDeckEdit (rdZbaKBG).  Sent by ColosseumTopScene::updateEvent on every visit and before Match, and by ColosseumPartySetScene."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field class_info type="[ColosseumClassEntry]" {
+        key "KtSHFZY7"
+        doc "One node."
+        optional #true
+    }
+
+    field members type="[ColosseumDeckMember]" {
+        key "Pgz43hTE"
+        doc "Both squads, one row per unit."
+        optional #true
+    }
+
+    field supports type="[ColosseumDeckSupport]" {
+        key "vAPeUI3X"
+        doc "Two rows, attack then defence."
+        optional #true
+    }
+}
+
+json ColosseumBattleInfoEntry {
+    doc "fq2C03jh node of ColosseumBattleStart::createBodyBattleInfo."
+
+    field ticket_cnt type="str" {
+        key "69vnphig"
+        doc "Tickets the player put on this match (the Top screen's slider); omitted when 0."
+        optional #true
+    }
+
+    field bonus_type type="str" {
+        key "ciDqCjAF"
+        doc "GeneralEventMst Colosseum campaign type, echoed in the result."
+        optional #true
+    }
+
+    field bonus_param type="str" {
+        key "59b1eE6N"
+        doc "GeneralEventMst Colosseum campaign parameter, echoed in the result."
+        optional #true
+    }
+}
+
+json ColosseumBattleStartReq {
+    doc "ColosseumBattleStart (ysP6qYcy), sent by ColosseumMatchScene::initConnect.  Also carries the ignored 60subGk3 header and rj5fgJh0 (drop display setting)."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field class_info type="[ColosseumClassEntry]" {
+        key "KtSHFZY7"
+        doc "One node."
+        optional #true
+    }
+
+    field battle_info type="[ColosseumBattleInfoEntry]" {
+        key "fq2C03jh"
+        doc "One node."
+        optional #true
+    }
+}
+
+json ColosseumClassReq {
+    doc "ColosseumBattleRestart (ohH9lfDE) and ColosseumFriendList (AoBvG2YN): the login block plus the class node."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field class_info type="[ColosseumClassEntry]" {
+        key "KtSHFZY7"
+        doc "One node."
+        optional #true
+    }
+}
+
+json ColosseumBattleEndEntry {
+    doc "BZ95Eg3M row of ColosseumBattleEnd::createBodyResult: one of the match's two fights (ArenaBattleScene::setColosseumResultParam; a give-up sends both rows as losses).  Only the fields the server keeps are modelled."
+
+    field battle_num type="str" {
+        key "1kisc6IF"
+        doc "The server's battle id, from ColosseumBattleEnemyInfo.battle_num."
+        optional #true
+    }
+
+    field battle_type type="str" {
+        key "2QOPHXW1"
+        doc "1 = the attack fight, 2 = the defence fight."
+        optional #true
+    }
+
+    field result type="str" {
+        key "3pAQY5KW"
+        doc "1 = won."
+        optional #true
+    }
+
+    field b_crystal_cnt type="str" {
+        key "hoG2ieT5"
+        doc "Battle crystals."
+        optional #true
+    }
+
+    field h_crystal_cnt type="str" {
+        key "6PLsn8xo"
+        doc "Heart crystals."
+        optional #true
+    }
+
+    field max_turn_damage type="str" {
+        key "5NRJQ1LU"
+        doc "Best single-turn damage."
+        optional #true
+    }
+
+    field max_turn_spark type="str" {
+        key "XP06YWdT"
+        doc "Best single-turn sparks."
+        optional #true
+    }
+
+    field defeat_unit_cnt type="str" {
+        key "mFID53JZ"
+        doc "Enemy units defeated."
+        optional #true
+    }
+
+    field hp_party_rest type="str" {
+        key "WDYR11jJ"
+        doc "Comma list, one value per squad slot (\"0,0,0,0,0\" on a give-up).  INFERRED: remaining HP of the player's side."
+        optional #true
+    }
+
+    field hp_enemy_rest type="str" {
+        key "chy3HnIm"
+        doc "Comma list, as hp_party_rest for the other side."
+        optional #true
+    }
+}
+
+json ColosseumBattleEndReq {
+    doc "ColosseumBattleEnd (fGDPoQI3), sent by ColosseumBattleEndScene::initConnect after both fights."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field class_info type="[ColosseumClassEntry]" {
+        key "KtSHFZY7"
+        doc "One node."
+        optional #true
+    }
+
+    field results type="[ColosseumBattleEndEntry]" {
+        key "BZ95Eg3M"
+        doc "One row per fight."
+        optional #true
+    }
+}
+
+json ColosseumRewardFilter {
+    doc "1x6T2Trz node of ColosseumGetRewardInfo::createBody."
+
+    field stage_id type="str" {
+        key "mQhKzRxu"
+        doc "Reward stage asked for (ColosseumShopScene::nextConnect sends the next stage)."
+        optional #true
+    }
+
+    field category_id type="str" {
+        key "VgU78CYj"
+        doc "Reward category."
+        optional #true
+    }
+}
+
+json ColosseumGetRewardInfoReq {
+    doc "ColosseumGetRewardInfo (jv0dI88o): the CBP exchange list.  Sent by the Top screen's Reward button and the shop scenes."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field filter type="[ColosseumRewardFilter]" {
+        key "1x6T2Trz"
+        doc "One node."
+        optional #true
+    }
+}
+
+json ColosseumReceiptEntry {
+    doc "zcN7zXLn row of ColosseumRewardReceipt::createBody: one reward to exchange."
+
+    field reward_id type="str" {
+        key "N1b6SUW4"
+        doc "ColosseumRewardInfo.reward_id."
+        optional #true
+    }
+
+    field category_id type="str" {
+        key "VgU78CYj"
+        doc "Its category."
+        optional #true
+    }
+
+    field count type="str" {
+        key "H6k1LIxC"
+        doc "Always 1 in the package path."
+        optional #true
+    }
+}
+
+json ColosseumRewardReceiptReq {
+    doc "ColosseumRewardReceipt (PN5CVaWy): exchange CBP for rewards.  ShopDetailScene sends one row; ShopScene's exchange-all (setIsPackage) sends every row whose receive status is 1."
+
+    field loginInfo type="[LoginInfoReq]::size(1)" {
+        key "IKqx1Cn9"
+        doc "Login info identifying the current user."
+    }
+
+    field rewards type="[ColosseumReceiptEntry]" {
+        key "zcN7zXLn"
+        doc "Rewards to exchange."
+        optional #true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Response rows
+// ---------------------------------------------------------------------------
+
+json ColosseumClassInfo {
+    doc "HgYvs3am ColosseumClassInfoResponse row (a list).  The Top, Class Select, Match and Reward scenes all look their class up with getObjectID and use the result unchecked, so every reply that carries the group lists all four classes."
+
+    field class_id type="i32::str" {
+        key "3mMAn6L5"
+        doc "Class id."
+    }
+
+    field position type="i32::str" {
+        key "2rqxaZ6K"
+        doc "This season's ranking position in the class, 0 while unranked."
+    }
+
+    field atk_party type="str" {
+        key "Enmv8X74"
+        doc "Attack squad, JSON [{P_USER_UNIT_ID, P_MEMBER_TYPE, P_DISPORDER}] (NpcPartyParseList::parse); \"[]\" when unset.  ColosseumCommonInfo::classDeckDataSet builds the squad screens from it."
+    }
+
+    field def_party type="str" {
+        key "UvOujGQX"
+        doc "Defence squad, same format."
+    }
+
+    field units type="str" {
+        key "U42YcFNu"
+        doc "Unused for the player's own classes (classDeckDataSet reads the units from UserUnitInfoList); sent as \"[]\"."
+    }
+
+    field atk_formation_id type="i32::str" {
+        key "XRaf10Pu"
+        doc "Attack formation; isDcekCheck refuses a match when FormationMstList has no such id."
+    }
+
+    field atk_support_id type="i32::str" {
+        key "dgtpPK70"
+        doc "Attack support."
+    }
+
+    field def_formation_id type="i32::str" {
+        key "5MjZwxqH"
+        doc "Defence formation."
+    }
+
+    field def_support_id type="i32::str" {
+        key "kPvAtLWr"
+        doc "Defence support."
+    }
+
+    field battle_cnt type="i32::str" {
+        key "69vnphig"
+        doc "Matches fought in this class."
+    }
+
+    field win_cnt type="i32::str" {
+        key "8CEu9Kcm"
+        doc "Matches won."
+    }
+
+    field atk_series_win_cnt type="i32::str" {
+        key "7sXWfE8j"
+        doc "Current winning streak (Reward screen \"consecutive victories\")."
+    }
+
+    field battle_cnt_accept type="i32::str" {
+        key "20iEWRCV"
+        doc "Times this player's squads were challenged."
+    }
+
+    field win_cnt_accept type="i32::str" {
+        key "0rAkzg7L"
+        doc "Challenges the squads held off."
+    }
+
+    field battle_num type="str" {
+        key "1kisc6IF"
+        doc "Open battle id, \"\" when none (only the dead ArenaInfoConnectScene::colosseumBattleTheWay reads it)."
+    }
+
+    field total_cbp type="i32::str" {
+        key "z1rMbo8n"
+        doc "This season's CBP in the class: the ranking score."
+    }
+
+    field all_win_cnt type="i32::str" {
+        key "PL0mqDhK"
+        doc "Matches where both fights were won."
+    }
+
+    field all_series_win_cnt type="i32::str" {
+        key "Txb2idHz"
+        doc "Current streak of matches with both fights won."
+    }
+}
+
+json ColosseumUserInfo {
+    doc "FfBebG0R ColosseumUserInfoResponse: a SINGLETON (readParam starts with clear()), so exactly one row."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Player id."
+    }
+
+    field cbp type="i32::str" {
+        key "qnccUrMN"
+        doc "CBP to spend in the reward exchange (the client caps the display at 999999999)."
+    }
+
+    field total_cbp type="i32::str" {
+        key "z1rMbo8n"
+        doc "CBP earned over all seasons."
+    }
+
+    field battle_cnt type="i32::str" {
+        key "69vnphig"
+        doc "Matches, all classes."
+    }
+
+    field win_cnt type="i32::str" {
+        key "8CEu9Kcm"
+        doc "Wins, all classes."
+    }
+
+    field battle_cnt_accept type="i32::str" {
+        key "20iEWRCV"
+        doc "Times challenged, all classes."
+    }
+
+    field win_cnt_accept type="i32::str" {
+        key "0rAkzg7L"
+        doc "Defences held, all classes."
+    }
+
+    field position type="i32::str" {
+        key "2rqxaZ6K"
+        doc "Unused by the scenes read; 0."
+    }
+
+    field reward_info type="str" {
+        key "JQ23rIvk"
+        doc "ColosseumTopScene::initialize shows a non-empty value as a notice and then clears it: the season-end message."
+    }
+
+    field duration_id type="str" {
+        key "ZW19nYrU"
+        doc "Current season id (YYYYMM); the Rank scene sends it back."
+    }
+
+    field stage_id type="str" {
+        key "mQhKzRxu"
+        doc "Current reward stage (the shop headers look it up in U6MWwoW4)."
+    }
+
+    field category_id type="str" {
+        key "VgU78CYj"
+        doc "Current reward category."
+    }
+}
+
+json ColosseumBattleEnemyInfo {
+    doc "y7A1mZft ColosseumBattleEnemyInfoResponse: the opponent of the open match.  Its parties and units are what RivalParty::entryColosseumEnemy builds the enemy side from."
+
+    field user_id type="str" {
+        key "h7eY3sAK"
+        doc "Opponent id (bots: COLOBOT<n>)."
+    }
+
+    field battle_num type="str" {
+        key "1kisc6IF"
+        doc "Server battle id; BattleEnd sends it back on every fight row."
+    }
+
+    field handle_name type="str" {
+        key "B5JQyV8j"
+        doc "Name on the Match screen."
+    }
+
+    field lv type="i32::str" {
+        key "D9wXQI2V"
+        doc "Team level."
+    }
+
+    field win_cnt type="i32::str" {
+        key "8CEu9Kcm"
+        doc "Wins in this class (Match screen record)."
+    }
+
+    field battle_cnt type="i32::str" {
+        key "69vnphig"
+        doc "Matches in this class; the screen shows battle_cnt - win_cnt as losses."
+    }
+
+    field team type="str" {
+        key "INT1K9Pf"
+        doc "JSON {P_USER_ID, P_FRIEND_MESSAGE, P_LV, P_GUILD_ID} (NpcTeamParse), as in arena."
+    }
+
+    field atk_party type="str" {
+        key "Enmv8X74"
+        doc "Opponent attack squad (fights the player's defence squad)."
+    }
+
+    field def_party type="str" {
+        key "UvOujGQX"
+        doc "Opponent defence squad (fights the player's attack squad)."
+    }
+
+    field units type="str" {
+        key "U42YcFNu"
+        doc "P_* unit JSON for both squads (NpcUnitParseList, arena format)."
+    }
+
+    field atk_formation_id type="i32::str" {
+        key "XRaf10Pu"
+        doc "Attack formation."
+    }
+
+    field atk_support_id type="i32::str" {
+        key "dgtpPK70"
+        doc "Attack support."
+    }
+
+    field def_formation_id type="i32::str" {
+        key "5MjZwxqH"
+        doc "Defence formation."
+    }
+
+    field def_support_id type="i32::str" {
+        key "kPvAtLWr"
+        doc "Defence support."
+    }
+
+    field friend_message type="str" {
+        key "bM7RLu5K"
+        doc "Opponent message."
+    }
+
+    field friend_id type="str" {
+        key "98WfKiyA"
+        doc "Opponent friend id."
+    }
+
+    field extra_flg type="i32::str" {
+        key "Z7PXoxc2"
+        doc "Extra rule flag; 0 (no extra rules)."
+    }
+
+    field rule_id type="i32::str" {
+        key "IvuccUuD"
+        doc "ColosseumExtraRuleMst id when extra_flg is set; 0."
+    }
+
+    field total_cbp type="i32::str" {
+        key "z1rMbo8n"
+        doc "Opponent's season CBP in the class."
+    }
+
+    field position type="i32::str" {
+        key "2rqxaZ6K"
+        doc "Opponent's ranking position, 0 when unranked."
+    }
+}
+
+json ColosseumBattlePartyInfo {
+    doc "7oXGyuVH ColosseumBattlePartyInfoResponse: the player's own side as the battle builds it (PlayerParty::entryColosseumPlayer reads the units from HERE, not from the unit box).  Empty parties make ColosseumMatchScene refuse with ARENA_COLOSSEUM_PLAYER_NULL."
+
+    field atk_party type="str" {
+        key "Enmv8X74"
+        doc "Attack squad."
+    }
+
+    field def_party type="str" {
+        key "UvOujGQX"
+        doc "Defence squad."
+    }
+
+    field units type="str" {
+        key "U42YcFNu"
+        doc "P_* unit JSON for both squads."
+    }
+
+    field atk_formation_id type="i32::str" {
+        key "XRaf10Pu"
+        doc "Attack formation."
+    }
+
+    field atk_support_id type="i32::str" {
+        key "dgtpPK70"
+        doc "Attack support."
+    }
+
+    field def_formation_id type="i32::str" {
+        key "5MjZwxqH"
+        doc "Defence formation."
+    }
+
+    field def_support_id type="i32::str" {
+        key "kPvAtLWr"
+        doc "Defence support."
+    }
+}
+
+json ColosseumBattleResult {
+    doc "BZ95Eg3M ColosseumBattleResultResponse row.  Rows 1 and 2 are the two fights; row 3 is the match summary that ColosseumResultScene / ResultJudgeScene / RewardScene fetch with getObjectWithBattleType(3) and use unchecked, so it is always sent."
+
+    field battle_num type="str" {
+        key "1kisc6IF"
+        doc "Battle id."
+    }
+
+    field battle_type type="i32::str" {
+        key "2QOPHXW1"
+        doc "1 attack fight, 2 defence fight, 3 summary."
+    }
+
+    field result type="i32::str" {
+        key "3pAQY5KW"
+        doc "1 = won.  On the summary: the match verdict the judge screen shows."
+    }
+
+    field defeat_unit_cnt type="i32::str" {
+        key "mFID53JZ"
+        doc "Enemy units defeated."
+    }
+
+    field before_cbp type="i32::str" {
+        key "43QyxTS5"
+        doc "Summary: class season CBP before the match."
+    }
+
+    field after_cbp type="i32::str" {
+        key "OUY9jpPA"
+        doc "Summary: class season CBP after the match."
+    }
+
+    field friend_req_state type="i32::str" {
+        key "Sx5H0Ikn"
+        doc "1 opens the friend-request prompt after the reward screen; 0."
+    }
+
+    field bonus_point type="i32::str" {
+        key "tvWWL9wI"
+        doc "Summary: the clean-sweep bonus included in after_cbp."
+    }
+
+    field battle_cnt type="i32::str" {
+        key "69vnphig"
+        doc "Summary: tickets used (ARENA_COLOSSEUM_REWARD_USE_TICKET)."
+    }
+
+    field bonus_type type="str" {
+        key "ciDqCjAF"
+        doc "Campaign type echoed from BattleStart."
+    }
+
+    field bonus_param type="str" {
+        key "59b1eE6N"
+        doc "Campaign parameter echoed from BattleStart."
+    }
+}
+
+json ColosseumRewardInfo {
+    doc "xNCYRb5G ColosseumRewardInfoResponse row: one reward of the current stage."
+
+    field category_id type="i32::str" {
+        key "VgU78CYj"
+        doc "Category."
+    }
+
+    field reward_id type="i32::str" {
+        key "N1b6SUW4"
+        doc "Reward id."
+    }
+
+    field present_type type="i32::str" {
+        key "30Kw4WBa"
+        doc "Present vocabulary (3 zel, 8 gem, 11 karma, 6 unit, 4/5/7 item)."
+    }
+
+    field target_id type="str" {
+        key "TdDHf59J"
+        doc "Unit or item id; \"\" for currencies."
+    }
+
+    field target_param type="str" {
+        key "37moriMq"
+        doc "Extra parameter (a unit's \"<skill>:...\"); \"\"."
+    }
+
+    field target_cnt type="i32::str" {
+        key "wJsB35iH"
+        doc "Amount."
+    }
+
+    field receive_status type="i32::str" {
+        key "rPk8gtY5"
+        doc "1 = can be exchanged (the exchange-all package takes exactly the status-1 rows), 2 = already exchanged."
+    }
+
+    field need_cbp type="i32::str" {
+        key "H218ntr9"
+        doc "Price in CBP."
+    }
+}
+
+json ColosseumRewardStageMst {
+    doc "U6MWwoW4 ColosseumRewardStageMstResponse row.  ColosseumRewardStageMstList::getNextStageID returns the FIRST row whose id differs from the shop's stage, so the list starts at the player's stage (#140)."
+
+    field stage_id type="i32::str" {
+        key "mQhKzRxu"
+        doc "Stage id."
+    }
+
+    field stage_name type="str" {
+        key "bkLH47xi"
+        doc "Shop sub-header."
+    }
+
+    field description type="str" {
+        key "qp37xTDh"
+        doc "Stage blurb."
+    }
+}
+
+json ColosseumDurationInfo {
+    doc "Q5jXpri7 ColosseumDurationInfoResponse row: a season."
+
+    field duration_id type="str" {
+        key "ZW19nYrU"
+        doc "Season id YYYYMM."
+    }
+
+    field title type="str" {
+        key "yEi6I3nF"
+        doc "Season title on the Rank screen."
+    }
+}
+
+json ColosseumPastRanking {
+    doc "dSC5DzuN ColosseumPastRankingResponse row: the player's final standing in a past season and class.  The Rank screen shows its Past Rankings button only when the list is non-empty."
+
+    field duration_id type="str" {
+        key "ZW19nYrU"
+        doc "Season id."
+    }
+
+    field class_id type="i32::str" {
+        key "3mMAn6L5"
+        doc "Class."
+    }
+
+    field position type="i32::str" {
+        key "2rqxaZ6K"
+        doc "Final position."
+    }
+
+    field cbp type="i32::str" {
+        key "qnccUrMN"
+        doc "Final season CBP."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Response envelopes
+// ---------------------------------------------------------------------------
+
+json ColosseumHubResp {
+    doc """
+    ArenaInfo (oim9TU1D) reply, also appended to ChallengeArenaResetInfo's: the
+    arena standing plus everything the Colosseum Top / Class Select screens read.
+
+    NO MASTER ROWS HERE (wmpLokaR / aCmTmaOx / kaQtidz4).  Their readParams
+    removeAllObjects first, and ColosseumTopScene::initialize keeps a pointer
+    to its ColosseumClassMst (+0x3b0) that only initialize sets, so a class row
+    in the Top screen's own ArenaInfo reply frees the object under it: the cost
+    check then read garbage and refused a Hero Class squad ("exceeds the set
+    cost limit", emulator 2026-10-23).  The CDN tables already carry the
+    English names the screens show.
+    """
+
+    field arena_info type="[UserArenaInfo]" {
+        key "8jBJ7uKR"
+        doc "Exactly one row (singleton parser)."
+    }
+
+    field classes type="[ColosseumClassInfo]" {
+        key "HgYvs3am"
+        doc "All four classes."
+    }
+
+    field user_info type="[ColosseumUserInfo]" {
+        key "FfBebG0R"
+        doc "Exactly one row."
+    }
+
+    field durations type="[ColosseumDurationInfo]" {
+        key "Q5jXpri7"
+        doc "Current and past seasons."
+    }
+
+    field past_rankings type="[ColosseumPastRanking]" {
+        key "dSC5DzuN"
+        doc "The player's past-season standings."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "HUD with the day's free tickets topped up."
+    }
+}
+
+json ColosseumDeckEditResp {
+    doc "ColosseumDeckEdit reply.  No HgYvs3am: the client built the request from its own ColosseumClassInfo, and replacing that list frees objects the Top and squad screens hold (see ColosseumHubResp)."
+
+    field user_info type="[ColosseumUserInfo]" {
+        key "FfBebG0R"
+        doc "Exactly one row."
+    }
+}
+
+json ColosseumBattleStartResp {
+    doc "ColosseumBattleStart / ColosseumBattleRestart reply."
+
+    field enemy_info type="[ColosseumBattleEnemyInfo]" {
+        key "y7A1mZft"
+        doc "Exactly one row."
+    }
+
+    field party_info type="[ColosseumBattlePartyInfo]" {
+        key "7oXGyuVH"
+        doc "Exactly one row."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "HUD with the spent tickets."
+    }
+
+    field ais type="[AIMst]" {
+        key "89ausgc4"
+        doc "Unit AI rows, as ArenaBattleStartResp.ais: both sides fight on AI."
+    }
+}
+
+json ColosseumBattleEndResp {
+    doc "ColosseumBattleEnd reply."
+
+    field results type="[ColosseumBattleResult]" {
+        key "BZ95Eg3M"
+        doc "Fight rows 1 and 2 plus the summary row 3."
+    }
+
+    field classes type="[ColosseumClassInfo]" {
+        key "HgYvs3am"
+        doc "All four classes, updated."
+    }
+
+    field user_info type="[ColosseumUserInfo]" {
+        key "FfBebG0R"
+        doc "Exactly one row."
+    }
+
+    field team_info type="[UserTeamInfo]::size(1)" {
+        key "fEi17cnx"
+        doc "HUD."
+    }
+}
+
+json ColosseumFriendListResp {
+    doc "ColosseumFriendList reply (ColosseumRankScene)."
+
+    field list type="[FriendUserArenaInfo]" {
+        key "BYaF62TE"
+        doc "Ranking rows; ranking_point is the class season CBP, position the rank."
+    }
+
+    field durations type="[ColosseumDurationInfo]" {
+        key "Q5jXpri7"
+        doc "Seasons, for the title."
+    }
+
+    field past_rankings type="[ColosseumPastRanking]" {
+        key "dSC5DzuN"
+        doc "The player's past-season standings."
+    }
+}
+
+json ColosseumRewardResp {
+    doc "ColosseumGetRewardInfo / ColosseumRewardReceipt reply."
+
+    field rewards type="[ColosseumRewardInfo]" {
+        key "xNCYRb5G"
+        doc "The asked-for stage's rewards; ColosseumTopScene goes straight to the shop when this is non-empty."
+    }
+
+    field stages type="[ColosseumRewardStageMst]" {
+        key "U6MWwoW4"
+        doc "The player's stage and the ones after it, in order: \"Go to Next Stage\" asks for the first row that is not the shop's stage."
+    }
+
+    field user_info type="[ColosseumUserInfo]" {
+        key "FfBebG0R"
+        doc "Exactly one row, with the CBP left."
+    }
+}

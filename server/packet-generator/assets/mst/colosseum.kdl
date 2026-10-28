@@ -30,19 +30,19 @@ json ColosseumClassMst {
         doc "Class display name — Japanese only, e.g. \"極輝召\", \"天星召\"."
     }
 
-    field unk1 type="i32::str" {
+    field max_cost type="i32::str" {
         key "YDxl64JI"
-        doc "// UNVERIFIED: 999/54/50/45 captured, descending with the class id.  Does NOT match the unit-cost caps quoted in `description` (unlimited/35/28/15), so this is some other per-class ceiling."
-    }
-
-    field display_order type="i32::str" {
-        key "XuJL4pc5"
-        doc "Display order 1..4.  Same hash/name as banner.kdl and raid.kdl."
+        doc "CONFIRMED setMaxCost (readParam).  The highest Cost a single unit may have in this class's squads: 999 (no limit) / 54 / 50 / 45.  Omni units cost 40-60, 7* units 38-52, so the three capped classes trim the top end of the box.  The ported descriptions quoting 35/28/15 come from an older era of this table."
     }
 
     field description type="str" {
+        key "XuJL4pc5"
+        doc "CONFIRMED setDescription (readParam @ColosseumClassMstResponse): the client reads THIS key as the class blurb.  The CDN rows carry the display order (1..4) here, so the Colosseum handlers send English rows of their own (gme/common/Colosseum.cpp)."
+    }
+
+    field note type="str" {
         key "qp37xTDh"
-        doc "Bracket blurb — e.g. \"ユニットコスト15以下限定の対戦ルール\" (unit cost 15 or lower)."
+        doc "Ignored by the client (no strcmp for it in readParam).  The ported rows keep a stale English blurb here."
     }
 
     field image type="str" {
