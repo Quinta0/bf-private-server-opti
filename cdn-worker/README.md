@@ -7,7 +7,7 @@ with `wrangler` to **your own Cloudflare account**.
 | Worker | Config | Purpose |
 |---|---|---|
 | `bf-cdn` | [`wrangler.jsonc`](wrangler.jsonc), [`src/`](src) | Serves `/content/*` and `/mst/*` from the R2 bucket `bf-assets` to game clients over plain HTTP. |
-| `bf-mst-publish` | [`mst-publish/wrangler.jsonc`](mst-publish/wrangler.jsonc) | Add-only upload endpoint for new client table parts (see [BALANCE_FORGE_OVERLAYS.md](../server/docs/features/BALANCE_FORGE_OVERLAYS.md) for the manifests that announce them). |
+| `bf-mst-publish` | [`mst-publish/wrangler.jsonc`](mst-publish/wrangler.jsonc) | Add-only upload endpoint for new client table parts (see [BALANCE_OVERLAYS.md](../server/docs/features/BALANCE_OVERLAYS.md) for the manifests that announce them). |
 | `bf-backup` | [`backup/wrangler.jsonc`](backup/wrangler.jsonc) | Write-only sink for gzipped database snapshots in the R2 bucket `bf-backups`. |
 | `bf-asset-uploader` | [`uploader/wrangler.jsonc`](uploader/wrangler.jsonc) | Temporary endpoint for the initial bulk upload of your game archive into R2. Delete it after use. |
 

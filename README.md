@@ -11,8 +11,9 @@
 > **Unofficial fan project.** This project is not affiliated with, endorsed by or sponsored by
 > gumi Inc. or Alim Co., Ltd. "Brave Frontier" and all related names, characters and artwork
 > are trademarks of their respective owners. **No game assets are distributed here**: this
-> repository contains source code only. The game client, data tables and art must be obtained
-> separately. The project exists for preservation, interoperability and educational use.
+> repository contains source code only. The game client, decoded client tables and art must be
+> obtained separately; the curated server data lives in a companion repository (see
+> [Game data](#game-data)). The project exists for preservation, interoperability and educational use.
 > See [NOTICE](NOTICE).
 
 ## Contents
@@ -21,6 +22,7 @@
 - [Features](#features)
 - [Repository layout](#repository-layout)
 - [Quick start](#quick-start)
+- [Game data](#game-data)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [Security](#security)
@@ -73,7 +75,7 @@ the evidence behind them.
   Merit exchange, Summoner's Journal, town, unit fusion and evolution, spheres and crafting.
 - **Live operations without restarts.** The server reads an optional `balance_root` folder of
   overlay and config files you author yourself: new client table versions are announced at the next login, and hand-built battles
-  are picked up within seconds ([BALANCE_FORGE_OVERLAYS.md](server/docs/features/BALANCE_FORGE_OVERLAYS.md)).
+  are picked up within seconds ([BALANCE_OVERLAYS.md](server/docs/features/BALANCE_OVERLAYS.md)).
 - **In-game news board** and an **in-game account reset** ([NEWS_BOARD.md](server/docs/features/NEWS_BOARD.md),
   [ACCOUNT_RESET.md](server/docs/features/ACCOUNT_RESET.md)).
 
@@ -106,7 +108,12 @@ data. Full instructions, including Windows and native Linux builds, are in
 
 ```bash
 git clone https://github.com/joppe2001/bf-private-server.git
+git clone https://github.com/joppe2001/bf-private-server-data.git
 cd bf-private-server
+
+# Copy the curated server data in (Docker only mounts server/, so a symlink
+# pointing outside it would not resolve inside the container)
+cp -R ../bf-private-server-data/archive server/deploy/archive
 
 # Build the server in the toolchain container (arm64 hosts, e.g. Apple Silicon)
 docker/build.sh
@@ -121,6 +128,20 @@ docker logs -f bf-server
 ```bash
 (cd cdn-worker && npm ci && npm test)
 ```
+
+## Game data
+
+The server reads three kinds of game data. None of them is in this repository:
+
+| Data | Where it comes from |
+|---|---|
+| Curated server data (`server/deploy/archive/`: missions, enemy AI, units, gacha, events) | The companion repository [bf-private-server-data](https://github.com/joppe2001/bf-private-server-data), folder `archive/`. It also holds optional hand-built mission overlays in `balance-overlays/`. |
+| Decoded client tables (`server/deploy/mst/`) | Not in either repository; obtain them separately. |
+| Client content (`content/` and `mst/`, passed as `ASSETS`) | Not in either repository; obtain it separately. |
+
+`server/deploy/system/` (server settings and reply fixtures) is part of this repository. See
+[Obtain the game data](docs/GETTING_STARTED.md#obtain-the-game-data) for the folder layout and
+the config keys.
 
 ## Documentation
 

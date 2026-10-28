@@ -25,9 +25,17 @@ files or decrypted dumps. The `.gitignore` already excludes the usual locations
 (`server/deploy/mst/`, `server/deploy/archive/`, `/re/lib/`, `*.apk`, ...); do not force-add
 around it.
 
-The game data is obtained separately, from public community preservation archives (for
-example BluuArc's Brave Frontier archive). Documentation should say "obtain the game data
-separately" and must not link to APK downloads or other redistributions of the client.
+The decoded client tables and client content are obtained separately, from public community
+preservation archives (for example BluuArc's Brave Frontier archive). Documentation should say
+"obtain the game data separately" and must not link to APK downloads or other redistributions of
+the client.
+
+The curated server data (`server/deploy/archive/`: missions, enemy AI, units, gacha, events) lives
+in the companion repository
+[bf-private-server-data](https://github.com/joppe2001/bf-private-server-data). Send data
+corrections there, not here: change or extend the generators in `server/scripts/` (`gen_*.py`)
+in this repository when the fix is a generator bug, regenerate the files, and open the pull
+request with the regenerated data against the data repository. Do not hand-edit generated files.
 
 Code that *reads* or *transforms* those files is welcome. Tests should build the small
 fixtures they need in code rather than check in real tables.

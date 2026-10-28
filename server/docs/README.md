@@ -22,7 +22,7 @@ or authored by this server.
 | Area | Documents |
 |---|---|
 | Accounts | [ACCOUNT_RESET.md](features/ACCOUNT_RESET.md) |
-| Overlay files (`balance_root`) | [BALANCE_FORGE_OVERLAYS.md](features/BALANCE_FORGE_OVERLAYS.md), [BATTLE_BUILDER.md](features/BATTLE_BUILDER.md), [NEWS_BOARD.md](features/NEWS_BOARD.md) |
+| Overlay files (`balance_root`) | [BALANCE_OVERLAYS.md](features/BALANCE_OVERLAYS.md), [BATTLE_BUILDER.md](features/BATTLE_BUILDER.md), [NEWS_BOARD.md](features/NEWS_BOARD.md) |
 | Summons | [FAIR_SUMMON.md](features/FAIR_SUMMON.md), [SUMMON_ROTATION.md](features/SUMMON_ROTATION.md), [EVENT_SUMMON.md](features/EVENT_SUMMON.md), [COLLAB_SUMMON.md](features/COLLAB_SUMMON.md) |
 | Social | [FRIENDS_SPEC.md](features/FRIENDS_SPEC.md), [GUILDS_SOCIAL_2026-10-17.md](features/GUILDS_SOCIAL_2026-10-17.md), [GUILD_INVITE_2026-09-26.md](features/GUILD_INVITE_2026-09-26.md) |
 | Raids | [RAIDS_SPEC.md](features/RAIDS_SPEC.md), [RAIDS_ROUND2_CORE.md](features/RAIDS_ROUND2_CORE.md), [RAIDS_ROUND2_MULTIPLAYER.md](features/RAIDS_ROUND2_MULTIPLAYER.md), [RAIDS_ROUND2_CAMP_ITEMS.md](features/RAIDS_ROUND2_CAMP_ITEMS.md) |

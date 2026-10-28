@@ -11,10 +11,11 @@ GimuFrontier C# proof of concept. For background, see
 [How the offline mod works](https://decompfrontier.github.io/pages/Architecture/Offlinemod-architecture.html)
 and [Emulator (Server) architecture](https://decompfrontier.github.io/pages/Architecture/Emulator-architecture.html).
 
-> No game data is included. The server reads decoded tables (`deploy/mst/`), its curated archive
-> (`deploy/archive/`) and the client content tree, which you obtain separately (see the
-> [root README](../README.md)). `deploy/system/` (server config and response fixtures) is part of
-> the source.
+> No game data is included. The curated archive (`deploy/archive/`) is the `archive/` folder of
+> the companion repository [bf-private-server-data](https://github.com/joppe2001/bf-private-server-data).
+> The decoded tables (`deploy/mst/`) and the client content tree are obtained separately (see the
+> [root README](../README.md#game-data)). `deploy/system/` (server config and response fixtures)
+> is part of the source.
 
 ## Layout
 
@@ -77,7 +78,7 @@ under `plugins[0].config.server`:
 | `public_host` | host[:port] the client is told to use in the `/dls` reply |
 | `resource_host` | host serving game assets (this server, or a CDN) |
 | `mst_root`, `system_root`, `archive_root` | decoded tables, server fixtures, curated archive |
-| `balance_root` | optional folder of overlay and config files you author yourself ([format](docs/features/BALANCE_FORGE_OVERLAYS.md)); remove to turn overlays off |
+| `balance_root` | optional folder of overlay and config files you author yourself ([format](docs/features/BALANCE_OVERLAYS.md)); remove to turn overlays off |
 | `game_version` | must be `21900` for client v2.19.6 |
 
 The SQLite save is set in `db_clients[0].filename`. At start the server switches it to WAL mode

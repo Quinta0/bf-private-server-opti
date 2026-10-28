@@ -19,9 +19,12 @@ Linux). For an amd64 image use [`prod/Dockerfile`](../prod/README.md).
 - `server/packet-generator` checked out (see [server/README.MD](../server/README.MD)).
 - A `.vcpkg-downloads/` directory at the repo root (`mkdir -p .vcpkg-downloads`); it is mounted as
   vcpkg's download cache.
-- Game data you obtained separately: an `assets/` folder containing `content/` and `mst/`, plus
-  the server's own `server/deploy/mst/` and `server/deploy/archive/`. None of it is in this
-  repository (see the [root README](../README.md)).
+- Game data: an `assets/` folder containing `content/` and `mst/`, plus the server's own
+  `server/deploy/mst/`, all obtained separately, and `server/deploy/archive/`, copied from the
+  `archive/` folder of [bf-private-server-data](https://github.com/joppe2001/bf-private-server-data).
+  Copy it rather than symlinking it: only `server/` is mounted, so a link pointing outside it
+  does not resolve in the container. None of this is in this repository (see the
+  [root README](../README.md#game-data)).
 
 ## Build
 

@@ -65,7 +65,7 @@
                     "mst_root": "./mst", // Decoded MST tables (read-only reference data)
                     "system_root": "./system", // Server config + response fixtures that are NOT MSTs
                     "archive_root": "./archive", // Server-owned curated archive data directory
-                    // Optional overlay folder (server/docs/features/BALANCE_FORGE_OVERLAYS.md): host
+                    // Optional overlay folder (server/docs/features/BALANCE_OVERLAYS.md): host
                     // /opt/bf/prod/balance mounted read-only at /app/balance. Remove to turn off.
                     "balance_root": "./balance",
 					"initial_level": 1,

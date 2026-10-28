@@ -28,7 +28,7 @@
 *   boss_drops.json): the loader tries the overlay with strict checks, then
 *   the base file with today's rules.
 *
-* Formats and checks: BALANCE_FORGE_OVERLAYS.md, section 2.
+* Formats and checks: BALANCE_OVERLAYS.md, section 2.
 */
 namespace forge
 {

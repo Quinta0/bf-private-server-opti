@@ -8,7 +8,10 @@ body:
       value: |
         Use this form for game content that is missing or incomplete. **Do not attach game
         files, art or APKs.** This repository is code only: link to a public source for the data
-        instead, such as a community wiki page or a public preservation archive.
+        instead, such as a community wiki page or a public preservation archive. Curated server
+        data (missions, enemy AI, units, gacha, events) lives in
+        [bf-private-server-data](https://github.com/joppe2001/bf-private-server-data); a fix
+        there is made through the generators in `server/scripts/`.
   - type: dropdown
     id: kind
     attributes:

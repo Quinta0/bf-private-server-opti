@@ -108,13 +108,13 @@ read-only as an unprivileged user, with only the save volume writable.
 
 A broken overlay file never stops the server: it is logged, reported in `forgeStatus.php`, and
 the image's own data loads as if the file were absent. The contract is in
-[BALANCE_FORGE_OVERLAYS.md](../server/docs/features/BALANCE_FORGE_OVERLAYS.md).
+[BALANCE_OVERLAYS.md](../server/docs/features/BALANCE_OVERLAYS.md).
 
 ## Overlay files
 
 The server can change game data without a new image by reading optional files under
 `balance_root`. You author these files yourself; the formats are documented in
-[BALANCE_FORGE_OVERLAYS.md](../server/docs/features/BALANCE_FORGE_OVERLAYS.md),
+[BALANCE_OVERLAYS.md](../server/docs/features/BALANCE_OVERLAYS.md),
 [BATTLE_BUILDER.md](../server/docs/features/BATTLE_BUILDER.md) and
 [NEWS_BOARD.md](../server/docs/features/NEWS_BOARD.md).
 

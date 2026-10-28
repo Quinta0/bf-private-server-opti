@@ -44,7 +44,7 @@ contains code only; game data and art must be obtained separately.
 - An in-game news page and persistent feature-visit tracking.
 - Optional boot-applied overlay and config files read from a `balance_root`
   directory, so balance changes, hand-built battles and news posts ship without
-  a new server image (`server/docs/features/BALANCE_FORGE_OVERLAYS.md`).
+  a new server image (`server/docs/features/BALANCE_OVERLAYS.md`).
 - A portable Windows release package (`server/RELEASE.md`).
 
 #### Cloudflare Workers (`cdn-worker/`)

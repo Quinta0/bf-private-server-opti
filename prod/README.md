@@ -9,8 +9,10 @@ Files for running the game server on a Linux host with Docker Compose.
 | [`config.json`](config.json) | Server config for `game`: listener, Drogon settings, SQLite at `/data/gme.sqlite`, `public_host` / `resource_host`, `balance_root`. |
 | [`config.test.json`](config.test.json) | The same for `game-test`, with its own host name, save file and balance folder. |
 
-> The image needs game data that is not in this repository (`server/deploy/mst/` and
-> `server/deploy/archive/`). Obtain it separately; see the [root README](../README.md).
+> The image needs game data that is not in this repository: `server/deploy/mst/`, which you
+> obtain separately, and `server/deploy/archive/`, the `archive/` folder of
+> [bf-private-server-data](https://github.com/joppe2001/bf-private-server-data). See the
+> [root README](../README.md#game-data).
 
 ## Requirements
 
@@ -31,7 +33,7 @@ Edit `config.json` (and `config.test.json` if you run the test server):
 - `resource_host`: where clients download assets, for example your CDN Worker's hostname
   ([cdn-worker/README.md](../cdn-worker/README.md)).
 - `balance_root`: keep `./balance` to load optional overlay files you author yourself
-  ([BALANCE_FORGE_OVERLAYS.md](../server/docs/features/BALANCE_FORGE_OVERLAYS.md)), remove it to
+  ([BALANCE_OVERLAYS.md](../server/docs/features/BALANCE_OVERLAYS.md)), remove it to
   turn that off.
 
 `compose.yaml` bind-mounts `/opt/bf/prod/balance` (and `/opt/bf/test/balance` for `game-test`)

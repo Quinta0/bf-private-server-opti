@@ -40,9 +40,11 @@ cd bf-private-server
 
 ## Obtain the game data
 
-This repository is code only. **Obtain the game data separately**, for example from a public
-community preservation archive such as BluuArc's Brave Frontier archive. Nothing in this project
-links to or redistributes the game client.
+This repository is code only. The curated server data lives in the companion repository
+[bf-private-server-data](https://github.com/joppe2001/bf-private-server-data); the decoded client
+tables and the client content are in neither repository. **Obtain those separately**, for example
+from a public community preservation archive such as BluuArc's Brave Frontier archive. Nothing in
+this project links to or redistributes the game client.
 
 The server reads three kinds of data, set in its configuration (`server/deploy/config.json`, or
 `server/deploy/config.docker.json` in Docker):
@@ -51,12 +53,37 @@ The server reads three kinds of data, set in its configuration (`server/deploy/c
 |---|---|---|---|
 | `document_root` | `server/deploy/game_content/` | The client's downloadable files: the archive's `content/` and `mst/` folders | No |
 | `mst_root` | `server/deploy/mst/` | Decoded master tables as JSON (`unit_mst.json`, `area_mst.json`, ...) that the server reads at startup | No |
-| `archive_root` | `server/deploy/archive/` | Curated server data (`mission.json`, `gacha.json`, `ai.json`, ...) built by the generators in `server/scripts/gen_*.py` | No |
+| `archive_root` | `server/deploy/archive/` | Curated server data (`mission.json`, `gacha.json`, `ai.json`, ...) built by the generators in `server/scripts/gen_*.py`; the `archive/` folder of [bf-private-server-data](https://github.com/joppe2001/bf-private-server-data) | No (data repo) |
 | `system_root` | `server/deploy/system/` | Server settings and reply fixtures that are not game tables (`features.json`, `notice_info.json`, ...) | Yes |
 
 `docker/run.sh` mounts the folder you pass as `ASSETS` read-only as `game_content`, so the server
 can never modify your copy. The server fails at startup when a table it needs from `mst_root` is
 missing. Keep all of these out of commits; the root `.gitignore` already excludes them.
+
+### The curated server data
+
+Clone the data repository next to this one, so both checkouts share a parent folder:
+
+```bash
+git clone https://github.com/joppe2001/bf-private-server-data.git
+```
+
+For a native build, link the server's archive folder to it (run from this repository's root):
+
+```bash
+ln -s ../../../bf-private-server-data/archive server/deploy/archive
+```
+
+Alternatively, set `archive_root` in `server/deploy/config.json` to the absolute path of
+`bf-private-server-data/archive`. `docker/run.sh` mounts only `server/`, so a symlink that points
+outside it does not resolve in the container: copy the folder instead
+(`cp -R ../bf-private-server-data/archive server/deploy/archive`) and copy it again after you pull
+the data repository.
+
+The data repository's `balance-overlays/` folder holds optional hand-built mission overlays; to
+use them, copy them to `<balance_root>/server/missions/`. The data repository does not contain
+the decoded client tables (`server/deploy/mst/`) or `server/deploy/system/` (which is in this
+repository).
 
 ## Build the server
 
@@ -160,7 +187,7 @@ The server reads an optional `balance_root` folder (`server/deploy/balance/` in 
 configuration) for overlay and config files you author yourself: client table versions, server
 table overlays, hand-built battles and news posts. Without it the server runs on its own data.
 The file formats are in
-[BALANCE_FORGE_OVERLAYS.md](../server/docs/features/BALANCE_FORGE_OVERLAYS.md),
+[BALANCE_OVERLAYS.md](../server/docs/features/BALANCE_OVERLAYS.md),
 [BATTLE_BUILDER.md](../server/docs/features/BATTLE_BUILDER.md) and
 [NEWS_BOARD.md](../server/docs/features/NEWS_BOARD.md).
 
@@ -231,7 +258,7 @@ The patch offsets and the reverse-engineering notes behind them are in
 |---|---|
 | CMake cannot find the packet-generator runtime or `Cargo.lock` | The vendored `server/packet-generator` directory is missing or incomplete: re-clone the repository or restore it with `git checkout -- server/packet-generator` |
 | `ASSETS must point at a folder containing content/ and mst/` | Pass the archive's `assets/` folder, not its parent |
-| The server exits at startup reading a table | `server/deploy/mst/` or `server/deploy/archive/` is missing a file; see [Obtain the game data](#obtain-the-game-data) |
+| The server exits at startup reading a table | `server/deploy/mst/` or `server/deploy/archive/` is missing a file (a dangling `archive` symlink counts as missing); see [Obtain the game data](#obtain-the-game-data) |
 | Docker build fails on an x86_64 host | `docker/build.sh` targets `arm64-linux`; use the `debug-lnx64` preset or `prod/Dockerfile` |
 | vcpkg cannot download a dependency's source (for example zlib, whose GitHub archive URL no longer serves) | Place the tarball vcpkg asks for in `.vcpkg-downloads/` at the repository root; `docker/build.sh` mounts it as `VCPKG_DOWNLOADS` |
 | Compiler killed / out of memory | Lower `PARALLEL` (Docker) or `-Jobs` (Windows) to 1 or 2 |

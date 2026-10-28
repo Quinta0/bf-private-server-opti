@@ -20,7 +20,7 @@
 * logged, reported in forgeStatus.php and skipped: the base table loads
 * exactly as it does without an overlay, and boot continues.
 *
-* File format and the per-table keys: BALANCE_FORGE_OVERLAYS.md, section 1.
+* File format and the per-table keys: BALANCE_OVERLAYS.md, section 1.
 */
 namespace forge
 {
