@@ -193,7 +193,8 @@ conventions below describe what the existing code does.
 
 ### C++ (`server/gimuserver/`)
 
-- C++23 (`CMAKE_CXX_STANDARD 23`); must build with MSVC (Windows CI) and GCC 14 (Docker).
+- C++23 (`CMAKE_CXX_STANDARD 23`); must build with GCC 14 (Linux CI and Docker). MSVC does not build
+  the current sources yet; fixes that restore it are welcome.
   Avoid compiler-specific extensions; guard platform differences (for example
   `localtime_s` / `localtime_r`).
 - Tabs for indentation, braces on their own line (Allman style).
@@ -235,7 +236,7 @@ Every behaviour change needs a test, and every bug fix a regression test where p
 | Component | Command | Notes |
 |---|---|---|
 | Workers | `cd cdn-worker && npm ci && npm test` | `node --test` |
-| Server build | `docker/build.sh` or `.\rebuild.bat` | must compile on both GCC and MSVC; CI builds Windows Debug on every push and pull request |
+| Server build | `docker/build.sh` or `.\rebuild.bat` | must compile on GCC 14; CI builds a Linux Release on every push and pull request |
 | Server startup | `python scripts/test_debug_startup.py <path-to-debug-exe>` | Windows; fresh isolated save, no game data needed |
 | Handler registration | `python scripts/audit_handlers.py` (from `server/`) | also run in CI |
 | Regression suites | `python scripts/run_bugfix_regressions.py <path-to-debug-exe> [--suite NAME ...] [--list]` | from `server/`; each suite gets a disposable copy of the save and its own port |

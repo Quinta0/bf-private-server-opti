@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![CI](https://github.com/joppe2001/bf-private-server/actions/workflows/ci.yml/badge.svg)](https://github.com/joppe2001/bf-private-server/actions/workflows/ci.yml)
-[![Server (Windows)](https://github.com/joppe2001/bf-private-server/actions/workflows/server-windows.yml/badge.svg)](https://github.com/joppe2001/bf-private-server/actions/workflows/server-windows.yml)
+[![Server (Linux)](https://github.com/joppe2001/bf-private-server/actions/workflows/server-linux.yml/badge.svg)](https://github.com/joppe2001/bf-private-server/actions/workflows/server-linux.yml)
 [![CodeQL](https://github.com/joppe2001/bf-private-server/actions/workflows/codeql.yml/badge.svg)](https://github.com/joppe2001/bf-private-server/actions/workflows/codeql.yml)
 
 > [!IMPORTANT]

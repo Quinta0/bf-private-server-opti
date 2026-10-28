@@ -1,0 +1,86 @@
+name: Server (Linux build)
+
+# Builds the game server the way prod/Dockerfile does: Ubuntu 24.04, GCC 14,
+# Release, vcpkg triplet x64-linux-release, standalone frontend, no debug CLI.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Must match the baseline in server/vcpkg-configuration.json.
+  VCPKG_COMMIT: efa4634bd526b87559684607d2cbbdeeec0f07d8
+  VCPKG_ROOT: ${{ github.workspace }}/.vcpkg
+  VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-bincache,readwrite
+  VCPKG_FORCE_SYSTEM_BINARIES: "1"
+
+jobs:
+  build:
+    name: GCC 14 Release build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++-14 gcc-14 ninja-build pkg-config zip unzip \
+            autoconf automake autoconf-archive libtool bison flex linux-libc-dev
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+          python3 -m pip install --user 'cmake>=4.0,<5'
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          rustup update stable
+          rustup default stable
+
+      - name: Restore the vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: .vcpkg-bincache
+          key: vcpkg-linux-release-${{ env.VCPKG_COMMIT }}-${{ hashFiles('server/vcpkg.json', 'server/vcpkg-configuration.json') }}
+          restore-keys: vcpkg-linux-release-${{ env.VCPKG_COMMIT }}-
+
+      - name: Bootstrap vcpkg
+        run: |
+          mkdir -p .vcpkg-bincache
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" checkout "$VCPKG_COMMIT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Check handler registrations
+        working-directory: server
+        run: python3 scripts/audit_handlers.py
+
+      - name: Configure
+        working-directory: server
+        run: |
+          cmake --version
+          cmake -S . -B out/build/ci-linux -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=x64-linux-release \
+            -DGIMUSRV_FRONTEND=STANDALONE \
+            -DGIMU_ENABLE_DEBUG_CLI=OFF
+
+      - name: Build
+        working-directory: server
+        # Three jobs: heavy template units need several GB each on a 16 GB runner.
+        run: cmake --build out/build/ci-linux --parallel 3
+
+      - name: Check the binary
+        working-directory: server
+        run: |
+          test -x out/build/ci-linux/standalone_frontend/gimuserverw
+          ls -la out/build/ci-linux/standalone_frontend/gimuserverw
