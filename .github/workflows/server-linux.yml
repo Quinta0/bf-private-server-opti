@@ -24,6 +24,8 @@ env:
   # Compiler cache: a push that touches few sources recompiles only those.
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CCACHE_MAXSIZE: 1G
+  # gimuserver uses a precompiled header; without these ccache skips every unit that includes it.
+  CCACHE_SLOPPINESS: pch_defines,time_macros
 
 jobs:
   build:
@@ -89,6 +91,7 @@ jobs:
         working-directory: server
         run: python3 scripts/audit_handlers.py
 
+      # No C++20 modules here; module scanning adds flags that make every compile uncacheable for ccache.
       - name: Configure
         working-directory: server
         run: |
@@ -100,7 +103,9 @@ jobs:
             -DGIMUSRV_FRONTEND=STANDALONE \
             -DGIMU_ENABLE_DEBUG_CLI=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_FLAGS=-fpch-preprocess \
+            -DCMAKE_CXX_SCAN_FOR_MODULES=OFF
 
       - name: Build
         working-directory: server
@@ -108,7 +113,7 @@ jobs:
         run: |
           ccache --zero-stats
           cmake --build out/build/ci-linux --parallel 3
-          ccache --show-stats
+          ccache --show-stats --verbose
 
       - name: Check the binary
         working-directory: server
