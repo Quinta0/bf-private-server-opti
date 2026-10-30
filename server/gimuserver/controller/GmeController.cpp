@@ -9,6 +9,7 @@
 #include <gimuserver/forge/Rules.hpp>
 #include <gimuserver/forge/StarterPack.hpp>
 #include <gimuserver/utils/BfCrypt.hpp>
+#include <gimuserver/utils/HuffmanGzip.hpp>
 
 using namespace drogon;
 
@@ -51,7 +52,22 @@ Task<> GmeController::HandleGame(HttpRequestPtr rq, std::function<void(const Htt
 			else
 			{
 				resp->setStatusCode(k200OK);
-				resp->setBody(buffer);
+
+				// Gzipped here, Huffman-only (utils/HuffmanGzip.hpp), under the
+				// same conditions drogon's own gzip uses.  Drogon leaves a reply
+				// that already has a Content-Encoding alone, so it is not
+				// compressed twice; static files still get drogon's gzip.
+				std::optional<std::string> gzipped;
+				if (app().isGzipEnabled() && buffer.size() >= 1024 &&
+					rq->getHeader("accept-encoding").find("gzip") != std::string::npos)
+					gzipped = HuffmanGzip::Compress(buffer);
+				if (gzipped)
+				{
+					resp->setBody(std::move(*gzipped));
+					resp->addHeader("Content-Encoding", "gzip");
+				}
+				else
+					resp->setBody(std::move(buffer));
 			}
 		}
 	}

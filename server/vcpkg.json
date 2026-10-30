@@ -9,6 +9,7 @@
     },
     "cryptopp",
     "sqlite3",
-    "glaze"
+    "glaze",
+    "zlib"
   ]
 }

@@ -13,6 +13,7 @@ target_link_libraries(gimuserver PUBLIC
     cryptopp::cryptopp
     unofficial::sqlite3::sqlite3
     glaze::glaze
+    ZLIB::ZLIB
     # project
     pkgen_cpp
 )

@@ -21,6 +21,7 @@ find_package(cryptopp CONFIG REQUIRED)
 find_package(Drogon CONFIG REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
 find_package(glaze CONFIG REQUIRED) # c++ JSON abstraction
+find_package(ZLIB REQUIRED) # Huffman-only gzip of game replies (utils/HuffmanGzip.hpp)
 
 # glaze's vcpkg port pins /GL (whole-program opt) and /LTCG on its imported
 # target for Release/MinSizeRel.  Those flags propagate through gimuserver to
