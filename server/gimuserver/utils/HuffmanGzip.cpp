@@ -26,3 +26,19 @@ std::optional<std::string> HuffmanGzip::Compress(std::string_view input)
 		return std::nullopt;
 	return output;
 }
+
+void HuffmanGzip::SetBody(const drogon::HttpRequestPtr& rq, const drogon::HttpResponsePtr& resp, std::string body)
+{
+	std::optional<std::string> gzipped;
+	if (drogon::app().isGzipEnabled() && body.size() >= 1024 &&
+		rq->getHeader("accept-encoding").find("gzip") != std::string::npos)
+		gzipped = Compress(body);
+
+	if (gzipped)
+	{
+		resp->setBody(std::move(*gzipped));
+		resp->addHeader("Content-Encoding", "gzip");
+	}
+	else
+		resp->setBody(std::move(body));
+}

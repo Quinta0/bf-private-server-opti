@@ -52,22 +52,8 @@ Task<> GmeController::HandleGame(HttpRequestPtr rq, std::function<void(const Htt
 			else
 			{
 				resp->setStatusCode(k200OK);
-
-				// Gzipped here, Huffman-only (utils/HuffmanGzip.hpp), under the
-				// same conditions drogon's own gzip uses.  Drogon leaves a reply
-				// that already has a Content-Encoding alone, so it is not
-				// compressed twice; static files still get drogon's gzip.
-				std::optional<std::string> gzipped;
-				if (app().isGzipEnabled() && buffer.size() >= 1024 &&
-					rq->getHeader("accept-encoding").find("gzip") != std::string::npos)
-					gzipped = HuffmanGzip::Compress(buffer);
-				if (gzipped)
-				{
-					resp->setBody(std::move(*gzipped));
-					resp->addHeader("Content-Encoding", "gzip");
-				}
-				else
-					resp->setBody(std::move(buffer));
+				// Gzipped Huffman-only here rather than by drogon (utils/HuffmanGzip.hpp).
+				HuffmanGzip::SetBody(rq, resp, std::move(buffer));
 			}
 		}
 	}
