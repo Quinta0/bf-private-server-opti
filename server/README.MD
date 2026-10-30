@@ -81,8 +81,11 @@ under `plugins[0].config.server`:
 | `balance_root` | optional folder of overlay and config files you author yourself ([format](docs/features/BALANCE_OVERLAYS.md)); remove to turn overlays off |
 | `game_version` | must be `21900` for client v2.19.6 |
 
-The SQLite save is set in `db_clients[0].filename`. At start the server switches it to WAL mode
-and sets a busy timeout; both are logged (`SQLite journal_mode: wal`, `SQLite busy_timeout: ...`).
+The SQLite save is set in `db_clients[0].filename`. At start the server switches it to WAL mode,
+sets a busy timeout and, once WAL is on, sets `synchronous = NORMAL`; all three are logged
+(`SQLite journal_mode: wal`, `SQLite busy_timeout: ...`, `SQLite synchronous: 1`). With `NORMAL` a
+commit does not wait for the disk: a crash of the server loses nothing, but a power loss or hard
+reset of the host can roll back the last few seconds of commits.
 
 ## Test
 

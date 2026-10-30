@@ -104,6 +104,22 @@ int main(int argc, char** argv)
                     LOG_INFO << "SQLite journal_mode: wal";
                 else
                     LOG_WARN << "SQLite journal_mode is still " << mode << "; WAL is retried at the next start";
+                // NORMAL instead of the default FULL, in WAL only: a commit no longer
+                // waits for an fsync of the WAL, which ran on the one SQLite thread and
+                // held up every other player's queries (~740 us per commit on local
+                // NVMe against ~13 us; a VPS disk is slower).  The WAL is still
+                // synced at each checkpoint, so the file cannot be corrupted, and a
+                // crash of this process loses nothing (the OS has the writes).  A
+                // power loss or hard reset of the host can roll back the last commits
+                // since the checkpoint.  In rollback-journal mode NORMAL could corrupt
+                // the file on power loss, so FULL stays until WAL is on.
+                if (mode == "wal")
+                {
+                    db->execSqlSync("PRAGMA synchronous = NORMAL;");
+                    const auto sync = db->execSqlSync("PRAGMA synchronous;");
+                    // 1 = NORMAL, 2 = FULL
+                    LOG_INFO << "SQLite synchronous: " << (sync.empty() ? std::string("?") : sync[0][0].as<std::string>());
+                }
                 // Page cache for the one connection: 128 MiB, more than the whole save
                 // (110 MB on 2026-10-20).  With the 2 MiB default every request read its
                 // pages back from the OS (pread + copy, ~8% of the SQLite thread under load).
